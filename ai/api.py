@@ -34,6 +34,12 @@ DATASET_PATH = os.path.join(os.path.dirname(__file__), "rosca_dataset.csv")
 # Global in-memory model cache
 model_bundle: Optional[Dict[str, Any]] = None
 
+def get_model_bundle():
+    global model_bundle
+    if model_bundle is None:
+        load_model_safely()
+    return model_bundle
+
 def load_model_safely():
     global model_bundle
     if os.path.exists(MODEL_PATH):
@@ -75,7 +81,7 @@ app.add_middleware(
 # --- Request / Response Schemas ---
 
 class RiskRequest(BaseModel):
-    member: str = Field(..., example="0x71C...498", description="Member wallet address or identifier")
+    member: str = Field(..., json_schema_extra={"example": "0x71C...498"}, description="Member wallet address or identifier")
     term_length: int = Field(10, ge=2, le=50, description="Total members / duration in cycles")
     months_remaining: int = Field(8, ge=0, le=50, description="Installments remaining in the group")
     current_round: Optional[int] = Field(None, ge=1, le=50, description="Current active round")
@@ -139,13 +145,13 @@ class CycleSimulationResponse(BaseModel):
 # --- Core Inference Logic ---
 
 def compute_risk(req: RiskRequest) -> RiskResponse:
-    global model_bundle
+    bundle = get_model_bundle()
     
     # Infer current_round if missing
     current_round = req.current_round if req.current_round is not None else max(1, req.term_length - req.months_remaining + 1)
     
-    if model_bundle is not None and "model" in model_bundle:
-        features = model_bundle.get("features", DEFAULT_FEATURES)
+    if bundle is not None and "model" in bundle:
+        features = bundle.get("features", DEFAULT_FEATURES)
         input_data = {
             "term_length": req.term_length,
             "months_remaining": req.months_remaining,
@@ -159,8 +165,8 @@ def compute_risk(req: RiskRequest) -> RiskResponse:
             "bid_aggression": req.bid_aggression,
         }
         df_input = pd.DataFrame([input_data])[features]
-        prob = float(model_bundle["model"].predict_proba(df_input)[0, 1])
-        model_ver = model_bundle.get("model_name", "XGBoost v2.0")
+        prob = float(bundle["model"].predict_proba(df_input)[0, 1])
+        model_ver = bundle.get("model_name", "XGBoost v2.0")
     else:
         # Heuristic fallback if model not loaded
         base_risk = 0.30
@@ -216,12 +222,13 @@ def compute_risk(req: RiskRequest) -> RiskResponse:
 
 @app.get("/health")
 def health():
+    bundle = get_model_bundle()
     return {
         "status": "healthy",
         "service": "Vouch AI Risk Scoring Engine",
-        "model_loaded": model_bundle is not None,
-        "model_name": model_bundle.get("model_name") if model_bundle else "None",
-        "trained_at": model_bundle.get("trained_at") if model_bundle else None,
+        "model_loaded": bundle is not None,
+        "model_name": bundle.get("model_name") if bundle else "None",
+        "trained_at": bundle.get("trained_at") if bundle else None,
         "uptime_seconds": round(time.time() - START_TIME, 2),
         "advisory_rule": "Strictly advisory. Zero contract write authority."
     }
@@ -304,15 +311,16 @@ def simulate_cycle(sim: CycleSimulationRequest):
 
 @app.get("/model-metrics")
 def get_model_metrics():
-    if model_bundle is None:
+    bundle = get_model_bundle()
+    if bundle is None:
         raise HTTPException(status_code=503, detail="Model bundle not loaded")
         
     return {
-        "model_name": model_bundle.get("model_name"),
-        "trained_at": model_bundle.get("trained_at"),
-        "features": model_bundle.get("features"),
-        "metrics": model_bundle.get("metrics"),
-        "feature_importances": model_bundle.get("feature_importances")
+        "model_name": bundle.get("model_name"),
+        "trained_at": bundle.get("trained_at"),
+        "features": bundle.get("features"),
+        "metrics": bundle.get("metrics"),
+        "feature_importances": bundle.get("feature_importances")
     }
 
 @app.post("/retrain")
