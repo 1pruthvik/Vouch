@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ethers } from "ethers";
 import { MST_TESTNET } from "../config/network";
+import { EIP6963ProviderDetail, EIP6963AnnounceProviderEvent } from "../types/global";
 
 export function useWallet() {
   const [account, setAccount] = useState<string | null>(null);
@@ -8,6 +9,28 @@ export function useWallet() {
   const [balance, setBalance] = useState<string>("0");
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
+  const [detectedProviders, setDetectedProviders] = useState<EIP6963ProviderDetail[]>([]);
+  const [selectedProviderDetail, setSelectedProviderDetail] = useState<EIP6963ProviderDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // 1. EIP-6963 Multi-Injected Provider Discovery
+  useEffect(() => {
+    const handleAnnounce = (event: EIP6963AnnounceProviderEvent) => {
+      if (!event.detail || !event.detail.info) return;
+      setDetectedProviders((prev) => {
+        const exists = prev.some((p) => p.info.uuid === event.detail.info.uuid);
+        if (exists) return prev;
+        return [...prev, event.detail];
+      });
+    };
+
+    window.addEventListener("eip6963:announceProvider" as any, handleAnnounce);
+    window.dispatchEvent(new Event("eip6963:requestProvider"));
+
+    return () => {
+      window.removeEventListener("eip6963:announceProvider" as any, handleAnnounce);
+    };
+  }, []);
 
   const checkNetwork = useCallback(async (prov: ethers.BrowserProvider) => {
     try {
@@ -30,10 +53,19 @@ export function useWallet() {
     }
   }, []);
 
+  const getRawProvider = useCallback(() => {
+    return selectedProviderDetail?.provider || (typeof window !== "undefined" ? window.ethereum : null);
+  }, [selectedProviderDetail]);
+
   const switchToMSTTestnet = async () => {
-    if (!window.ethereum) return false;
+    const rawProv = getRawProvider();
+    if (!rawProv) {
+      setError("No Web3 provider available to switch networks.");
+      return false;
+    }
+    setError(null);
     try {
-      await window.ethereum.request({
+      await rawProv.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: MST_TESTNET.chainIdHex }],
       });
@@ -41,7 +73,7 @@ export function useWallet() {
     } catch (switchError: any) {
       if (switchError.code === 4902 || switchError.message?.includes("Unrecognized chain")) {
         try {
-          await window.ethereum.request({
+          await rawProv.request({
             method: "wallet_addEthereumChain",
             params: [
               {
@@ -58,26 +90,35 @@ export function useWallet() {
             ],
           });
           return true;
-        } catch (addError) {
+        } catch (addError: any) {
           console.error("Failed to add MST Testnet:", addError);
+          setError(addError?.message || "Failed to add MST Testnet.");
           return false;
         }
       }
+      setError(switchError?.message || "Failed to switch to MST Testnet.");
       return false;
     }
   };
 
-  const connectWallet = async () => {
-    if (typeof window === "undefined" || !window.ethereum) {
+  const connectWallet = async (providerDetail?: EIP6963ProviderDetail) => {
+    setError(null);
+    const targetDetail = providerDetail || selectedProviderDetail || (detectedProviders.length > 0 ? detectedProviders[0] : null);
+    const rawProvider = targetDetail ? targetDetail.provider : (typeof window !== "undefined" ? window.ethereum : null);
+
+    if (!rawProvider) {
       alert("BridgeKey or Web3 wallet not detected. Please install BridgeKey wallet!");
       return;
     }
 
     try {
       setIsConnecting(true);
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      if (targetDetail) {
+        setSelectedProviderDetail(targetDetail);
+      }
+      const browserProvider = new ethers.BrowserProvider(rawProvider);
       const accounts = await browserProvider.send("eth_requestAccounts", []);
-      
+
       if (accounts && accounts.length > 0) {
         setAccount(accounts[0]);
         setProvider(browserProvider);
@@ -89,13 +130,22 @@ export function useWallet() {
       }
     } catch (err: any) {
       console.error("Wallet connection error:", err);
+      setError(err?.message || "Failed to connect wallet.");
     } finally {
       setIsConnecting(false);
     }
   };
 
+  const disconnectWallet = () => {
+    setAccount(null);
+    setBalance("0");
+    setChainId(null);
+    setProvider(null);
+  };
+
   useEffect(() => {
-    if (typeof window !== "undefined" && window.ethereum) {
+    const rawProv = getRawProvider();
+    if (rawProv && rawProv.on) {
       const handleAccountsChanged = (accounts: string[]) => {
         if (accounts.length > 0) {
           setAccount(accounts[0]);
@@ -106,19 +156,24 @@ export function useWallet() {
         }
       };
 
-      const handleChainChanged = () => {
-        window.location.reload();
+      const handleChainChanged = (newChainIdHex: string) => {
+        setChainId(Number(newChainIdHex));
+        if (account && provider) {
+          updateBalance(account, provider);
+        }
       };
 
-      window.ethereum.on("accountsChanged", handleAccountsChanged);
-      window.ethereum.on("chainChanged", handleChainChanged);
+      rawProv.on("accountsChanged", handleAccountsChanged);
+      rawProv.on("chainChanged", handleChainChanged);
 
       return () => {
-        window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
-        window.ethereum.removeListener("chainChanged", handleChainChanged);
+        if (rawProv.removeListener) {
+          rawProv.removeListener("accountsChanged", handleAccountsChanged);
+          rawProv.removeListener("chainChanged", handleChainChanged);
+        }
       };
     }
-  }, [provider, updateBalance]);
+  }, [getRawProvider, account, provider, updateBalance]);
 
   return {
     account,
@@ -126,8 +181,12 @@ export function useWallet() {
     balance,
     isConnecting,
     provider,
+    detectedProviders,
+    error,
     connectWallet,
+    disconnectWallet,
     switchToMSTTestnet,
     isCorrectNetwork: chainId === MST_TESTNET.chainId,
   };
 }
+
