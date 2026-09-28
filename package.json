@@ -1,0 +1,33 @@
+{
+  "name": "vouch-monorepo",
+  "version": "1.0.0",
+  "description": "Vouch — Decentralized, Autonomous ROSCA & Chit Fund Protocol on MST Blockchain with AI Risk Scoring",
+  "scripts": {
+    "contracts:install": "cd contracts && npm install",
+    "contracts:compile": "cd contracts && npx hardhat compile",
+    "contracts:test": "cd contracts && npx hardhat test",
+    "contracts:deploy:local": "cd contracts && npx hardhat run scripts/deploy.ts --network localhost",
+    "contracts:deploy:mst": "cd contracts && npx hardhat run scripts/deploy.ts --network mstTestnet",
+    "frontend:install": "cd frontend && npm install",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "backend:install": "cd backend && npm install",
+    "backend:dev": "cd backend && npm run dev",
+    "backend:build": "cd backend && npm run build",
+    "backend:keeper": "cd backend && npm run keeper",
+    "ai:install": "cd ai && pip install -r requirements.txt",
+    "ai:train": "cd ai && python train_model.py",
+    "ai:dev": "cd ai && python api.py"
+  },
+  "keywords": [
+    "solidity",
+    "hardhat",
+    "mst-blockchain",
+    "chit-fund",
+    "rosca",
+    "defi",
+    "ai-risk-scoring"
+  ],
+  "author": "Vouch Team (Pranav, Nivish, Ujwal, Pruthvik)",
+  "license": "MIT"
+}

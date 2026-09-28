@@ -1,0 +1,12 @@
+{
+  "network": "mstTestnet",
+  "chainId": 91562037,
+  "rpcUrl": "https://testnetrpc.mstblockchain.com",
+  "contracts": {
+    "ChitFactory": "",
+    "VouchRegistry": "",
+    "MockYieldVault": "",
+    "MockERC20": ""
+  },
+  "abis": {}
+}

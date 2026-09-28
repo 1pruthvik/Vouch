@@ -1,0 +1,26 @@
+{
+  "name": "vouch-contracts",
+  "version": "1.0.0",
+  "description": "Solidity Smart Contracts for Vouch Protocol on MST Blockchain",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:mst": "hardhat run scripts/deploy.ts --network mstTestnet"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.2",
+    "@types/node": "^20.0.0",
+    "@types/mocha": "^10.0.6",
+    "@types/chai": "^4.3.14",
+    "chai": "^4.3.7"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2",
+    "dotenv": "^16.4.5"
+  }
+}
