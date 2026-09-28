@@ -8,10 +8,12 @@ export function useWallet() {
   const [chainId, setChainId] = useState<number | null>(null);
   const [balance, setBalance] = useState<string>("0");
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
-  const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
+  const [provider, setProvider] = useState<ethers.BrowserProvider | ethers.JsonRpcProvider | null>(null);
+  const [signer, setSigner] = useState<ethers.Signer | null>(null);
   const [detectedProviders, setDetectedProviders] = useState<EIP6963ProviderDetail[]>([]);
   const [selectedProviderDetail, setSelectedProviderDetail] = useState<EIP6963ProviderDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isPrivateKeyMode, setIsPrivateKeyMode] = useState<boolean>(false);
 
   // 1. EIP-6963 Multi-Injected Provider Discovery
   useEffect(() => {
@@ -32,7 +34,7 @@ export function useWallet() {
     };
   }, []);
 
-  const checkNetwork = useCallback(async (prov: ethers.BrowserProvider) => {
+  const checkNetwork = useCallback(async (prov: ethers.BrowserProvider | ethers.JsonRpcProvider) => {
     try {
       const network = await prov.getNetwork();
       const currentChainId = Number(network.chainId);
@@ -44,7 +46,7 @@ export function useWallet() {
     }
   }, []);
 
-  const updateBalance = useCallback(async (acc: string, prov: ethers.BrowserProvider) => {
+  const updateBalance = useCallback(async (acc: string, prov: ethers.BrowserProvider | ethers.JsonRpcProvider) => {
     try {
       const bal = await prov.getBalance(acc);
       setBalance(ethers.formatEther(bal));
@@ -54,10 +56,12 @@ export function useWallet() {
   }, []);
 
   const getRawProvider = useCallback(() => {
-    return selectedProviderDetail?.provider || (typeof window !== "undefined" ? window.ethereum : null);
+    if (typeof window === "undefined") return null;
+    return selectedProviderDetail?.provider || window.ethereum || (window as any).bridgekey || null;
   }, [selectedProviderDetail]);
 
   const switchToMSTTestnet = async () => {
+    if (isPrivateKeyMode) return true;
     const rawProv = getRawProvider();
     if (!rawProv) {
       setError("No Web3 provider available to switch networks.");
@@ -104,11 +108,11 @@ export function useWallet() {
   const connectWallet = async (providerDetail?: EIP6963ProviderDetail) => {
     setError(null);
     const targetDetail = providerDetail || selectedProviderDetail || (detectedProviders.length > 0 ? detectedProviders[0] : null);
-    const rawProvider = targetDetail ? targetDetail.provider : (typeof window !== "undefined" ? window.ethereum : null);
+    const rawProvider = targetDetail ? targetDetail.provider : getRawProvider();
 
     if (!rawProvider) {
-      alert("BridgeKey or Web3 wallet not detected. Please install BridgeKey wallet!");
-      return;
+      setError("Browser extension not detected. You can also connect via Private Key.");
+      return false;
     }
 
     try {
@@ -122,15 +126,48 @@ export function useWallet() {
       if (accounts && accounts.length > 0) {
         setAccount(accounts[0]);
         setProvider(browserProvider);
+        const userSigner = await browserProvider.getSigner();
+        setSigner(userSigner);
+        setIsPrivateKeyMode(false);
+
         const currentChainId = await checkNetwork(browserProvider);
         if (currentChainId !== MST_TESTNET.chainId) {
           await switchToMSTTestnet();
         }
         await updateBalance(accounts[0], browserProvider);
+        return true;
       }
     } catch (err: any) {
       console.error("Wallet connection error:", err);
       setError(err?.message || "Failed to connect wallet.");
+      return false;
+    } finally {
+      setIsConnecting(false);
+    }
+    return false;
+  };
+
+  // Connect directly with Private Key on MST Testnet (Phase 0 Option)
+  const connectWithPrivateKey = async (privateKey: string) => {
+    setError(null);
+    try {
+      setIsConnecting(true);
+      const formattedKey = privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`;
+      const rpcProvider = new ethers.JsonRpcProvider(MST_TESTNET.rpcUrl);
+      const wallet = new ethers.Wallet(formattedKey, rpcProvider);
+
+      setAccount(wallet.address);
+      setProvider(rpcProvider);
+      setSigner(wallet);
+      setChainId(MST_TESTNET.chainId);
+      setIsPrivateKeyMode(true);
+
+      await updateBalance(wallet.address, rpcProvider);
+      return true;
+    } catch (err: any) {
+      console.error("Private key connection error:", err);
+      setError(err?.message || "Invalid private key format.");
+      return false;
     } finally {
       setIsConnecting(false);
     }
@@ -141,11 +178,13 @@ export function useWallet() {
     setBalance("0");
     setChainId(null);
     setProvider(null);
+    setSigner(null);
+    setIsPrivateKeyMode(false);
   };
 
   useEffect(() => {
     const rawProv = getRawProvider();
-    if (rawProv && rawProv.on) {
+    if (rawProv && rawProv.on && !isPrivateKeyMode) {
       const handleAccountsChanged = (accounts: string[]) => {
         if (accounts.length > 0) {
           setAccount(accounts[0]);
@@ -173,7 +212,7 @@ export function useWallet() {
         }
       };
     }
-  }, [getRawProvider, account, provider, updateBalance]);
+  }, [getRawProvider, account, provider, isPrivateKeyMode, updateBalance]);
 
   return {
     account,
@@ -181,12 +220,14 @@ export function useWallet() {
     balance,
     isConnecting,
     provider,
+    signer,
     detectedProviders,
     error,
+    isPrivateKeyMode,
     connectWallet,
+    connectWithPrivateKey,
     disconnectWallet,
     switchToMSTTestnet,
-    isCorrectNetwork: chainId === MST_TESTNET.chainId,
+    isCorrectNetwork: isPrivateKeyMode || chainId === MST_TESTNET.chainId,
   };
 }
-

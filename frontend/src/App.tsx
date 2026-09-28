@@ -6,6 +6,7 @@ import { RiskAdvisorCard } from "./components/RiskAdvisorCard";
 import { LedgerView, LedgerEvent } from "./components/LedgerView";
 import { CreateGroupModal } from "./components/CreateGroupModal";
 import { JoinGroupModal } from "./components/JoinGroupModal";
+import { ConnectWalletModal } from "./components/ConnectWalletModal";
 import { useWallet } from "./hooks/useWallet";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
@@ -19,12 +20,17 @@ export function App() {
     isConnecting,
     isCorrectNetwork,
     provider,
+    signer,
+    detectedProviders,
+    error: walletError,
     connectWallet,
+    connectWithPrivateKey,
     switchToMSTTestnet,
   } = useWallet();
 
   const [contractService, setContractService] = useState<ContractService | null>(null);
 
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "auction" | "ledger">("dashboard");
@@ -43,16 +49,14 @@ export function App() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  // Initialize ContractService when provider changes
+  // Initialize ContractService when provider or signer changes
   useEffect(() => {
-    const srv = new ContractService(provider || undefined);
-    if (provider && account) {
-      provider.getSigner().then((signer) => {
-        srv.setSigner(signer);
-      }).catch(console.error);
+    const srv = new ContractService(provider as any || undefined);
+    if (signer) {
+      srv.setSigner(signer);
     }
     setContractService(srv);
-  }, [provider, account]);
+  }, [provider, signer]);
 
   // Refresh Group and Member state
   const refreshData = useCallback(async () => {
@@ -193,7 +197,7 @@ export function App() {
         balance={balance}
         isConnecting={isConnecting}
         isCorrectNetwork={isCorrectNetwork}
-        onConnect={connectWallet}
+        onConnect={() => setIsConnectModalOpen(true)}
         onSwitchNetwork={switchToMSTTestnet}
       />
 
@@ -387,6 +391,15 @@ export function App() {
         {/* View 3: Audit Ledger */}
         {activeTab === "ledger" && <LedgerView events={ledgerEvents} />}
       </main>
+
+      <ConnectWalletModal
+        isOpen={isConnectModalOpen}
+        onClose={() => setIsConnectModalOpen(false)}
+        detectedProviders={detectedProviders}
+        onConnectExtension={connectWallet}
+        onConnectPrivateKey={connectWithPrivateKey}
+        error={walletError}
+      />
 
       <CreateGroupModal
         isOpen={isCreateModalOpen}

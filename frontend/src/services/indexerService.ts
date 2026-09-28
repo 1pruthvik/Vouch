@@ -2,7 +2,7 @@ import { LedgerEvent } from "../components/LedgerView";
 
 export async function fetchLedgerEvents(
   groupId: string,
-  apiBaseUrl: string = "http://localhost:3001/api"
+  apiBaseUrl: string = "http://localhost:4000/api"
 ): Promise<LedgerEvent[]> {
   try {
     const res = await fetch(`${apiBaseUrl}/ledger/${groupId}`);
@@ -25,7 +25,7 @@ export async function fetchLedgerEvents(
 }
 
 export async function fetchIndexedGroups(
-  apiBaseUrl: string = "http://localhost:3001/api"
+  apiBaseUrl: string = "http://localhost:4000/api"
 ): Promise<any[]> {
   try {
     const res = await fetch(`${apiBaseUrl}/groups`);
