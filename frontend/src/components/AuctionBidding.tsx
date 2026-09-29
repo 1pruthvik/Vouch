@@ -115,12 +115,12 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
 
   if (phase === "Forming") {
     return (
-      <div ref={containerRef} className="v-card p-8 sm:p-10 text-center space-y-4">
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: "rgba(245, 166, 35, 0.1)" }}>
-          <Clock className="w-7 h-7 text-[#f5a623]" />
+      <div ref={containerRef} className="v-card p-8 sm:p-10 text-center space-y-4 border border-black/[0.06]">
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto bg-[#E9B949]/15">
+          <Clock className="w-7 h-7 text-[#946800]" />
         </div>
-        <h3 className="text-xl font-bold text-white font-display">Circle is Forming</h3>
-        <p className="text-sm text-[#9ca3b4] max-w-md mx-auto">
+        <h3 className="text-xl font-bold text-[#121316] font-display">Circle is Forming</h3>
+        <p className="text-sm text-[#5F6368] max-w-md mx-auto">
           The savings auction opens once all {groupDetails?.memberCount || 5} members join and complete initial security deposits.
         </p>
       </div>
@@ -129,12 +129,12 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
 
   if (phase === "Collect") {
     return (
-      <div ref={containerRef} className="v-card p-8 sm:p-10 text-center space-y-4">
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: "rgba(45, 212, 168, 0.1)" }}>
-          <Clock className="w-7 h-7 text-[#2dd4a8]" />
+      <div ref={containerRef} className="v-card p-8 sm:p-10 text-center space-y-4 border border-black/[0.06]">
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto bg-emerald-500/10">
+          <Clock className="w-7 h-7 text-emerald-700" />
         </div>
-        <h3 className="text-xl font-bold text-white font-display">Round {currentRound} Collection Phase</h3>
-        <p className="text-sm text-[#9ca3b4] max-w-md mx-auto">
+        <h3 className="text-xl font-bold text-[#121316] font-display">Round {currentRound} Collection Phase</h3>
+        <p className="text-sm text-[#5F6368] max-w-md mx-auto">
           Reverse auction bidding will open automatically when all member contributions for the round are collected.
         </p>
       </div>

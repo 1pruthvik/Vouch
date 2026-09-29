@@ -20,6 +20,7 @@ import {
 import gsap from "gsap";
 import { formatINR } from "../utils/formatters";
 import { MST_TESTNET } from "../config/network";
+import { Modal } from "./ui/Modal";
 
 export interface LedgerEvent {
   id: string;
@@ -44,7 +45,6 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   const [filterType, setFilterType] = useState<"ALL" | "CONTRIBUTIONS" | "PAYOUTS">("ALL");
   const [selectedTx, setSelectedTx] = useState<LedgerEvent | null>(null);
 
-  const drawerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const copyToClipboard = (text: string, e?: React.MouseEvent) => {
@@ -53,29 +53,6 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
     setCopiedHash(text);
     setTimeout(() => setCopiedHash(null), 2200);
   };
-
-  // Close drawer with ESC key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSelectedTx(null);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  // GSAP animation when drawer opens
-  useEffect(() => {
-    if (selectedTx && drawerRef.current) {
-      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (!prefersReducedMotion) {
-        gsap.fromTo(
-          drawerRef.current,
-          { x: 30, opacity: 0 },
-          { x: 0, opacity: 1, duration: 0.35, ease: "power2.out" }
-        );
-      }
-    }
-  }, [selectedTx]);
 
   const formatTransaction = (ev: LedgerEvent) => {
     let title = "Transaction";
@@ -310,72 +287,58 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
         </div>
       )}
 
-      {/* Transaction Detail Drawer Modal */}
-      {selectedTx && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm anim-fade-in">
-          <div
-            ref={drawerRef}
-            className="w-full max-w-lg rounded-3xl bg-[#FAF9F5] border border-black/10 p-6 sm:p-8 shadow-2xl space-y-6 relative"
-          >
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-black/[0.06]">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-700">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-base font-bold text-[#121316] font-display">Transaction Audit Proof</h4>
-                  <p className="text-xs text-[#5F6368]">MST Testnet Blockchain Record (Chain ID 91562037)</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedTx(null)}
-                className="p-1.5 rounded-full bg-black/[0.04] hover:bg-black/[0.08] text-[#5F6368] hover:text-[#121316] transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
+      {/* Transaction Detail Drawer Modal via Portal */}
+      <Modal
+        isOpen={!!selectedTx}
+        onClose={() => setSelectedTx(null)}
+        title="Transaction Audit Proof"
+        description="MST Testnet Blockchain Record (Chain ID 91562037)"
+        icon={<ShieldCheck className="w-5 h-5 text-[#137333]" />}
+        maxWidth="max-w-lg"
+      >
+        {selectedTx && (
+          <div className="space-y-4">
             {/* Transaction Data Fields */}
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between items-center p-3 rounded-2xl bg-white border border-black/[0.05]">
+            <div className="space-y-2.5 text-xs">
+              <div className="flex justify-between items-center p-3 rounded-2xl bg-black/[0.02] border border-black/[0.06]">
                 <span className="text-[#5F6368]">Event Type:</span>
                 <span className="font-semibold text-[#121316] font-mono">{selectedTx.eventName}</span>
               </div>
 
-              <div className="flex justify-between items-center p-3 rounded-2xl bg-white border border-black/[0.05]">
+              <div className="flex justify-between items-center p-3 rounded-2xl bg-black/[0.02] border border-black/[0.06]">
                 <span className="text-[#5F6368]">Transacted Amount:</span>
                 <div className="text-right">
-                  <span className="font-bold text-emerald-700 text-sm">{formatINR(selectedTx.amount.split(" ")[0])}</span>
+                  <span className="font-bold text-[#137333] text-sm">{formatINR(selectedTx.amount.split(" ")[0])}</span>
                   <span className="text-[11px] text-[#5F6368] font-mono ml-1.5">({selectedTx.amount})</span>
                 </div>
               </div>
 
-              <div className="flex justify-between items-center p-3 rounded-2xl bg-white border border-black/[0.05]">
+              <div className="flex justify-between items-center p-3 rounded-2xl bg-black/[0.02] border border-black/[0.06]">
                 <span className="text-[#5F6368]">Chit Round:</span>
                 <span className="font-semibold text-[#121316]">Round {selectedTx.round}</span>
               </div>
 
-              <div className="flex justify-between items-center p-3 rounded-2xl bg-white border border-black/[0.05]">
+              <div className="flex justify-between items-center p-3 rounded-2xl bg-black/[0.02] border border-black/[0.06]">
                 <span className="text-[#5F6368]">Timestamp:</span>
                 <span className="text-[#121316] flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-[#8F959E]" />
+                  <Clock className="w-3.5 h-3.5 text-[#5F6368]" />
                   {selectedTx.timestamp}
                 </span>
               </div>
 
-              <div className="p-3 rounded-2xl bg-white border border-black/[0.05] space-y-1">
+              <div className="p-3 rounded-2xl bg-black/[0.02] border border-black/[0.06] space-y-1">
                 <span className="text-[#5F6368]">Member Address:</span>
                 <div className="flex items-center justify-between gap-2 mt-0.5">
                   <span className="font-mono text-[#121316] break-all text-[11px]">{selectedTx.member || "Community Pool"}</span>
                   {selectedTx.member && (
                     <button
+                      type="button"
                       onClick={(e) => copyToClipboard(selectedTx.member, e)}
-                      className="p-1 text-[#8F959E] hover:text-[#121316]"
+                      className="p-1 text-[#5F6368] hover:text-[#121316]"
                       title="Copy Address"
                     >
                       {copiedHash === selectedTx.member ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <Check className="w-3.5 h-3.5 text-[#137333]" />
                       ) : (
                         <Copy className="w-3.5 h-3.5" />
                       )}
@@ -384,17 +347,18 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 </div>
               </div>
 
-              <div className="p-3 rounded-2xl bg-white border border-black/[0.05] space-y-1">
+              <div className="p-3 rounded-2xl bg-black/[0.02] border border-black/[0.06] space-y-1">
                 <span className="text-[#5F6368]">Cryptographic Transaction Hash:</span>
                 <div className="flex items-center justify-between gap-2 mt-0.5">
-                  <span className="font-mono text-emerald-700 break-all text-[11px]">{selectedTx.txHash}</span>
+                  <span className="font-mono text-[#137333] break-all text-[11px]">{selectedTx.txHash}</span>
                   <button
+                    type="button"
                     onClick={(e) => copyToClipboard(selectedTx.txHash, e)}
-                    className="p-1 text-[#8F959E] hover:text-[#121316]"
+                    className="p-1 text-[#5F6368] hover:text-[#121316]"
                     title="Copy Transaction Hash"
                   >
                     {copiedHash === selectedTx.txHash ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <Check className="w-3.5 h-3.5 text-[#137333]" />
                     ) : (
                       <Copy className="w-3.5 h-3.5" />
                     )}
@@ -404,7 +368,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
             </div>
 
             {/* Independent Verification Callout */}
-            <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-start gap-2.5 text-xs text-indigo-900">
+            <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200/80 flex items-start gap-2.5 text-xs text-indigo-900">
               <Info className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
               <p className="leading-relaxed text-[11px]">
                 Every action on Vouch is non-custodial and cryptographically anchored. You can independently verify this receipt on the public explorer.
@@ -413,22 +377,26 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
 
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-3 pt-2">
-              <button onClick={() => setSelectedTx(null)} className="btn-pill-secondary text-xs px-4 py-2">
+              <button
+                type="button"
+                onClick={() => setSelectedTx(null)}
+                className="v-btn-secondary text-xs"
+              >
                 Dismiss
               </button>
               <a
                 href={`${MST_TESTNET.explorerUrl}/tx/${selectedTx.txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-pill-primary text-xs px-5 py-2.5 flex items-center gap-1.5"
+                className="v-btn-primary text-xs inline-flex items-center gap-1.5"
               >
                 Inspect on MSTScan
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 };

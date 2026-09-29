@@ -252,6 +252,115 @@ h1, h2, h3, h4, h5, .font-display {
   border: 1px solid var(--border-subtle);
 }
 
+/* ── Overlay & Modal Primitives ── */
+.v-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: rgba(18, 19, 22, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  overflow-y: auto;
+}
+
+.v-modal {
+  position: relative;
+  background-color: #FAF9F5;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 28px;
+  box-shadow: 0 32px 80px -16px rgba(0, 0, 0, 0.25);
+  color: #121316;
+  width: 100%;
+  max-height: calc(100dvh - 3rem);
+  overflow-y: auto;
+  margin: auto;
+}
+
+/* ── Standard Input Fields ── */
+.v-input {
+  width: 100%;
+  background-color: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 14px;
+  padding: 10px 14px;
+  color: #121316;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.v-input:focus {
+  border-color: #121316;
+  box-shadow: 0 0 0 3px rgba(233, 185, 73, 0.25);
+}
+
+/* ── Fixed Viewport Toast Notifications ── */
+.v-toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+  max-width: calc(100vw - 2rem);
+}
+
+.v-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.25);
+  animation: toastSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+@keyframes toastSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.v-toast-success {
+  background-color: #121316;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.v-toast-error {
+  background-color: #7F1D1D;
+  color: #FEE2E2;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.v-input::placeholder {
+  color: #8F959E;
+}
+
+.v-input:disabled {
+  background-color: #F5F3ED;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* ── Technical Pro Mode Callout Box ── */
 .v-tech-box, .tech-details-box {
   background: #F4F1E8;

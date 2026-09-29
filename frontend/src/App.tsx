@@ -377,25 +377,6 @@ export function App() {
 
         {/* Main Content Area */}
         <main className="flex-1 w-full mx-auto px-4 sm:px-8 lg:px-12 py-6 space-y-6">
-          {/* Toast Notification */}
-          {notification && (
-            <div className={`v-toast ${notification.isError ? "v-toast-error" : "v-toast-success"}`}>
-              <div className="flex items-center gap-2.5">
-                {notification.isError ? (
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                ) : (
-                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                )}
-                <span>{notification.message}</span>
-              </div>
-              <button
-                onClick={() => setNotification(null)}
-                className="text-inherit opacity-60 hover:opacity-100 ml-4 transition-opacity"
-              >
-                ✕
-              </button>
-            </div>
-          )}
 
           {/* Secondary Sub-navigation Pill Bar for Workspace Tabs */}
           {activeTab !== "overview" && (
@@ -622,6 +603,30 @@ export function App() {
         onConnectExtension={connectWallet}
         onConnectPrivateKey={connectWithPrivateKey}
       />
+
+      {/* Fixed Viewport Toast Notifications */}
+      {notification && (
+        <div className="v-toast-container" role="status" aria-live="polite">
+          <div className={`v-toast ${notification.isError ? "v-toast-error" : "v-toast-success"}`}>
+            <div className="flex items-center gap-2.5">
+              {notification.isError ? (
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              )}
+              <span>{notification.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNotification(null)}
+              className="text-inherit opacity-60 hover:opacity-100 ml-3 p-1 transition-opacity"
+              aria-label="Dismiss notification"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

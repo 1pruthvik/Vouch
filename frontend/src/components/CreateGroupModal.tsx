@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { X, Plus, ArrowRight, Code2 } from "lucide-react";
+import { Plus, ArrowRight, Code2 } from "lucide-react";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
+import { Modal } from "./ui/Modal";
 
 interface CreateGroupModalProps {
   isOpen: boolean;
@@ -30,8 +31,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const [reserveFeeInr, setReserveFeeInr] = useState<number | "">(250);
   const [cycleDurationMonths, setCycleDurationMonths] = useState<number | "">(1);
   const [discountCapPercent, setDiscountCapPercent] = useState<number | "">(30);
-
-  if (!isOpen) return null;
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const numInstallmentInr = Number(installmentInr) || 0;
   const numMembers = Number(memberCount) || 1;
@@ -46,165 +46,178 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const numMonths = Number(cycleDurationMonths) || 1;
   const cycleDurationSeconds = numMonths * 30 * 24 * 3600;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!groupName || !memberCount || !installmentInr) return;
-    onSubmit({
-      groupName,
-      memberCount: Number(memberCount),
-      installmentAmount: installmentTokens,
-      cycleDuration: cycleDurationSeconds,
-      discountCapBps: (Number(discountCapPercent) || 30) * 100,
-      reserveFeeBps: calculatedReserveFeeBps,
-    });
-    onClose();
+    if (!groupName || !memberCount || !installmentInr || isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      await onSubmit({
+        groupName,
+        memberCount: Number(memberCount),
+        installmentAmount: installmentTokens,
+        cycleDuration: cycleDurationSeconds,
+        discountCapBps: (Number(discountCapPercent) || 30) * 100,
+        reserveFeeBps: calculatedReserveFeeBps,
+      });
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="v-overlay">
-      <div className="v-modal p-6 sm:p-7 max-w-lg">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(45, 212, 168, 0.1)', border: '1px solid rgba(45, 212, 168, 0.2)' }}>
-              <Plus className="w-5 h-5 text-[#2dd4a8] stroke-[2.5]" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white font-display">Start a Savings Circle</h2>
-              <p className="text-xs text-[#5f6578]">Create an autonomous community chit fund</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-[#5f6578] hover:text-white hover:bg-white/5 transition-all duration-200">
-            <X className="w-5 h-5" />
-          </button>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Start a Savings Circle"
+      description="Create an autonomous community chit fund on MST Blockchain"
+      icon={<Plus className="w-5 h-5 text-[#946800] stroke-[2.5]" />}
+      maxWidth="max-w-lg"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+        {/* Circle Name */}
+        <div>
+          <label className="block font-semibold text-[#5F6368] mb-1.5">Circle Name</label>
+          <input
+            type="text"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            placeholder="e.g. Bangalore Techies Savings"
+            className="v-input"
+            required
+            autoFocus
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-5 text-xs">
-          {/* Circle Name */}
+        {/* Members & Monthly Contribution */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block font-semibold text-[#9ca3b4] mb-2">Circle Name</label>
+            <label className="block font-semibold text-[#5F6368] mb-1.5">Total Members</label>
             <input
-              type="text"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder="e.g. Friends & Family Circle"
-              className="v-input text-xs"
+              type="number"
+              min="2"
+              max="50"
+              value={memberCount}
+              onChange={(e) => setMemberCount(parseInt(e.target.value) || 2)}
+              className="v-input"
               required
             />
           </div>
-
-          {/* Members & Monthly Contribution */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-[#9ca3b4] mb-2">Total Members</label>
-              <input
-                type="number"
-                min="2"
-                max="50"
-                value={memberCount}
-                onChange={(e) => setMemberCount(parseInt(e.target.value) || 2)}
-                className="v-input text-xs"
-                required
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-[#9ca3b4] mb-2">Monthly Contribution (₹)</label>
-              <input
-                type="number"
-                min="100"
-                step="100"
-                value={installmentInr}
-                onChange={(e) => setInstallmentInr(parseFloat(e.target.value) || 0)}
-                className="v-input text-xs"
-                required
-              />
-            </div>
+          <div>
+            <label className="block font-semibold text-[#5F6368] mb-1.5">Monthly Contribution (₹)</label>
+            <input
+              type="number"
+              min="100"
+              step="100"
+              value={installmentInr}
+              onChange={(e) => setInstallmentInr(parseFloat(e.target.value) || 0)}
+              className="v-input"
+              required
+            />
           </div>
+        </div>
 
-          {/* Reserve Fee & Cycle Months */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-[#9ca3b4] mb-2">Reserve Security Fee (₹)</label>
-              <input
-                type="number"
-                min="0"
-                step="50"
-                value={reserveFeeInr}
-                onChange={(e) => setReserveFeeInr(parseFloat(e.target.value) || 0)}
-                className="v-input text-xs"
-                required
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-[#9ca3b4] mb-2">Round Cycle (Months)</label>
-              <input
-                type="number"
-                min="1"
-                max="24"
-                value={cycleDurationMonths}
-                onChange={(e) => setCycleDurationMonths(parseInt(e.target.value) || 1)}
-                className="v-input text-xs"
-                required
-              />
-            </div>
+        {/* Reserve Fee & Cycle Months */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block font-semibold text-[#5F6368] mb-1.5">Reserve Security Fee (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="50"
+              value={reserveFeeInr}
+              onChange={(e) => setReserveFeeInr(parseFloat(e.target.value) || 0)}
+              className="v-input"
+              required
+            />
           </div>
-
-          {/* Summary */}
-          <div className="p-4 rounded-2xl space-y-2.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="flex items-center justify-between text-[#9ca3b4]">
-              <span>Total Monthly Pot</span>
-              <span className="text-base font-bold text-white font-display">
-                {formatRawINR(totalPotInr)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-[11px]" style={{ color: '#5f6578' }}>
-              <span>Duration</span>
-              <span className="font-semibold text-[#9ca3b4]">{numMembers} Months ({numMembers} Draws)</span>
-            </div>
-            <div className="flex items-center justify-between text-[11px]" style={{ color: '#5f6578' }}>
-              <span>Security Deposit</span>
-              <span className="font-semibold text-[#2dd4a8]">
-                {formatRawINR(numInstallmentInr)} (100% Refundable)
-              </span>
-            </div>
+          <div>
+            <label className="block font-semibold text-[#5F6368] mb-1.5">Round Cycle (Months)</label>
+            <input
+              type="number"
+              min="1"
+              max="24"
+              value={cycleDurationMonths}
+              onChange={(e) => setCycleDurationMonths(parseInt(e.target.value) || 1)}
+              className="v-input"
+              required
+            />
           </div>
+        </div>
 
-          {/* Technical Parameters */}
-          {isTechnicalMode && (
-            <div className="v-tech-box text-[11px] space-y-2">
-              <p className="font-bold text-[#8b5cf6] flex items-center gap-1">
-                <Code2 className="w-3.5 h-3.5" /> Advanced Protocol Parameters
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <p className="text-[#5f6578]">Max Discount Floor (%):</p>
-                  <input
-                    type="number"
-                    min="5"
-                    max="50"
-                    value={discountCapPercent}
-                    onChange={(e) => setDiscountCapPercent(parseInt(e.target.value) || 30)}
-                    className="v-input text-xs mt-1 font-mono"
-                  />
-                </div>
-                <div>
-                  <p className="text-[#5f6578]">Calculated Reserve Fee:</p>
-                  <p className="font-mono text-white mt-2">{calculatedReserveFeeBps} BPS ({(calculatedReserveFeeBps / 100).toFixed(2)}%)</p>
-                </div>
+        {/* Summary Card */}
+        <div className="p-4 rounded-2xl bg-white border border-black/[0.06] space-y-2.5">
+          <div className="flex items-center justify-between text-[#5F6368]">
+            <span className="font-medium">Total Monthly Pot</span>
+            <span className="text-base font-bold text-[#121316] font-display tabular-nums">
+              {formatRawINR(totalPotInr)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-[#5F6368]">
+            <span>Duration</span>
+            <span className="font-semibold text-[#121316]">{numMembers} Months ({numMembers} Draws)</span>
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-[#5F6368]">
+            <span>Required Security Buffer</span>
+            <span className="font-semibold text-emerald-700">
+              {formatRawINR(numInstallmentInr)} (100% Refundable)
+            </span>
+          </div>
+        </div>
+
+        {/* Technical Parameters */}
+        {isTechnicalMode && (
+          <div className="v-tech-box text-[11px] space-y-2">
+            <p className="font-bold text-[#121316] flex items-center gap-1.5">
+              <Code2 className="w-3.5 h-3.5 text-indigo-600" /> Advanced Protocol Parameters
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[#5F6368]">Max Discount Floor (%):</p>
+                <input
+                  type="number"
+                  min="5"
+                  max="50"
+                  value={discountCapPercent}
+                  onChange={(e) => setDiscountCapPercent(parseInt(e.target.value) || 30)}
+                  className="v-input mt-1 font-mono text-xs"
+                />
+              </div>
+              <div>
+                <p className="text-[#5F6368]">Calculated Reserve Fee:</p>
+                <p className="font-mono text-[#121316] mt-2 font-semibold">{calculatedReserveFeeBps} BPS ({(calculatedReserveFeeBps / 100).toFixed(2)}%)</p>
               </div>
             </div>
-          )}
-
-          {/* Actions */}
-          <div className="pt-2 flex items-center justify-end gap-3">
-            <button type="button" onClick={onClose} className="v-btn-secondary text-xs">Cancel</button>
-            <button type="submit" className="v-btn-primary text-xs">
-              Create Circle
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+
+        {/* Actions with double-click protection */}
+        <div className="pt-2 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="btn-pill-secondary text-xs px-4 py-2"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="btn-pill-primary text-xs px-5 py-2.5 flex items-center gap-1.5"
+          >
+            {isSubmitting ? (
+              "Deploying..."
+            ) : (
+              <>
+                Create Circle
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 };

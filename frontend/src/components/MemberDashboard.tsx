@@ -24,6 +24,7 @@ import {
   Zap,
   HelpCircle,
   Activity,
+  X,
 } from "lucide-react";
 import gsap from "gsap";
 import { formatINR, formatRawINR, getTrafficLightStatus, MST_TO_INR_RATE } from "../utils/formatters";
@@ -77,6 +78,26 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
   const heroRef = useRef<HTMLDivElement>(null);
   const statsGridRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
+
+  // Close tooltips on ESC key or click outside
+  useEffect(() => {
+    if (!activeTooltip) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveTooltip(null);
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".tooltip-trigger") && !target.closest(".tooltip-popup")) {
+        setActiveTooltip(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [activeTooltip]);
 
   // Entrance animations
   useEffect(() => {
@@ -392,10 +413,12 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
             <span className="text-xs font-semibold flex items-center gap-1">
               Your Security Deposit
               <button
+                type="button"
                 onClick={() => setActiveTooltip(activeTooltip === "buffer" ? null : "buffer")}
-                className="text-[#8F959E] hover:text-[#121316]"
+                className="tooltip-trigger text-[#8F959E] hover:text-[#121316] p-0.5 rounded focus:outline-none"
+                aria-label="Explain security deposit"
               >
-                <HelpCircle className="w-3 h-3" />
+                <HelpCircle className="w-3.5 h-3.5" />
               </button>
             </span>
             <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-700">
@@ -409,8 +432,18 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
             <span className="text-indigo-700 font-medium">100% refundable</span> at final month
           </p>
           {activeTooltip === "buffer" && (
-            <div className="absolute left-4 right-4 top-12 p-3 rounded-xl bg-[#121316] text-white text-[11px] shadow-xl z-20 anim-fade-in border border-black/10">
-              Security buffer deposited into the smart contract upon joining. It guarantees circle solvency and is fully refunded at completion.
+            <div className="tooltip-popup absolute left-4 right-4 top-12 p-3.5 rounded-2xl bg-[#121316] text-white text-[11px] shadow-2xl z-30 anim-fade-in border border-white/10 flex items-start justify-between gap-2">
+              <span className="leading-relaxed">
+                Security buffer deposited into the smart contract upon joining. It guarantees circle solvency and is fully refunded at completion.
+              </span>
+              <button
+                type="button"
+                onClick={() => setActiveTooltip(null)}
+                className="p-1 rounded-full hover:bg-white/10 text-white/70 hover:text-white flex-shrink-0"
+                aria-label="Dismiss info"
+              >
+                <X className="w-3 h-3" />
+              </button>
             </div>
           )}
         </div>
@@ -420,10 +453,12 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
             <span className="text-xs font-semibold flex items-center gap-1">
               Earned Dividends
               <button
+                type="button"
                 onClick={() => setActiveTooltip(activeTooltip === "dividends" ? null : "dividends")}
-                className="text-[#8F959E] hover:text-[#121316]"
+                className="tooltip-trigger text-[#8F959E] hover:text-[#121316] p-0.5 rounded focus:outline-none"
+                aria-label="Explain earned dividends"
               >
-                <HelpCircle className="w-3 h-3" />
+                <HelpCircle className="w-3.5 h-3.5" />
               </button>
             </span>
             <div className="p-1.5 rounded-lg bg-[#E9B949]/20 text-[#946800]">
@@ -437,8 +472,18 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
             Automated discount yield rolled forward
           </p>
           {activeTooltip === "dividends" && (
-            <div className="absolute left-4 right-4 top-12 p-3 rounded-xl bg-[#121316] text-white text-[11px] shadow-xl z-20 anim-fade-in border border-black/10">
-              Accumulated interest savings from peers who took early pot payouts at a discount. Credited back directly to your balance.
+            <div className="tooltip-popup absolute left-4 right-4 top-12 p-3.5 rounded-2xl bg-[#121316] text-white text-[11px] shadow-2xl z-30 anim-fade-in border border-white/10 flex items-start justify-between gap-2">
+              <span className="leading-relaxed">
+                Accumulated interest savings from peers who took early pot payouts at a discount. Credited back directly to your balance.
+              </span>
+              <button
+                type="button"
+                onClick={() => setActiveTooltip(null)}
+                className="p-1 rounded-full hover:bg-white/10 text-white/70 hover:text-white flex-shrink-0"
+                aria-label="Dismiss info"
+              >
+                <X className="w-3 h-3" />
+              </button>
             </div>
           )}
         </div>
