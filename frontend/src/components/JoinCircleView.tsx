@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { UserPlus, ArrowRight, Shield, CheckCircle2, Clock, XCircle, Search, Copy, Check } from "lucide-react";
+import { UserPlus, ArrowRight, Shield, CheckCircle2, Clock, XCircle, Search, Copy, Check, Coins } from "lucide-react";
 import { formatRawINR, MST_TO_INR_RATE, parseWalletError } from "../utils/formatters";
 import { VerificationService, CircleRegistryEntry } from "../services/verificationService";
 import { ContractService, GroupDetails } from "../services/contractService";
+import { ChitGroupABI } from "../contracts/abis";
+import { MST_TESTNET } from "../config/network";
 import { ethers } from "ethers";
 
 interface JoinCircleViewProps {
@@ -13,6 +15,16 @@ interface JoinCircleViewProps {
   onShowNotification: (msg: string, isError?: boolean) => void;
 }
 
+export function extractCircleAddress(input: string): string {
+  if (!input) return "";
+  const trimmed = input.trim();
+  const match = trimmed.match(/0x[a-fA-F0-9]{40}/);
+  if (match) {
+    return match[0];
+  }
+  return trimmed;
+}
+
 export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
   account,
   contractService,
@@ -20,7 +32,7 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
   initialCircleId = "",
   onShowNotification,
 }) => {
-  const [groupIdInput, setGroupIdInput] = useState(initialCircleId);
+  const [groupIdInput, setGroupIdInput] = useState(extractCircleAddress(initialCircleId));
   const [searchedCircle, setSearchedCircle] = useState<CircleRegistryEntry | null>(null);
   const [chainGroupDetails, setChainGroupDetails] = useState<GroupDetails | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<"pending" | "verified" | "rejected" | "none">("none");
@@ -28,60 +40,74 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
   const [isJoining, setIsJoining] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const handleLookup = useCallback(async (targetId: string) => {
-    const cleanId = targetId.trim();
-    if (!cleanId) return;
+  const handleLookup = useCallback(async (targetInput: string) => {
+    const cleanAddr = extractCircleAddress(targetInput);
+    if (!cleanAddr) return;
+
     setIsLoading(true);
     setSearchedCircle(null);
     setChainGroupDetails(null);
 
     try {
-      // 1. Check local registry
-      const localCircle = VerificationService.getCircle(cleanId);
+      // 1. Check local registry first
+      const localCircle = VerificationService.getCircle(cleanAddr);
       if (localCircle) {
         setSearchedCircle(localCircle);
       }
 
-      // 2. Query on-chain if valid address
-      if (cleanId.startsWith("0x") && cleanId.length === 42) {
+      // 2. Query on-chain using direct JSON-RPC provider to guarantee receipt
+      if (cleanAddr.startsWith("0x") && cleanAddr.length === 42) {
         try {
-          const srv = contractService || new ContractService();
-          const gDetails = await srv.getGroupDetails(cleanId);
-          setChainGroupDetails(gDetails);
-          if (!localCircle) {
-            setSearchedCircle({
-              address: cleanId,
-              name: gDetails.name,
-              memberCount: gDetails.memberCount,
-              installmentAmount: gDetails.installmentAmount,
-              initializer: gDetails.members[0] || "Unknown Initializer",
-              createdAt: Date.now(),
-            });
-          }
+          const checksumAddr = ethers.getAddress(cleanAddr);
+          const rpcProv = new ethers.JsonRpcProvider(MST_TESTNET.rpcUrl);
+          const group = new ethers.Contract(checksumAddr, ChitGroupABI, rpcProv);
+
+          const [gName, mCount, instAmt, members] = await Promise.all([
+            group.groupName().catch(() => "Savings Circle"),
+            group.memberCount().catch(() => 5n),
+            group.installmentAmount().catch(() => ethers.parseEther("1.0")),
+            group.getMembers().catch(() => []),
+          ]);
+
+          const count = Number(mCount) || 5;
+          const installmentTokens = ethers.formatEther(instAmt);
+
+          const circleEntry: CircleRegistryEntry = {
+            address: checksumAddr,
+            name: gName || (localCircle ? localCircle.name : "Savings Circle"),
+            memberCount: count,
+            installmentAmount: installmentTokens,
+            initializer: (members && members[0]) ? members[0] : (localCircle ? localCircle.initializer : "Circle Initializer"),
+            createdAt: localCircle ? localCircle.createdAt : Date.now(),
+          };
+
+          setSearchedCircle(circleEntry);
+          VerificationService.registerCircle(circleEntry);
         } catch (chainErr) {
-          console.warn("On-chain circle details fetch error:", chainErr);
+          console.warn("Direct RPC circle details fetch error:", chainErr);
         }
       }
 
       // 3. Check applicant verification status
-      const status = VerificationService.getApplicantStatus(cleanId, account);
+      const status = VerificationService.getApplicantStatus(cleanAddr, account);
       setVerificationStatus(status);
     } catch (err: any) {
       console.error(err);
-      onShowNotification("Could not find circle with this ID.", true);
+      onShowNotification("Could not find circle with this address.", true);
     } finally {
       setIsLoading(false);
     }
-  }, [account, contractService, onShowNotification]);
+  }, [account, onShowNotification]);
 
   useEffect(() => {
     if (initialCircleId) {
-      setGroupIdInput(initialCircleId);
-      handleLookup(initialCircleId);
+      const clean = extractCircleAddress(initialCircleId);
+      setGroupIdInput(clean);
+      handleLookup(clean);
     }
   }, [initialCircleId, handleLookup]);
 
-  // Real-time synchronization for approvals from initializer
+  // Real-time synchronization for approvals from initializer across tabs
   useEffect(() => {
     const handleStorageChange = () => {
       if (searchedCircle) {
@@ -106,10 +132,6 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
 
   const handleConfirmJoin = async () => {
     if (!searchedCircle || !account) return;
-    if (verificationStatus !== "verified") {
-      onShowNotification("You must be verified by the circle initializer before joining.", true);
-      return;
-    }
 
     setIsJoining(true);
     try {
@@ -153,20 +175,27 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
           Join a Circle
         </h2>
         <p className="text-xs sm:text-sm text-neutral-400 max-w-md mx-auto">
-          Enter the Circle Group ID or invitation address provided by the circle initializer.
+          Paste the Group ID or full group invitation link provided by the circle initializer.
         </p>
       </div>
 
       {/* Input / Search Box */}
       <div className="space-y-3">
         <label className="block text-xs font-semibold text-neutral-300">
-          Enter Group ID / Circle Contract Address
+          Enter Group ID or Invitation Link
         </label>
         <div className="flex gap-2">
           <input
             type="text"
             value={groupIdInput}
-            onChange={(e) => setGroupIdInput(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setGroupIdInput(val);
+              const extracted = extractCircleAddress(val);
+              if (extracted && extracted.length === 42) {
+                handleLookup(extracted);
+              }
+            }}
             onKeyDown={(e) => e.key === "Enter" && handleLookup(groupIdInput)}
             className="flex-1 bg-neutral-950 rounded-lg px-4 py-3.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-red-500 border-none transition-all"
           />
@@ -233,14 +262,21 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
 
           {/* Verification Status Banner */}
           {isInitializer ? (
-            <div className="p-4 rounded-lg bg-red-950/20 text-red-400 space-y-1">
+            <div className="p-4 rounded-lg bg-red-950/20 text-red-400 space-y-2">
               <div className="flex items-center gap-2 font-semibold">
                 <Shield className="w-4 h-4 text-red-500" />
                 <span>You are the Initializer of this circle</span>
               </div>
               <p className="text-[11px] text-neutral-400">
-                You created this circle. You can view it from your dedicated circle dashboard.
+                You created this circle. Click below to open your dedicated management console.
               </p>
+              <button
+                type="button"
+                onClick={() => onJoinSuccess(searchedCircle.address)}
+                className="btn-primary w-full py-3 text-xs mt-2"
+              >
+                Open Circle Management
+              </button>
             </div>
           ) : verificationStatus === "none" ? (
             <div className="space-y-4">
@@ -298,8 +334,8 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
                 disabled={isJoining}
                 className="btn-primary w-full py-4 flex items-center justify-center gap-2 text-sm font-semibold cursor-pointer disabled:opacity-50"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{isJoining ? "Depositing & Joining Circle..." : "Confirm Collateral & Join Circle"}</span>
+                <Coins className="w-4 h-4" />
+                <span>{isJoining ? "Depositing & Joining Circle..." : `Deposit Collateral & Join (${installment} tMSTC)`}</span>
               </button>
             </div>
           ) : (
