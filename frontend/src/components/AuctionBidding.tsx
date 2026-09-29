@@ -3,88 +3,114 @@ import { Gavel, Key, CheckCircle, Clock } from "lucide-react";
 import { ethers } from "ethers";
 
 interface AuctionBiddingProps {
-  currentRound: number;
-  totalPot: string;
-  minBidAllowed: string;
-  phase: "Commit" | "Reveal" | "Collect" | "Settle";
-  hasCommitted: boolean;
-  hasRevealed: boolean;
-  onCommitBid: (commitmentHash: string) => void;
-  onRevealBid: (bidAmount: string, salt: string) => void;
+  currentRound?: number;
+  totalPot?: string;
+  minBidAllowed?: string;
+  phase?: "Commit" | "Reveal" | "Collect" | "Settle" | "Forming" | "Closed";
+  hasCommitted?: boolean;
+  hasRevealed?: boolean;
+  onCommitBid?: (commitmentHash: string) => void;
+  onRevealBid?: (bidAmount: string, salt: string) => void;
 }
 
 export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
-  currentRound = 1,
-  totalPot = "2.5",
-  minBidAllowed = "1.75",
+  currentRound = 0,
+  totalPot = "0.00",
+  minBidAllowed = "0.00",
   phase = "Commit",
   hasCommitted = false,
   hasRevealed = false,
   onCommitBid,
   onRevealBid,
 }) => {
-  const [bidAmount, setBidAmount] = useState(minBidAllowed);
-  const [salt, setSalt] = useState("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
+  const [bidAmount, setBidAmount] = useState("");
+  const [salt, setSalt] = useState("");
 
   const handleGenerateCommitment = (e: React.FormEvent) => {
     e.preventDefault();
-    // keccak256 hash simulation
+    if (!bidAmount) return;
+    const generatedSalt = salt || ethers.hexlify(ethers.randomBytes(32));
     const hash = ethers.keccak256(
-      ethers.toUtf8Bytes(`${bidAmount}-${salt}`)
+      ethers.toUtf8Bytes(`${bidAmount}-${generatedSalt}`)
     );
-    onCommitBid(hash);
+    if (onCommitBid) {
+      onCommitBid(hash);
+    }
   };
 
   const handleReveal = (e: React.FormEvent) => {
     e.preventDefault();
-    onRevealBid(bidAmount, salt);
+    if (!bidAmount || !salt) return;
+    if (onRevealBid) {
+      onRevealBid(bidAmount, salt);
+    }
   };
 
   return (
-    <div className="glass-card p-6 border-white/10">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-[#0e0e0e] rounded-xl p-8 space-y-6">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
         <div className="flex items-center gap-2">
-          <Gavel className="w-5 h-5 text-indigo-400" />
-          <h2 className="text-lg font-bold text-white font-display">Reverse Auction (Round {currentRound})</h2>
+          <Gavel className="w-5 h-5 text-neutral-300" />
+          <h2 className="text-lg font-bold text-white font-display">
+            Reverse Auction {currentRound > 0 ? `(Round ${currentRound})` : ""}
+          </h2>
         </div>
-        <span className="badge badge-warning">
+        <span className="badge">
           Phase: {phase}
         </span>
       </div>
 
-      <div className="p-4 rounded-xl bg-slate-900/60 border border-white/5 mb-6 flex items-center justify-between">
+      <div className="p-6 rounded-xl bg-black flex flex-col sm:flex-row items-center justify-around gap-4 text-center">
         <div>
-          <p className="text-xs text-slate-400">Total Round Pot</p>
-          <p className="text-xl font-bold text-white font-display">{totalPot} tMSTC</p>
+          <p className="text-xs text-neutral-400">Total Round Pot</p>
+          <p className="text-2xl font-bold text-white font-display mt-1">{totalPot} tMSTC</p>
         </div>
+        <div className="hidden sm:block w-px h-10 bg-neutral-800" />
         <div>
-          <p className="text-xs text-slate-400">Discount Floor (Min Bid)</p>
-          <p className="text-xl font-bold text-indigo-400 font-display">{minBidAllowed} tMSTC</p>
+          <p className="text-xs text-neutral-400">Discount Floor (Min Allowed Bid)</p>
+          <p className="text-2xl font-bold text-white font-display mt-1">{minBidAllowed} tMSTC</p>
         </div>
       </div>
 
       {phase === "Commit" && (
-        <form onSubmit={handleGenerateCommitment} className="space-y-4">
+        <form onSubmit={handleGenerateCommitment} className="space-y-4 max-w-lg mx-auto text-left">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-neutral-300 mb-1">
               Your Secret Bid Payout (tMSTC)
             </label>
             <input
-              type="text"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Bid Amount"
               value={bidAmount}
               onChange={(e) => setBidAmount(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
+              required
             />
-            <p className="text-xs text-slate-400 mt-1">
-              Lowest bid wins the pot. The discount is shared as dividends.
+            <p className="text-xs text-neutral-400 mt-1">
+              Lowest payout bid wins the pot. The discount is distributed to other members.
             </p>
           </div>
 
-          <div className="flex justify-end">
+          <div>
+            <label className="block text-xs font-semibold text-neutral-300 mb-1">
+              Secret Salt (Optional - auto-generated if left blank)
+            </label>
+            <input
+              type="text"
+              placeholder="Hex salt or secret phrase"
+              value={salt}
+              onChange={(e) => setSalt(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm font-mono focus:outline-none placeholder:text-neutral-700"
+            />
+          </div>
+
+          <div className="flex justify-center pt-2">
             <button
               type="submit"
               disabled={hasCommitted}
-              className="btn-primary text-sm"
+              className="btn-primary"
             >
               <Key className="w-4 h-4" />
               {hasCommitted ? "Commitment Submitted" : "Commit Secret Bid"}
@@ -94,24 +120,42 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
       )}
 
       {phase === "Reveal" && (
-        <form onSubmit={handleReveal} className="space-y-4">
+        <form onSubmit={handleReveal} className="space-y-4 max-w-lg mx-auto text-left">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-neutral-300 mb-1">
               Reveal Bid Amount (tMSTC)
             </label>
             <input
-              type="text"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Bid Amount"
               value={bidAmount}
               onChange={(e) => setBidAmount(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
+              required
             />
           </div>
 
-          <div className="flex justify-end">
+          <div>
+            <label className="block text-xs font-semibold text-neutral-300 mb-1">
+              Secret Salt
+            </label>
+            <input
+              type="text"
+              placeholder="Enter the exact salt used during commit"
+              value={salt}
+              onChange={(e) => setSalt(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm font-mono focus:outline-none"
+              required
+            />
+          </div>
+
+          <div className="flex justify-center pt-2">
             <button
               type="submit"
               disabled={hasRevealed}
-              className="btn-primary text-sm"
+              className="btn-primary"
             >
               <CheckCircle className="w-4 h-4" />
               {hasRevealed ? "Bid Revealed" : "Reveal Bid"}
@@ -121,9 +165,9 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
       )}
 
       {phase !== "Commit" && phase !== "Reveal" && (
-        <div className="text-center py-8 text-slate-400 text-sm">
-          <Clock className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-          Auction is currently awaiting next cycle transition ({phase}).
+        <div className="text-center py-10 text-neutral-400 text-sm flex flex-col items-center justify-center gap-2">
+          <Clock className="w-8 h-8 text-neutral-500" />
+          <p>Auction is awaiting the next cycle transition ({phase}).</p>
         </div>
       )}
     </div>
