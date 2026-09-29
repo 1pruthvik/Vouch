@@ -35,6 +35,7 @@ export interface MemberDetails {
   bufferBalance: string;
   lockedDividends: string;
   paidInstallments: number;
+  hasPaidCurrentRound?: boolean;
   hasWon: boolean;
   winRound: number;
   isDefaulted: boolean;
@@ -160,16 +161,34 @@ export class ContractService {
   }
 
   // Commit secret bid hash in Commit phase
-  public async commitBid(groupAddress: string, commitmentHash: string): Promise<string> {
+  public async commitBid(
+    groupAddress: string,
+    bidAmountOrHash: string,
+    salt: string = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+  ): Promise<string> {
     if (!this.signer) throw new Error("Wallet not connected");
     const group = new ethers.Contract(groupAddress, ChitGroupABI, this.signer);
+    let commitmentHash = bidAmountOrHash;
+    if (!bidAmountOrHash.startsWith("0x") || bidAmountOrHash.length !== 66) {
+      const userAddr = await this.signer.getAddress();
+      const parsedBid = ethers.parseEther(bidAmountOrHash);
+      const saltBytes = salt.startsWith("0x") ? salt : ethers.keccak256(ethers.toUtf8Bytes(salt));
+      commitmentHash = ethers.solidityPackedKeccak256(
+        ["uint256", "bytes32", "address"],
+        [parsedBid, saltBytes, userAddr]
+      );
+    }
     const tx = await group.commitBid(commitmentHash);
     await tx.wait();
     return tx.hash;
   }
 
   // Reveal secret bid in Reveal phase
-  public async revealBid(groupAddress: string, bidAmount: string, salt: string): Promise<string> {
+  public async revealBid(
+    groupAddress: string,
+    bidAmount: string,
+    salt: string = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+  ): Promise<string> {
     if (!this.signer) throw new Error("Wallet not connected");
     const group = new ethers.Contract(groupAddress, ChitGroupABI, this.signer);
     const parsedBid = ethers.parseEther(bidAmount);
@@ -271,6 +290,7 @@ export class ContractService {
       bufferBalance: ethers.formatEther(m.bufferBalance),
       lockedDividends: ethers.formatEther(m.lockedDividends),
       paidInstallments: Number(m.paidInstallments),
+      hasPaidCurrentRound: m.hasPaidCurrentRound ?? false,
       hasWon: m.hasWon,
       winRound: Number(m.winRound),
       isDefaulted: m.isDefaulted,

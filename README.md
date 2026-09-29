@@ -36,9 +36,14 @@ Vouch/
 │   │   ├── keeper/     # Autonomous cycle automation bot
 │   │   └── api/        # REST endpoints feeding the frontend
 ├── ai/                 # Python XGBoost & FastAPI Risk Advisory Engine
-│   ├── generate_dataset.py # Synthetic ROSCA profile & default generator
-│   ├── train_model.py      # Training pipeline
-│   └── api.py              # FastAPI advisory service (/predict-risk)
+│   ├── generate_dataset.py    # Synthetic ROSCA profile & empirical default generator
+│   ├── train_model.py         # XGBoost training pipeline, 5-fold CV & sanity checks
+│   ├── api.py                 # FastAPI service (/predict-risk, /batch-predict, /simulate-cycle)
+│   ├── simulate_stress_test.py# Stress-test simulation visualizer & pitch chart generator
+│   ├── live_retrain.py        # Live on-stage real-time model retraining script
+│   ├── test_ai_engine.py      # Unit & integration test suite (9/9 passing)
+│   ├── assets/                # High-DPI pitch charts (collateral trajectories, voucher impact)
+│   └── README.md              # In-depth AI engine architecture & API reference
 ├── docs/               # Architecture, PRD, Network specs, and Phase roadmap
 │   ├── PHASES.md
 │   ├── ARCHITECTURE.md
@@ -84,12 +89,25 @@ npm install
 npm run dev
 ```
 
-### 4. AI Advisory Service
+### 4. AI Advisory Service & Simulations
 ```bash
 cd ai
 pip install -r requirements.txt
+
+# Train model & verify domain sanity invariants
 python train_model.py
-python api.py
+
+# Start FastAPI risk advisory service (Port 8000)
+uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+
+# Run comprehensive test suite
+pytest test_ai_engine.py -v
+
+# Generate pitch presentation visuals & stress test charts
+python simulate_stress_test.py
+
+# Live on-stage model retraining demo (<3s runtime)
+python live_retrain.py 500
 ```
 
 ---

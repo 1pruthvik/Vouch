@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { X, Plus, Shield, IndianRupee, ArrowRight } from "lucide-react";
+import { X, Plus, Users, ShieldCheck, Sparkles, HelpCircle, Code2, ArrowRight } from "lucide-react";
+import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 
 interface CreateGroupModalProps {
   isOpen: boolean;
@@ -11,175 +12,172 @@ interface CreateGroupModalProps {
     cycleDuration: number;
     discountCapBps: number;
     reserveFeeBps: number;
-    installmentInr: number;
   }) => void;
+  isTechnicalMode: boolean;
 }
-
-// 1 tMSTC = ₹1,000 (Internal conversion rate)
-export const INR_PER_TMSTC = 1000;
 
 export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  isTechnicalMode,
 }) => {
-  const [groupName, setGroupName] = useState("");
-  const [memberCount, setMemberCount] = useState<number | "">("");
-  const [installmentInr, setInstallmentInr] = useState<number | "">("");
-  const [reserveFeeInr, setReserveFeeInr] = useState<number | "">("");
-  const [cycleDurationMonths, setCycleDurationMonths] = useState<number | "">("");
+  const [groupName, setGroupName] = useState("Alpha Savings Circle");
+  const [memberCount, setMemberCount] = useState(5);
+  const [installmentAmountINR, setInstallmentAmountINR] = useState(5000);
+  const [cycleDurationMins, setCycleDurationMins] = useState(5); // 5 mins in demo
+  const [discountCapPercent, setDiscountCapPercent] = useState(30); // 30% discount cap
+  const [reserveFeePercent, setReserveFeePercent] = useState(5); // 5% reserve fund
 
   if (!isOpen) return null;
 
-  // Calculate internal token values and fee bps
-  const numInstallmentInr = Number(installmentInr) || 0;
-  const numMembers = Number(memberCount) || 1;
-  const installmentTokens = (numInstallmentInr / INR_PER_TMSTC).toFixed(4);
-  const totalPotInr = numMembers * numInstallmentInr;
-  const numReserveFeeInr = Number(reserveFeeInr) || 0;
+  const totalPotINR = installmentAmountINR * memberCount;
+  const installmentMST = (installmentAmountINR / MST_TO_INR_RATE).toFixed(4);
 
-  // Calculate reserve fee BPS from rupees
-  const calculatedReserveFeeBps = totalPotInr > 0
-    ? Math.min(2000, Math.max(100, Math.round((numReserveFeeInr / totalPotInr) * 10000)))
-    : 500;
-
-  // Convert Months to Seconds (1 month = 30 days = 2,592,000 seconds)
-  const numMonths = Number(cycleDurationMonths) || 1;
-  const cycleDurationSeconds = numMonths * 30 * 24 * 3600;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      groupName,
+      memberCount,
+      installmentAmount: installmentMST,
+      cycleDuration: cycleDurationMins * 60,
+      discountCapBps: discountCapPercent * 100,
+      reserveFeeBps: reserveFeePercent * 100,
+    });
+    onClose();
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
-      <div className="bg-[#0e0e0e] max-w-lg w-full p-8 rounded-xl relative shadow-2xl">
-        <div className="flex items-center justify-between pb-4 mb-4 border-b border-neutral-800">
-          <div className="flex items-center gap-2">
-            <Plus className="w-5 h-5 text-neutral-300" />
-            <h2 className="text-lg font-bold text-white font-display">Create Chit Group</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+      <div className="cred-card max-w-lg w-full p-6 sm:p-7 border-emerald-500/20 relative max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <Plus className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white font-display">Start a Savings Circle</h2>
+              <p className="text-xs text-slate-400">Create an autonomous community chit fund</p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="text-neutral-400 hover:text-white transition-colors"
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit({
-              groupName,
-              memberCount: Number(memberCount) || 5,
-              installmentAmount: installmentTokens,
-              cycleDuration: cycleDurationSeconds,
-              discountCapBps: 3000, // Standard 30% discount cap
-              reserveFeeBps: calculatedReserveFeeBps,
-              installmentInr: numInstallmentInr,
-            });
-            onClose();
-          }}
-          className="space-y-4"
-        >
+        <form onSubmit={handleSubmit} className="space-y-4 my-5 text-xs">
+          {/* Circle Name */}
           <div>
-            <label className="block text-xs font-semibold text-neutral-300 mb-1">
-              Group Name
-            </label>
+            <label className="block font-semibold text-slate-300 mb-1.5">Circle Name</label>
             <input
               type="text"
-              placeholder="Community Savings Circle"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
+              placeholder="e.g. Friends & Family Circle"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b0d11] border border-white/10 text-white text-xs focus:outline-none focus:border-emerald-500 transition-colors"
               required
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Members & Monthly Contribution */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                Member Count
-              </label>
+              <label className="block font-semibold text-slate-300 mb-1.5">Total Members</label>
               <input
                 type="number"
                 min="2"
-                max="50"
-                placeholder="5"
+                max="20"
                 value={memberCount}
-                onChange={(e) => setMemberCount(e.target.value === "" ? "" : parseInt(e.target.value))}
-                className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
-                required
+                onChange={(e) => setMemberCount(parseInt(e.target.value) || 2)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b0d11] border border-white/10 text-white text-xs focus:outline-none focus:border-emerald-500"
               />
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                Installment (Rupees / ₹)
-              </label>
+              <label className="block font-semibold text-slate-300 mb-1.5">Monthly Contribution (₹)</label>
               <input
                 type="number"
-                min="100"
-                step="50"
-                placeholder="5000"
-                value={installmentInr}
-                onChange={(e) => setInstallmentInr(e.target.value === "" ? "" : parseFloat(e.target.value))}
-                className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
-                required
+                min="500"
+                step="500"
+                value={installmentAmountINR}
+                onChange={(e) => setInstallmentAmountINR(parseInt(e.target.value) || 500)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b0d11] border border-white/10 text-white text-xs focus:outline-none focus:border-emerald-500"
               />
-              {numInstallmentInr > 0 && (
-                <p className="text-[11px] text-neutral-400 mt-1 font-mono">
-                  ≈ {installmentTokens} tMSTC (1 tMSTC = ₹{INR_PER_TMSTC.toLocaleString()})
-                </p>
-              )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                Reserve Fee (Rupees / ₹)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="10"
-                placeholder="250"
-                value={reserveFeeInr}
-                onChange={(e) => setReserveFeeInr(e.target.value === "" ? "" : parseFloat(e.target.value))}
-                className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
-                required
-              />
-              {totalPotInr > 0 && numReserveFeeInr > 0 && (
-                <p className="text-[11px] text-neutral-400 mt-1">
-                  {(calculatedReserveFeeBps / 100).toFixed(1)}% of total pot (₹{totalPotInr.toLocaleString()})
-                </p>
-              )}
+          {/* Circle Summary Preview Card */}
+          <div className="p-4 rounded-xl bg-gradient-to-br from-[#12151d] to-[#0d0f14] border border-white/5 space-y-2">
+            <div className="flex items-center justify-between text-slate-400">
+              <span>Total Monthly Pot</span>
+              <span className="text-base font-extrabold text-white font-display">
+                {formatRawINR(totalPotINR)}
+              </span>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                Round Cycle (Months)
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="24"
-                placeholder="1"
-                value={cycleDurationMonths}
-                onChange={(e) => setCycleDurationMonths(e.target.value === "" ? "" : parseInt(e.target.value))}
-                className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
-                required
-              />
-              {numMonths > 0 && (
-                <p className="text-[11px] text-neutral-400 mt-1">
-                  {numMonths} {numMonths === 1 ? "Month" : "Months"} per round cycle
-                </p>
-              )}
+            <div className="flex items-center justify-between text-slate-400 text-[11px]">
+              <span>Duration</span>
+              <span className="font-semibold text-slate-200">{memberCount} Months ({memberCount} Draws)</span>
+            </div>
+            <div className="flex items-center justify-between text-slate-400 text-[11px]">
+              <span>Required Security Deposit</span>
+              <span className="font-semibold text-emerald-400">
+                {formatRawINR(installmentAmountINR)} (100% Refundable)
+              </span>
             </div>
           </div>
 
-          <div className="pt-4 flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="btn-secondary">
+          {/* Technical Mode Parameters */}
+          {isTechnicalMode && (
+            <div className="tech-details-box text-[11px] space-y-2">
+              <p className="font-bold text-indigo-300 flex items-center gap-1">
+                <Code2 className="w-3.5 h-3.5 text-indigo-400" /> Advanced Protocol Parameters
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-slate-300">
+                <div>
+                  <p className="text-slate-400">Max Discount Floor (%):</p>
+                  <input
+                    type="number"
+                    min="5"
+                    max="50"
+                    value={discountCapPercent}
+                    onChange={(e) => setDiscountCapPercent(parseInt(e.target.value) || 30)}
+                    className="w-full mt-1 px-2 py-1 rounded bg-black border border-white/10 text-white font-mono text-xs"
+                  />
+                </div>
+                <div>
+                  <p className="text-slate-400">Reserve Fund Cut (%):</p>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={reserveFeePercent}
+                    onChange={(e) => setReserveFeePercent(parseInt(e.target.value) || 5)}
+                    className="w-full mt-1 px-2 py-1 rounded bg-black border border-white/10 text-white font-mono text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="pt-2 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-cred-secondary text-xs"
+            >
               Cancel
             </button>
-            <button type="submit" className="btn-primary">
-              Deploy Group
+            <button
+              type="submit"
+              className="btn-cred-primary text-xs"
+            >
+              Create Circle
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </form>
