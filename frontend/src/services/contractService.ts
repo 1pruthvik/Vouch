@@ -102,17 +102,35 @@ export class ContractService {
         params.cycleDuration,
         params.discountCapBps,
         params.reserveFeeBps,
-        safetyFactor
+        safetyFactor,
+        { gasLimit: 3000000 }
       );
 
-      const receipt = await tx.wait();
       let groupAddress: string | undefined;
+      let receipt: any = null;
+
+      try {
+        receipt = await Promise.race([
+          tx.wait(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("wait timeout")), 15000)),
+        ]);
+      } catch {
+        // Direct RPC fallback polling to avoid extension listener drop
+        const rpcProvider = new ethers.JsonRpcProvider(MST_TESTNET.rpcUrl);
+        for (let i = 0; i < 20; i++) {
+          try {
+            receipt = await rpcProvider.getTransactionReceipt(tx.hash);
+            if (receipt && receipt.blockNumber) break;
+          } catch {}
+          await new Promise((res) => setTimeout(res, 1200));
+        }
+      }
 
       if (receipt && receipt.logs) {
         for (const log of receipt.logs) {
           try {
             const parsed = factory.interface.parseLog(log);
-            if (parsed && parsed.name === "GroupCreated") {
+            if (parsed && (parsed.name === "GroupCreated" || parsed.args?.groupAddress)) {
               groupAddress = parsed.args.groupAddress;
               break;
             }
@@ -120,7 +138,16 @@ export class ContractService {
         }
       }
 
-      return { txHash: tx.hash, groupAddress };
+      if (!groupAddress) {
+        try {
+          const deployedList = await factory.getDeployedGroups();
+          if (deployedList && deployedList.length > 0) {
+            groupAddress = deployedList[deployedList.length - 1];
+          }
+        } catch {}
+      }
+
+      return { txHash: tx.hash, groupAddress: groupAddress || tx.hash };
     }
 
     // Direct on-chain deployment of ChitGroup from user wallet
