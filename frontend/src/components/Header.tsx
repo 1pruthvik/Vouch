@@ -6,23 +6,25 @@ import { MST_TESTNET } from "../config/network";
 interface HeaderProps {
   account: string | null;
   balance: string;
-  groupName?: string;
   isConnecting: boolean;
+  groupName?: string;
   isTechnicalMode: boolean;
   onToggleTechnicalMode: () => void;
   onOpenAccountModal: () => void;
   onOpenCreateGroupModal: () => void;
+  onSwitchGroup?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   account,
   balance,
-  groupName = "Alpha Savings Circle",
   isConnecting,
+  groupName = "Alpha Savings Circle",
   isTechnicalMode,
   onToggleTechnicalMode,
   onOpenAccountModal,
   onOpenCreateGroupModal,
+  onSwitchGroup,
 }) => {
   return (
     <header className="sticky top-0 z-40 backdrop-blur-xl bg-[#08090C]/85 border-b border-white/5 px-4 sm:px-8 py-3.5 flex items-center justify-between">
@@ -44,12 +46,24 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Active Group Pill */}
-        {groupName && (
-          <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/90 border border-white/10 text-xs text-slate-300">
+        {groupName ? (
+          <button
+            onClick={onSwitchGroup}
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 border border-white/10 text-xs text-slate-300 transition-colors"
+            title="Click to switch or explore other Savings Circles"
+          >
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-slate-400">Circle:</span>
             <span className="font-semibold text-white">{groupName}</span>
-          </div>
+            <span className="text-[10px] text-emerald-400 underline ml-1">Change</span>
+          </button>
+        ) : (
+          <button
+            onClick={onSwitchGroup}
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-xs text-slate-300 transition-colors"
+          >
+            <span>Explore Circles</span>
+          </button>
         )}
       </div>
 
@@ -93,7 +107,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <div className="text-left hidden sm:block">
             <p className="text-xs font-semibold text-white leading-tight">
-              {account ? `Pranav (${account.substring(0, 6)}...)` : "Connect Account"}
+              {account ? `${account.substring(0, 6)}...` : "Connect Account"}
             </p>
             <p className="text-[10px] text-emerald-400 leading-tight tabular-nums">
               {account ? `${formatINR(balance)} (${parseFloat(balance).toFixed(2)} tMSTC)` : "UPI / BridgeKey"}

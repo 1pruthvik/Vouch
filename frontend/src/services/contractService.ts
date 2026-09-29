@@ -15,6 +15,7 @@ import {
   type PhaseType,
   PHASE_NAMES,
 } from "../sdk/types";
+import { ChitFactoryABI } from "../sdk/contracts";
 
 export { PHASE_NAMES, type PhaseType, type GroupDetails, type MemberDetails, type SolvencyInfo };
 
@@ -55,6 +56,20 @@ export class ContractService {
 
   public getSDK(): VouchSDK {
     return this.sdk;
+  }
+
+  public async getDeployedGroupsFromFactory(): Promise<string[]> {
+    try {
+      const groups = await this.sdk.publicClient.readContract({
+        address: this.sdk.factoryAddress,
+        abi: ChitFactoryABI,
+        functionName: "getDeployedGroups",
+      }) as string[];
+      return groups || [];
+    } catch (err) {
+      console.warn("Could not fetch deployed groups from factory:", err);
+      return [];
+    }
   }
 
   // ==========================================
@@ -147,8 +162,13 @@ export class ContractService {
   public async getMemberDetails(
     groupAddress: string,
     memberAddress: string
-  ): Promise<MemberDetails> {
-    return this.sdk.getMemberDetails(groupAddress as Address, memberAddress as Address);
+  ): Promise<MemberDetails & { isMember?: boolean }> {
+    const details = await this.sdk.getMemberDetails(groupAddress as Address, memberAddress as Address);
+    const isMember = details.bufferBalanceRaw > 0n || details.paidInstallments > 0 || details.hasWon;
+    return {
+      ...details,
+      isMember,
+    };
   }
 
   public async checkSolvency(

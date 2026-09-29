@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { X, UserPlus, ShieldCheck, Lock, ArrowRight, Code2, CheckCircle2 } from "lucide-react";
-import { formatRawINR } from "../utils/formatters";
+import { X, UserPlus, Lock, ArrowRight, Code2 } from "lucide-react";
+import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 
 interface JoinGroupModalProps {
   isOpen: boolean;
   onClose: () => void;
+  defaultGroupAddress?: string;
+  defaultDepositINR?: number;
   onJoin: (groupAddress: string, bufferDeposit: string) => void;
   isTechnicalMode: boolean;
 }
@@ -12,21 +14,34 @@ interface JoinGroupModalProps {
 export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
   isOpen,
   onClose,
+  defaultGroupAddress = "",
+  defaultDepositINR = 5000,
   onJoin,
   isTechnicalMode,
 }) => {
-  const [groupAddress, setGroupAddress] = useState("");
-  const [bufferDepositINR, setBufferDepositINR] = useState(5000);
+  const [groupAddress, setGroupAddress] = useState(defaultGroupAddress);
+  const [bufferDepositINR, setBufferDepositINR] = useState<number | "">(defaultDepositINR);
   const [isJoining, setIsJoining] = useState(false);
+
+  React.useEffect(() => {
+    if (defaultGroupAddress) {
+      setGroupAddress(defaultGroupAddress);
+    }
+    if (defaultDepositINR) {
+      setBufferDepositINR(defaultDepositINR);
+    }
+  }, [defaultGroupAddress, defaultDepositINR, isOpen]);
 
   if (!isOpen) return null;
 
+  const depositInr = Number(bufferDepositINR) || 0;
+  const bufferMST = (depositInr / MST_TO_INR_RATE).toFixed(4);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!groupAddress) return;
+    if (!groupAddress || !bufferDepositINR) return;
     try {
       setIsJoining(true);
-      const bufferMST = (bufferDepositINR / 10000).toFixed(4);
       onJoin(groupAddress, bufferMST);
       onClose();
     } catch (err) {
@@ -37,82 +52,80 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="cred-card max-w-md w-full p-6 sm:p-7 border-emerald-500/20 relative">
+    <div className="v-overlay">
+      <div className="v-modal p-6 sm:p-7 max-w-md">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+        <div className="flex items-center justify-between pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-              <UserPlus className="w-5 h-5 stroke-[2.5]" />
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(45, 212, 168, 0.1)', border: '1px solid rgba(45, 212, 168, 0.2)' }}>
+              <UserPlus className="w-5 h-5 text-[#2dd4a8] stroke-[2.5]" />
             </div>
             <div>
               <h2 className="text-base font-bold text-white font-display">Join a Savings Circle</h2>
-              <p className="text-xs text-slate-400">Enter your circle invite code</p>
+              <p className="text-xs text-[#5f6578]">Enter your circle invite code</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
-          >
+          <button onClick={onClose} className="p-2 rounded-xl text-[#5f6578] hover:text-white hover:bg-white/5 transition-all duration-200">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 my-5 text-xs">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-5 text-xs">
           <div>
-            <label className="block font-semibold text-slate-300 mb-1.5">Circle Code / Invite Address</label>
+            <label className="block font-semibold text-[#9ca3b4] mb-2">Circle Address / Invite Code</label>
             <input
               type="text"
               value={groupAddress}
               onChange={(e) => setGroupAddress(e.target.value.trim())}
-              placeholder="0x... or Circle Invite Link"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b0d11] border border-white/10 text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+              placeholder="0x..."
+              className="v-input text-xs font-mono"
               required
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-300 mb-1.5">Refundable Security Deposit (₹)</label>
+            <label className="block font-semibold text-[#9ca3b4] mb-2">Refundable Security Deposit (₹)</label>
             <input
               type="number"
-              min="500"
-              step="500"
+              min="100"
+              step="50"
+              placeholder="Enter deposit in ₹"
               value={bufferDepositINR}
-              onChange={(e) => setBufferDepositINR(parseInt(e.target.value) || 500)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b0d11] border border-white/10 text-white text-xs focus:outline-none focus:border-emerald-500"
+              onChange={(e) => setBufferDepositINR(e.target.value === "" ? "" : parseFloat(e.target.value))}
+              className="v-input text-xs"
+              required
             />
-            <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-              <Lock className="w-3.5 h-3.5 text-emerald-400" />
-              100% refundable at the completion of all circle rounds.
+            {depositInr > 0 && (
+              <p className="text-[11px] text-[#9ca3b4] mt-1.5 font-mono">
+                ≈ {bufferMST} tMSTC (1 tMSTC = ₹{MST_TO_INR_RATE.toLocaleString()})
+              </p>
+            )}
+            <p className="text-[11px] text-[#5f6578] mt-1.5 flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-[#2dd4a8]" />
+              100% refundable when all circle rounds complete.
             </p>
           </div>
 
           {/* Technical Details */}
           {isTechnicalMode && (
-            <div className="tech-details-box text-[11px] space-y-1">
-              <p className="font-bold text-indigo-300 flex items-center gap-1">
-                <Code2 className="w-3.5 h-3.5 text-indigo-400" /> Contract Execution
+            <div className="v-tech-box text-[11px] space-y-1">
+              <p className="font-bold text-[#8b5cf6] flex items-center gap-1">
+                <Code2 className="w-3.5 h-3.5" /> Contract Execution
               </p>
-              <p>• Calls <code className="text-slate-200">ChitGroup.joinGroup{`{value: deposit}`}()</code></p>
-              <p>• Equivalent: <code className="text-slate-200">{(bufferDepositINR / 10000).toFixed(4)} tMSTC</code></p>
+              <p className="text-[#9ca3b4]">• Calls <code className="text-white/80">ChitGroup.joinGroup{`{value: deposit}`}()</code></p>
+              <p className="text-[#9ca3b4]">• Equivalent: <code className="text-white/80">{bufferMST} tMSTC</code></p>
             </div>
           )}
 
           {/* Actions */}
           <div className="pt-2 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn-cred-secondary text-xs"
-            >
-              Cancel
-            </button>
+            <button type="button" onClick={onClose} className="v-btn-secondary text-xs">Cancel</button>
             <button
               type="submit"
-              disabled={isJoining || !groupAddress}
-              className="btn-cred-primary text-xs"
+              disabled={isJoining || !groupAddress || !bufferDepositINR}
+              className="v-btn-primary text-xs"
             >
-              {isJoining ? "Joining..." : `Confirm & Join (${formatRawINR(bufferDepositINR)})`}
+              {isJoining ? "Joining..." : `Join Circle (${depositInr > 0 ? formatRawINR(depositInr) : "Deposit"})`}
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

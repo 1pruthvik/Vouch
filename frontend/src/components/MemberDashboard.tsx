@@ -3,14 +3,10 @@ import {
   ShieldCheck,
   TrendingUp,
   Coins,
-  Users,
   ChevronDown,
   ChevronUp,
   ArrowRight,
   Sparkles,
-  Info,
-  Calendar,
-  Zap,
   Lock,
   HeartHandshake,
   CheckCircle2,
@@ -21,11 +17,23 @@ import {
   Layers,
   ArrowUpRight,
   ExternalLink,
+  Compass,
+  Users,
+  Plus,
+  UserPlus,
+  Zap,
 } from "lucide-react";
 import gsap from "gsap";
-import { formatINR, getTrafficLightStatus, getFriendlyMemberName } from "../utils/formatters";
+import { formatINR, formatRawINR, getTrafficLightStatus } from "../utils/formatters";
 import { GroupDetails, MemberDetails } from "../services/contractService";
 import { RiskPredictionResponse } from "../services/aiService";
+
+export interface AvailableCircle {
+  address: string;
+  name: string;
+  memberCount: number;
+  installmentAmount: string;
+}
 
 interface MemberDashboardProps {
   account: string | null;
@@ -33,10 +41,14 @@ interface MemberDashboardProps {
   memberDetails: MemberDetails | null;
   riskAdvisory: RiskPredictionResponse | null;
   isTechnicalMode: boolean;
+  isMandateActive?: boolean;
+  availableGroups?: AvailableCircle[];
+  onSelectGroup?: (address: string) => void;
   onPayInstallment: () => Promise<void>;
   onOpenMandateModal: () => void;
   onOpenDrawTab: () => void;
   onJoinGroup: () => void;
+  onCreateGroup?: () => void;
 }
 
 export const MemberDashboard: React.FC<MemberDashboardProps> = ({
@@ -45,10 +57,14 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
   memberDetails,
   riskAdvisory,
   isTechnicalMode,
+  isMandateActive = false,
+  availableGroups = [],
+  onSelectGroup,
   onPayInstallment,
   onOpenMandateModal,
   onOpenDrawTab,
   onJoinGroup,
+  onCreateGroup,
 }) => {
   const [isBackupLayersExpanded, setIsBackupLayersExpanded] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -56,7 +72,6 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
 
   const heroRef = useRef<HTMLDivElement>(null);
   const statsGridRef = useRef<HTMLDivElement>(null);
-  const waterfallRef = useRef<HTMLDivElement>(null);
 
   // Animate on entrance
   useEffect(() => {
@@ -64,11 +79,13 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
     if (prefersReducedMotion) return;
 
     const ctx = gsap.context(() => {
-      gsap.fromTo(
-        heroRef.current,
-        { opacity: 0, y: 15 },
-        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }
-      );
+      if (heroRef.current) {
+        gsap.fromTo(
+          heroRef.current,
+          { opacity: 0, y: 15 },
+          { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }
+        );
+      }
       if (statsGridRef.current) {
         gsap.fromTo(
           statsGridRef.current.children,
@@ -79,24 +96,124 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
     });
 
     return () => ctx.revert();
-  }, []);
+  }, [groupDetails?.address]);
 
-  // Defaults if no group is loaded
-  const groupName = groupDetails?.name || "Alpha Savings Circle";
-  const currentRound = groupDetails?.currentRound || 1;
-  const totalRounds = groupDetails?.memberCount || 5;
-  const rawInstallment = groupDetails?.installmentAmount || "0.5";
+  // Default featured circles if no groups list
+  const featuredCircles: AvailableCircle[] = availableGroups.length > 0 ? availableGroups : [
+    {
+      address: "0xAf378D33B037A6668fOd128c4BBA28bb65974D9b",
+      name: "Alpha Savings Circle",
+      memberCount: 5,
+      installmentAmount: "5.0",
+    },
+    {
+      address: "0xb794f5ea0ba39494ce839613fffba74279579268",
+      name: "Bangalore Techies Chit",
+      memberCount: 4,
+      installmentAmount: "10.0",
+    },
+    {
+      address: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+      name: "Family Emergency Pool",
+      memberCount: 5,
+      installmentAmount: "2.0",
+    },
+  ];
+
+  // 1. If no group is selected, display rich, interactive Circle Discovery Directory
+  if (!groupDetails) {
+    return (
+      <div className="space-y-6">
+        {/* Welcome Hero */}
+        <div className="fintech-hero-card p-6 sm:p-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+            <div className="space-y-2">
+              <div className="badge-status-green inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold">
+                <Compass className="w-3.5 h-3.5" />
+                Community Chit Funds
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-white font-display">
+                Choose a Savings Circle
+              </h2>
+              <p className="text-sm text-slate-400 max-w-lg leading-relaxed">
+                Join an active rotating savings pool or launch your own private circle with friends, family, or colleagues on MST Blockchain.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {onCreateGroup && (
+                <button onClick={onCreateGroup} className="btn-fintech-primary text-xs">
+                  <Plus className="w-4 h-4" />
+                  Launch New Circle
+                </button>
+              )}
+              <button onClick={onJoinGroup} className="btn-fintech-secondary text-xs">
+                <UserPlus className="w-4 h-4 text-emerald-400" />
+                Join via Contract Address
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Featured Circles Grid */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold text-slate-300 font-display flex items-center gap-2">
+            <Users className="w-4 h-4 text-emerald-400" />
+            Available Savings Circles
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {featuredCircles.map((circle) => (
+              <div
+                key={circle.address}
+                onClick={() => onSelectGroup && onSelectGroup(circle.address)}
+                className="fintech-card p-5 cursor-pointer hover:border-emerald-500/40 hover:-translate-y-1 transition-all group"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h4 className="font-bold text-white group-hover:text-emerald-400 transition-colors font-display">
+                      {circle.name}
+                    </h4>
+                    <p className="text-[11px] font-mono text-slate-400">
+                      {circle.address.substring(0, 8)}...{circle.address.substring(circle.address.length - 6)}
+                    </p>
+                  </div>
+                  <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-black transition-colors">
+                    <ArrowRight className="w-4 h-4" />
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/5 text-xs">
+                  <div>
+                    <span className="text-slate-400 text-[11px]">Installment</span>
+                    <p className="font-bold text-white tabular-nums">{formatINR(circle.installmentAmount)}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[11px]">Members</span>
+                    <p className="font-bold text-white">{circle.memberCount} Participants</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Active Circle Variables
+  const groupName = groupDetails.name || "Alpha Savings Circle";
+  const currentRound = groupDetails.currentRound || 1;
+  const totalRounds = groupDetails.memberCount || 5;
+  const rawInstallment = groupDetails.installmentAmount || "0.5";
   const formattedInstallment = formatINR(rawInstallment);
 
   const bufferBalance = memberDetails?.bufferBalance || "0.5";
   const lockedDividends = memberDetails?.lockedDividends || "0.08";
   const hasPaidCurrentRound = memberDetails?.hasPaidCurrentRound || false;
-  const isMember = !!memberDetails;
+  const isMember = memberDetails?.isMember ?? false;
 
-  // Traffic light status
   const trafficLight = getTrafficLightStatus(memberDetails?.solvency, memberDetails?.isDefaulted);
-
-  // Progress percentage
   const progressPercent = Math.min(100, Math.round((currentRound / totalRounds) * 100));
 
   const handlePay = async () => {
@@ -112,9 +229,8 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* 1. PRIMARY HERO CARD — Next Payment, Mandate & Month Progress */}
+      {/* 1. PRIMARY HERO CARD */}
       <div ref={heroRef} className="fintech-hero-card p-6 sm:p-8 relative overflow-hidden">
-        {/* Subtle Ambient Radial Glow */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/[0.07] rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
@@ -147,8 +263,8 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
                 </button>
               </div>
               <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                Due in {groupDetails?.cycleDuration ? `${Math.round(groupDetails.cycleDuration / 60)} mins (Demo Timer)` : "4 days"}
+                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                Due in {groupDetails.cycleDuration ? `${Math.round(groupDetails.cycleDuration / 60)} mins (Demo Timer)` : "4 days"}
               </p>
             </div>
           </div>
@@ -185,7 +301,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
                   className="btn-fintech-secondary w-full py-2.5 text-xs text-slate-300"
                 >
                   <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-                  Auto-Pay Mandate Active ✓
+                  {isMandateActive ? "Auto-Pay Mandate Active ✓" : "Setup Auto-Pay Mandate"}
                 </button>
               </>
             ) : (
@@ -224,9 +340,8 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
         </div>
       </div>
 
-      {/* 2. SECONDARY METRICS GRID — High-Contrast Financial Balances */}
+      {/* 2. SECONDARY METRICS GRID */}
       <div ref={statsGridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Community Pot */}
         <div className="fintech-card p-5 space-y-2">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-semibold">Total Community Pot</span>
@@ -235,14 +350,13 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
             </div>
           </div>
           <p className="text-2xl font-bold text-white font-display tabular-nums tracking-tight">
-            {formatINR(groupDetails?.currentPot || "2.5")}
+            {formatINR(groupDetails.currentPot || "2.5")}
           </p>
           <p className="text-[11px] text-slate-400 flex items-center gap-1">
             <span className="text-emerald-400 font-medium">Available for draw</span> this round
           </p>
         </div>
 
-        {/* Card 2: Your Safety Buffer */}
         <div className="fintech-card p-5 space-y-2">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-semibold">Your Security Deposit</span>
@@ -258,7 +372,6 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
           </p>
         </div>
 
-        {/* Card 3: Earned Dividend Savings */}
         <div className="fintech-card p-5 space-y-2">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-semibold">Earned Dividends</span>
@@ -274,7 +387,6 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
           </p>
         </div>
 
-        {/* Card 4: Monthly Draw Eligibility */}
         <div className="fintech-card p-5 space-y-2 cursor-pointer hover:border-emerald-500/30 transition-all" onClick={onOpenDrawTab}>
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-semibold">Need Early Funds?</span>
@@ -291,7 +403,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
         </div>
       </div>
 
-      {/* 3. TERTIARY SECTION: 5-LAYER WATERFALL DISCLOSURE */}
+      {/* 3. 5-LAYER WATERFALL DISCLOSURE */}
       <div className="fintech-card p-6 border-white/5 space-y-4">
         <button
           onClick={() => setIsBackupLayersExpanded(!isBackupLayersExpanded)}
@@ -320,7 +432,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
         </button>
 
         {isBackupLayersExpanded && (
-          <div className="pt-4 border-t border-white/5 space-y-3 animate-fadeIn">
+          <div className="pt-4 border-t border-white/5 space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs">
               <div className="p-3.5 rounded-xl bg-slate-900/90 border border-white/5 space-y-1">
                 <span className="font-bold text-emerald-400">Layer 1</span>
@@ -356,7 +468,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
         )}
       </div>
 
-      {/* 4. TECHNICAL / BLOCKCHAIN DETAILS (Opt-in for evaluators/judges) */}
+      {/* 4. TECHNICAL DETAILS CALLOUT (Opt-in) */}
       {isTechnicalMode && (
         <div className="tech-details-box text-xs space-y-2">
           <div className="flex items-center justify-between text-indigo-300 font-bold">
@@ -370,7 +482,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-slate-300 pt-2">
             <div>
               <p className="text-slate-400 text-[11px]">Contract State:</p>
-              <p className="font-mono text-emerald-400 font-bold">{groupDetails?.currentState || "Collect"}</p>
+              <p className="font-mono text-emerald-400 font-bold">{groupDetails.currentState || "Collect"}</p>
             </div>
             <div>
               <p className="text-slate-400 text-[11px]">Solvency Invariant:</p>
@@ -378,11 +490,11 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
             </div>
             <div>
               <p className="text-slate-400 text-[11px]">Safety Factor:</p>
-              <p className="font-mono text-slate-200">{groupDetails?.safetyFactorBps ? `${groupDetails.safetyFactorBps / 100}%` : "120%"}</p>
+              <p className="font-mono text-slate-200">{groupDetails.safetyFactorBps ? `${groupDetails.safetyFactorBps / 100}%` : "120%"}</p>
             </div>
             <div>
               <p className="text-slate-400 text-[11px]">Discount Floor Cap:</p>
-              <p className="font-mono text-slate-200">{groupDetails?.discountCapBps ? `${groupDetails.discountCapBps / 100}%` : "30%"}</p>
+              <p className="font-mono text-slate-200">{groupDetails.discountCapBps ? `${groupDetails.discountCapBps / 100}%` : "30%"}</p>
             </div>
           </div>
         </div>

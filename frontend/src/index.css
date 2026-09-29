@@ -1,44 +1,56 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Plus Jakarta Sans', 'Outfit', sans-serif;
-  
-  /* Institutional Onyx & Slate Palette */
+  --font-sans: 'Inter', 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'Space Grotesk', sans-serif;
+
+  /* Institutional Onyx & Charcoal Base */
   --bg-app: #08090C;
   --bg-surface: #0E1117;
-  --bg-surface-elevated: #131720;
-  --bg-surface-hover: #181D28;
-  --bg-surface-subtle: #0B0E14;
+  --bg-surface-raised: #131720;
+  --bg-surface-overlay: #181D28;
   --bg-input: #090C10;
-  
-  /* Trust & Status Colors */
+
+  /* Trust & Status Accents */
   --primary-emerald: #10B981;
   --primary-emerald-glow: rgba(16, 185, 129, 0.15);
-  --accent-sapphire: #3B82F6;
+  --accent-teal: #2DD4A8;
+  --accent-teal-dim: rgba(45, 212, 168, 0.12);
   --accent-amber: #F59E0B;
+  --accent-amber-dim: rgba(245, 158, 11, 0.12);
+  --accent-violet: #8B5CF6;
+  --accent-violet-dim: rgba(139, 92, 246, 0.12);
   --accent-rose: #EF4444;
-  --accent-indigo: #6366F1;
-  
-  /* Typography & Contrast */
+  --accent-rose-dim: rgba(239, 68, 68, 0.12);
+  --accent-sapphire: #3B82F6;
+  --accent-sky: #38BDF8;
+  --accent-sky-dim: rgba(56, 189, 248, 0.12);
+
+  /* Text Hierarchy */
   --text-primary: #F8FAFC;
   --text-secondary: #94A3B8;
   --text-muted: #64748B;
   --text-dim: #475569;
-  
+
   /* Precision Borders & Shadows */
   --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-medium: rgba(255, 255, 255, 0.12);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-medium: rgba(255, 255, 255, 0.14);
   --border-focus: rgba(16, 185, 129, 0.4);
   --shadow-card: 0 12px 32px -4px rgba(0, 0, 0, 0.6);
   --shadow-hero: 0 24px 48px -12px rgba(0, 0, 0, 0.8);
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
 }
 
-* {
+*, *::before, *::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -62,8 +74,7 @@ body {
   background-attachment: fixed;
 }
 
-/* Typography Helpers */
-h1, h2, h3, h4, .font-display {
+h1, h2, h3, h4, h5, .font-display {
   font-family: var(--font-display);
   letter-spacing: -0.02em;
 }
@@ -72,36 +83,52 @@ h1, h2, h3, h4, .font-display {
   font-variant-numeric: tabular-nums;
 }
 
-/* Institutional FinTech Surface Cards */
-.fintech-card {
+::selection {
+  background: rgba(16, 185, 129, 0.3);
+  color: white;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Institutional Card Surfaces */
+.fintech-card, .v-card, .cred-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.fintech-card:hover {
+.fintech-card:hover, .v-card:hover, .cred-card:hover {
   border-color: var(--border-medium);
 }
 
-.fintech-hero-card {
+.fintech-hero-card, .v-card-hero, .cred-hero-card {
   background: linear-gradient(145deg, #11151F 0%, #0C0E14 100%);
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-hero);
   position: relative;
+  overflow: hidden;
 }
 
-.fintech-glass-panel {
+.fintech-glass-panel, .v-card-glass {
   background: rgba(14, 17, 23, 0.7);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
 }
 
-/* Primary High-Impact FinTech Action Button */
-.btn-fintech-primary {
+/* Primary High-Impact FinTech Action Buttons */
+.btn-fintech-primary, .btn-cred-primary, .v-btn-primary {
   background: linear-gradient(135deg, #10B981 0%, #059669 100%);
   color: #FFFFFF;
   border: none;
@@ -118,25 +145,21 @@ h1, h2, h3, h4, .font-display {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.btn-fintech-primary:hover:not(:disabled) {
+.btn-fintech-primary:hover:not(:disabled), .btn-cred-primary:hover:not(:disabled), .v-btn-primary:hover:not(:disabled) {
   background: linear-gradient(135deg, #34D399 0%, #10B981 100%);
   box-shadow: 0 6px 24px rgba(16, 185, 129, 0.4);
   transform: translateY(-1px);
 }
 
-.btn-fintech-primary:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.btn-fintech-primary:disabled {
+.btn-fintech-primary:disabled, .btn-cred-primary:disabled, .v-btn-primary:disabled {
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
-/* Secondary Surface Button */
-.btn-fintech-secondary {
+/* Secondary Surface Buttons */
+.btn-fintech-secondary, .btn-cred-secondary, .v-btn-secondary {
   background: rgba(255, 255, 255, 0.05);
   color: #F1F5F9;
   border: 1px solid var(--border-subtle);
@@ -152,40 +175,78 @@ h1, h2, h3, h4, .font-display {
   transition: all 0.2s ease;
 }
 
-.btn-fintech-secondary:hover:not(:disabled) {
+.btn-fintech-secondary:hover:not(:disabled), .btn-cred-secondary:hover:not(:disabled), .v-btn-secondary:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.09);
   border-color: var(--border-medium);
   color: #FFFFFF;
 }
 
-.btn-fintech-secondary:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.v-btn-outline {
+  background: transparent;
+  color: #F1F5F9;
+  border: 1px solid var(--border-default);
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.v-btn-outline:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-medium);
 }
 
 /* Status Badges */
-.badge-status-green {
+.badge-status-green, .v-badge-success {
   background: rgba(16, 185, 129, 0.1);
   color: #34D399;
   border: 1px solid rgba(16, 185, 129, 0.22);
 }
 
-.badge-status-yellow {
+.badge-status-yellow, .v-badge-warning {
   background: rgba(245, 158, 11, 0.1);
   color: #FBBF24;
   border: 1px solid rgba(245, 158, 11, 0.22);
 }
 
-.badge-status-red {
+.badge-status-red, .v-badge-danger {
   background: rgba(239, 68, 68, 0.1);
   color: #F87171;
   border: 1px solid rgba(239, 68, 68, 0.22);
 }
 
-.badge-status-indigo {
+.badge-status-indigo, .v-badge-purple {
   background: rgba(99, 102, 241, 0.1);
   color: #A5B4FC;
   border: 1px solid rgba(99, 102, 241, 0.22);
+}
+
+.v-badge-info {
+  background: rgba(56, 189, 248, 0.1);
+  color: #38BDF8;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+}
+
+.v-badge-neutral {
+  background: rgba(255, 255, 255, 0.06);
+  color: #94A3B8;
+  border: 1px solid var(--border-subtle);
+}
+
+.v-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 /* Technical Details Accordion / Pro Callout */

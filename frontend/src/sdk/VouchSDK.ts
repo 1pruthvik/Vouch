@@ -308,6 +308,7 @@ export class VouchSDK {
 
     return {
       address: memberAddress,
+      isMember: m.isMember !== undefined ? Boolean(m.isMember) : (Number(m.paidInstallments || 0n) > 0 || (m.bufferBalance && m.bufferBalance > 0n)),
       bufferBalance: formatEther(m.bufferBalance || 0n),
       bufferBalanceRaw: m.bufferBalance || 0n,
       lockedDividends: formatEther(m.lockedDividends || 0n),

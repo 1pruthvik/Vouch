@@ -9,9 +9,9 @@ import {
   CheckCircle2,
   Copy,
   Check,
-  Filter,
+  History,
 } from "lucide-react";
-import { formatINR, formatRawINR } from "../utils/formatters";
+import { formatINR } from "../utils/formatters";
 import { MST_TESTNET } from "../config/network";
 
 export interface LedgerEvent {
@@ -42,36 +42,41 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
     setTimeout(() => setCopiedHash(null), 2000);
   };
 
-  // Map raw on-chain events to friendly statement transactions
   const formatTransaction = (ev: LedgerEvent) => {
     let title = "Transaction";
     let isCredit = false;
-    let icon = <ArrowUpRight className="w-4 h-4 text-slate-400" />;
+    let icon = <ArrowUpRight className="w-4 h-4 text-[#9ca3b4]" />;
     let inrAmount = formatINR(ev.amount.split(" ")[0]);
+    let iconBg = "rgba(255,255,255,0.05)";
 
     if (ev.eventName === "InstallmentCollected" || ev.eventName === "InstallmentPaid") {
       title = `Month ${ev.round} Contribution Paid`;
       isCredit = false;
-      icon = <ArrowUpRight className="w-4 h-4 text-slate-400" />;
+      icon = <ArrowUpRight className="w-4 h-4 text-[#f5a623]" />;
+      iconBg = "rgba(245, 166, 35, 0.1)";
     } else if (ev.eventName === "AuctionSettled") {
-      title = `Month ${ev.round} Community Draw Payout`;
+      title = `Month ${ev.round} Draw Payout`;
       isCredit = true;
-      icon = <ArrowDownLeft className="w-4 h-4 text-emerald-400" />;
+      icon = <ArrowDownLeft className="w-4 h-4 text-[#2dd4a8]" />;
+      iconBg = "rgba(45, 212, 168, 0.1)";
     } else if (ev.eventName === "DefaultAbsorbed") {
       title = `Backup Layer Absorbed Deficit`;
       isCredit = false;
-      icon = <ShieldCheck className="w-4 h-4 text-amber-400" />;
+      icon = <ShieldCheck className="w-4 h-4 text-[#f43f5e]" />;
+      iconBg = "rgba(244, 63, 94, 0.1)";
     } else if (ev.eventName === "MemberJoined" || ev.eventName === "UserJoined") {
       title = `Security Deposit Confirmed`;
       isCredit = false;
-      icon = <ShieldCheck className="w-4 h-4 text-emerald-400" />;
+      icon = <ShieldCheck className="w-4 h-4 text-[#8b5cf6]" />;
+      iconBg = "rgba(139, 92, 246, 0.1)";
     } else if (ev.eventName === "BalancesWithdrawn") {
-      title = `Final Deposit & Savings Refunded`;
+      title = `Deposit & Savings Refunded`;
       isCredit = true;
-      icon = <ArrowDownLeft className="w-4 h-4 text-emerald-400" />;
+      icon = <ArrowDownLeft className="w-4 h-4 text-[#2dd4a8]" />;
+      iconBg = "rgba(45, 212, 168, 0.1)";
     }
 
-    return { title, isCredit, icon, inrAmount };
+    return { title, isCredit, icon, inrAmount, iconBg };
   };
 
   const sampleEvents: LedgerEvent[] = events.length > 0 ? events : [
@@ -104,20 +109,23 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
     },
   ];
 
-  const filteredEvents = sampleEvents.filter((ev) => {
+  const displayEvents = events.length > 0 ? events : sampleEvents;
+
+  const filteredEvents = displayEvents.filter((ev) => {
     if (filterType === "CONTRIBUTIONS") return ev.eventName.includes("Installment") || ev.eventName.includes("Joined");
     if (filterType === "PAYOUTS") return ev.eventName.includes("Auction") || ev.eventName.includes("Withdrawn");
     return true;
   });
 
   return (
-    <div className="fintech-card p-6 sm:p-7 border-white/5 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/5">
+    <div className="v-card p-6 sm:p-7 space-y-5 anim-fade-up">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
         <div>
-          <h3 className="text-base font-bold text-white font-display">Blockchain Audit Ledger</h3>
-          <p className="text-xs text-slate-400">Statement of all verified on-chain contributions, draws, and savings credits</p>
+          <h3 className="text-base font-bold text-white font-display">Transaction History & Audit Ledger</h3>
+          <p className="text-xs text-[#9ca3b4] mt-0.5">Verified on-chain contributions, draws, and savings credits</p>
         </div>
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-400">
+        <div className="v-badge v-badge-green self-start sm:self-auto">
           <CheckCircle2 className="w-3.5 h-3.5" />
           MST Blockchain Verified
         </div>
@@ -133,7 +141,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               : "bg-white/5 text-slate-400 hover:text-white"
           }`}
         >
-          All Activity ({sampleEvents.length})
+          All Activity ({displayEvents.length})
         </button>
         <button
           onClick={() => setFilterType("CONTRIBUTIONS")}
@@ -157,74 +165,102 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
         </button>
       </div>
 
-      {/* Transaction List */}
-      <div className="divide-y divide-white/5">
-        {filteredEvents.map((ev) => {
-          const { title, isCredit, icon, inrAmount } = formatTransaction(ev);
-          const explorerUrl = `${MST_TESTNET.explorerUrl}/tx/${ev.txHash}`;
+      {/* Transaction List or Empty State */}
+      {filteredEvents.length === 0 ? (
+        <div className="py-12 text-center space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-white/5 text-[#5f6578] flex items-center justify-center mx-auto">
+            <History className="w-6 h-6" />
+          </div>
+          <p className="text-sm font-semibold text-white font-display">No Transactions Found</p>
+          <p className="text-xs text-[#9ca3b4] max-w-sm mx-auto">
+            Transactions will appear here automatically once group members join, contribute, or settle draws.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-1 divide-y divide-white/5">
+          {filteredEvents.map((ev, index) => {
+            const { title, isCredit, icon, inrAmount, iconBg } = formatTransaction(ev);
+            const explorerUrl = `${MST_TESTNET.explorerUrl}/tx/${ev.txHash}`;
 
-          return (
-            <div
-              key={ev.id}
-              className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] px-2 rounded-xl transition-all"
-            >
-              <div className="flex items-center gap-3.5">
-                <div className={`p-2.5 rounded-xl ${isCredit ? "bg-emerald-500/10" : "bg-slate-900 border border-white/5"}`}>
-                  {icon}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-white font-display">{title}</p>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3 text-slate-500" /> {ev.timestamp}
-                    </span>
-                    <span>•</span>
-                    <span className="text-slate-300 font-mono">
-                      {ev.member ? `${ev.member.substring(0, 6)}...` : "Community Pool"}
-                    </span>
+            return (
+              <div
+                key={ev.id || index}
+                className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] px-2 rounded-xl transition-all group"
+              >
+                {/* Left */}
+                <div className="flex items-center gap-3.5">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105"
+                    style={{ background: iconBg }}
+                  >
+                    {icon}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-white font-display">{title}</p>
+                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#5f6578]">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {ev.timestamp}
+                      </span>
+                      <span>·</span>
+                      <span className="font-mono text-slate-400">
+                        {ev.member ? `${ev.member.substring(0, 6)}...${ev.member.substring(ev.member.length - 4)}` : "Community Pool"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center justify-between sm:justify-end gap-4 text-right">
-                <div>
-                  <p className={`text-sm font-bold font-display tabular-nums ${isCredit ? "text-emerald-400" : "text-white"}`}>
-                    {isCredit ? `+${inrAmount}` : `-${inrAmount}`}
-                  </p>
-                  <p className="text-[10px] text-slate-400 font-mono">
-                    {ev.amount}
-                  </p>
+                {/* Right */}
+                <div className="flex items-center justify-between sm:justify-end gap-4 text-right">
+                  <div>
+                    <p className={`text-sm font-bold font-display ${isCredit ? "text-[#2dd4a8]" : "text-white"}`}>
+                      {isCredit ? `+${inrAmount}` : `-${inrAmount}`}
+                    </p>
+                    <p className="text-[10px] text-[#5f6578] font-mono">
+                      {ev.amount}
+                    </p>
+                  </div>
+
+                  {/* Hash & Explorer */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => copyToClipboard(ev.txHash)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                      title="Copy Transaction Hash"
+                    >
+                      {copiedHash === ev.txHash ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+
+                    <a
+                      href={explorerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-1 text-[11px]"
+                      title="View on MSTScan Explorer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
                 </div>
 
-                {/* Hash & Explorer */}
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => copyToClipboard(ev.txHash)}
-                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-                    title="Copy Transaction Hash"
-                  >
-                    {copiedHash === ev.txHash ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-
-                  <a
-                    href={explorerUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-1 text-[11px]"
-                    title="View on MSTScan Explorer"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </div>
+                {/* Technical Mode Details */}
+                {isTechnicalMode && (
+                  <div className="w-full text-[10px] font-mono flex items-center gap-2 pt-1 border-t border-white/5 text-purple-400/80">
+                    <Code2 className="w-3 h-3" />
+                    <span>Event: {ev.eventName}</span>
+                    <span>|</span>
+                    <span className="truncate">Tx: {ev.txHash}</span>
+                  </div>
+                )}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

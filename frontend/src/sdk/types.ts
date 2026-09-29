@@ -52,6 +52,7 @@ export interface SolvencyInfo {
 
 export interface MemberDetails {
   address: Address;
+  isMember?: boolean;
   bufferBalance: string;
   bufferBalanceRaw: bigint;
   lockedDividends: string;
