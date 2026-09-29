@@ -165,7 +165,13 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
                     </div>
                   </div>
 
-                  <button className="w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 bg-white/[0.04] group-hover:bg-[#2dd4a8]/10 group-hover:text-[#2dd4a8] text-[#9ca3b4]">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onSelectGroup) onSelectGroup(circle.address);
+                    }}
+                    className="w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 bg-white/[0.04] group-hover:bg-[#2dd4a8]/10 group-hover:text-[#2dd4a8] text-[#9ca3b4]"
+                  >
                     Enter Circle
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>

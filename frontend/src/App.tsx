@@ -117,6 +117,21 @@ export function App() {
     }
   }, [activeGroupAddress, contractService, account]);
 
+  const handleSelectGroup = async (addr: string) => {
+    setActiveGroupAddress(addr);
+    const srv = contractService || new ContractService((provider as any) || undefined);
+    try {
+      const g = await srv.getGroupDetails(addr);
+      setGroupDetails(g);
+      if (account) {
+        const m = await srv.getMemberDetails(addr, account);
+        setMemberDetails(m);
+      }
+    } catch (e) {
+      console.warn("Could not load group details on selection:", e);
+    }
+  };
+
   useEffect(() => {
     if (activeGroupAddress) {
       refreshData();
@@ -317,9 +332,7 @@ export function App() {
               riskAdvisory={riskAdvisory}
               isTechnicalMode={isTechnicalMode}
               isMandateActive={isMandateActive}
-              onSelectGroup={(addr) => {
-                setActiveGroupAddress(addr);
-              }}
+              onSelectGroup={handleSelectGroup}
               onPayInstallment={handlePayInstallment}
               onOpenMandateModal={() => setIsMandateModalOpen(true)}
               onOpenDrawTab={() => setActiveTab("draw")}
@@ -378,9 +391,7 @@ export function App() {
                 riskAdvisory={riskAdvisory}
                 isTechnicalMode={isTechnicalMode}
                 isMandateActive={isMandateActive}
-                onSelectGroup={(addr) => {
-                  setActiveGroupAddress(addr);
-                }}
+                onSelectGroup={handleSelectGroup}
                 onPayInstallment={handlePayInstallment}
                 onOpenMandateModal={() => setIsMandateModalOpen(true)}
                 onOpenDrawTab={() => setActiveTab("draw")}
