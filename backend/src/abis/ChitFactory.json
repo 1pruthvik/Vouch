@@ -1,0 +1,64 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "groupAddress", "type": "address" },
+      { "indexed": false, "internalType": "string", "name": "groupName", "type": "string" },
+      { "indexed": false, "internalType": "uint256", "name": "memberCount", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "installmentAmount", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "cycleDuration", "type": "uint256" }
+    ],
+    "name": "GroupCreated",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "groupName", "type": "string" },
+      { "internalType": "uint256", "name": "memberCount", "type": "uint256" },
+      { "internalType": "uint256", "name": "installmentAmount", "type": "uint256" },
+      { "internalType": "uint256", "name": "cycleDuration", "type": "uint256" },
+      { "internalType": "uint256", "name": "discountCapBps", "type": "uint256" },
+      { "internalType": "uint256", "name": "reserveFeeBps", "type": "uint256" },
+      { "internalType": "uint256", "name": "safetyFactorBps", "type": "uint256" }
+    ],
+    "name": "createGroup",
+    "outputs": [{ "internalType": "address", "name": "groupAddr", "type": "address" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getDeployedGroups",
+    "outputs": [{ "internalType": "address[]", "name": "", "type": "address[]" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getDeployedGroupsCount",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "name": "deployedGroups",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "vouchRegistry",
+    "outputs": [{ "internalType": "contract VouchRegistry", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultYieldStrategy",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

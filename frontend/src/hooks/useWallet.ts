@@ -1,15 +1,40 @@
 import { useState, useEffect, useCallback } from "react";
 import { ethers } from "ethers";
 import { MST_TESTNET } from "../config/network";
+import { EIP6963ProviderDetail, EIP6963AnnounceProviderEvent } from "../types/global";
 
 export function useWallet() {
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [balance, setBalance] = useState<string>("0");
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
-  const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
+  const [provider, setProvider] = useState<ethers.BrowserProvider | ethers.JsonRpcProvider | null>(null);
+  const [signer, setSigner] = useState<ethers.Signer | null>(null);
+  const [detectedProviders, setDetectedProviders] = useState<EIP6963ProviderDetail[]>([]);
+  const [selectedProviderDetail, setSelectedProviderDetail] = useState<EIP6963ProviderDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPrivateKeyMode, setIsPrivateKeyMode] = useState<boolean>(false);
 
-  const checkNetwork = useCallback(async (prov: ethers.BrowserProvider) => {
+  // 1. EIP-6963 Multi-Injected Provider Discovery
+  useEffect(() => {
+    const handleAnnounce = (event: EIP6963AnnounceProviderEvent) => {
+      if (!event.detail || !event.detail.info) return;
+      setDetectedProviders((prev) => {
+        const exists = prev.some((p) => p.info.uuid === event.detail.info.uuid);
+        if (exists) return prev;
+        return [...prev, event.detail];
+      });
+    };
+
+    window.addEventListener("eip6963:announceProvider" as any, handleAnnounce);
+    window.dispatchEvent(new Event("eip6963:requestProvider"));
+
+    return () => {
+      window.removeEventListener("eip6963:announceProvider" as any, handleAnnounce);
+    };
+  }, []);
+
+  const checkNetwork = useCallback(async (prov: ethers.BrowserProvider | ethers.JsonRpcProvider) => {
     try {
       const network = await prov.getNetwork();
       const currentChainId = Number(network.chainId);
@@ -21,7 +46,7 @@ export function useWallet() {
     }
   }, []);
 
-  const updateBalance = useCallback(async (acc: string, prov: ethers.BrowserProvider) => {
+  const updateBalance = useCallback(async (acc: string, prov: ethers.BrowserProvider | ethers.JsonRpcProvider) => {
     try {
       const bal = await prov.getBalance(acc);
       setBalance(ethers.formatEther(bal));
@@ -30,10 +55,21 @@ export function useWallet() {
     }
   }, []);
 
+  const getRawProvider = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    return selectedProviderDetail?.provider || window.ethereum || (window as any).bridgekey || null;
+  }, [selectedProviderDetail]);
+
   const switchToMSTTestnet = async () => {
-    if (!window.ethereum) return false;
+    if (isPrivateKeyMode) return true;
+    const rawProv = getRawProvider();
+    if (!rawProv) {
+      setError("No Web3 provider available to switch networks.");
+      return false;
+    }
+    setError(null);
     try {
-      await window.ethereum.request({
+      await rawProv.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: MST_TESTNET.chainIdHex }],
       });
@@ -41,7 +77,7 @@ export function useWallet() {
     } catch (switchError: any) {
       if (switchError.code === 4902 || switchError.message?.includes("Unrecognized chain")) {
         try {
-          await window.ethereum.request({
+          await rawProv.request({
             method: "wallet_addEthereumChain",
             params: [
               {
@@ -58,44 +94,97 @@ export function useWallet() {
             ],
           });
           return true;
-        } catch (addError) {
+        } catch (addError: any) {
           console.error("Failed to add MST Testnet:", addError);
+          setError(addError?.message || "Failed to add MST Testnet.");
           return false;
         }
       }
+      setError(switchError?.message || "Failed to switch to MST Testnet.");
       return false;
     }
   };
 
-  const connectWallet = async () => {
-    if (typeof window === "undefined" || !window.ethereum) {
-      alert("BridgeKey or Web3 wallet not detected. Please install BridgeKey wallet!");
-      return;
+  const connectWallet = async (providerDetail?: EIP6963ProviderDetail) => {
+    setError(null);
+    const targetDetail = providerDetail || selectedProviderDetail || (detectedProviders.length > 0 ? detectedProviders[0] : null);
+    const rawProvider = targetDetail ? targetDetail.provider : getRawProvider();
+
+    if (!rawProvider) {
+      setError("Browser extension not detected. You can also connect via Private Key.");
+      return false;
     }
 
     try {
       setIsConnecting(true);
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      if (targetDetail) {
+        setSelectedProviderDetail(targetDetail);
+      }
+      const browserProvider = new ethers.BrowserProvider(rawProvider);
       const accounts = await browserProvider.send("eth_requestAccounts", []);
-      
+
       if (accounts && accounts.length > 0) {
         setAccount(accounts[0]);
         setProvider(browserProvider);
+        const userSigner = await browserProvider.getSigner();
+        setSigner(userSigner);
+        setIsPrivateKeyMode(false);
+
         const currentChainId = await checkNetwork(browserProvider);
         if (currentChainId !== MST_TESTNET.chainId) {
           await switchToMSTTestnet();
         }
         await updateBalance(accounts[0], browserProvider);
+        return true;
       }
     } catch (err: any) {
       console.error("Wallet connection error:", err);
+      setError(err?.message || "Failed to connect wallet.");
+      return false;
+    } finally {
+      setIsConnecting(false);
+    }
+    return false;
+  };
+
+  // Connect directly with Private Key on MST Testnet (Phase 0 Option)
+  const connectWithPrivateKey = async (privateKey: string) => {
+    setError(null);
+    try {
+      setIsConnecting(true);
+      const formattedKey = privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`;
+      const rpcProvider = new ethers.JsonRpcProvider(MST_TESTNET.rpcUrl);
+      const wallet = new ethers.Wallet(formattedKey, rpcProvider);
+
+      setAccount(wallet.address);
+      setProvider(rpcProvider);
+      setSigner(wallet);
+      setChainId(MST_TESTNET.chainId);
+      setIsPrivateKeyMode(true);
+
+      await updateBalance(wallet.address, rpcProvider);
+      return true;
+    } catch (err: any) {
+      console.error("Private key connection error:", err);
+      setError(err?.message || "Invalid private key format.");
+      return false;
     } finally {
       setIsConnecting(false);
     }
   };
 
+  const disconnectWallet = () => {
+    setAccount(null);
+    setBalance("0");
+    setChainId(null);
+    setProvider(null);
+    setSigner(null);
+    setIsPrivateKeyMode(false);
+  };
+
   useEffect(() => {
-    if (typeof window !== "undefined" && window.ethereum) {
+    const rawProv = getRawProvider();
+    if (rawProv && rawProv.on && !isPrivateKeyMode) {
       const handleAccountsChanged = (accounts: string[]) => {
         if (accounts.length > 0) {
           setAccount(accounts[0]);
@@ -106,19 +195,24 @@ export function useWallet() {
         }
       };
 
-      const handleChainChanged = () => {
-        window.location.reload();
+      const handleChainChanged = (newChainIdHex: string) => {
+        setChainId(Number(newChainIdHex));
+        if (account && provider) {
+          updateBalance(account, provider);
+        }
       };
 
-      window.ethereum.on("accountsChanged", handleAccountsChanged);
-      window.ethereum.on("chainChanged", handleChainChanged);
+      rawProv.on("accountsChanged", handleAccountsChanged);
+      rawProv.on("chainChanged", handleChainChanged);
 
       return () => {
-        window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
-        window.ethereum.removeListener("chainChanged", handleChainChanged);
+        if (rawProv.removeListener) {
+          rawProv.removeListener("accountsChanged", handleAccountsChanged);
+          rawProv.removeListener("chainChanged", handleChainChanged);
+        }
       };
     }
-  }, [provider, updateBalance]);
+  }, [getRawProvider, account, provider, isPrivateKeyMode, updateBalance]);
 
   return {
     account,
@@ -126,8 +220,14 @@ export function useWallet() {
     balance,
     isConnecting,
     provider,
+    signer,
+    detectedProviders,
+    error,
+    isPrivateKeyMode,
     connectWallet,
+    connectWithPrivateKey,
+    disconnectWallet,
     switchToMSTTestnet,
-    isCorrectNetwork: chainId === MST_TESTNET.chainId,
+    isCorrectNetwork: isPrivateKeyMode || chainId === MST_TESTNET.chainId,
   };
 }

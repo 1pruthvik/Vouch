@@ -7,7 +7,8 @@ import "./interfaces/IYieldStrategy.sol";
 
 /**
  * @title ChitGroup
- * @dev Autonomous ROSCA / Chit Fund group executing cycles, reverse auctions, 5-tier waterfall, and solvency checks
+ * @dev Autonomous ROSCA / Chit Fund group executing cycles, reverse auctions, 5-tier waterfall, and solvency checks.
+ * Target EVM: Paris. Complies with MST Blockchain architecture specifications.
  */
 contract ChitGroup is ReentrancyGuard {
     enum GroupState {
@@ -21,12 +22,13 @@ contract ChitGroup is ReentrancyGuard {
 
     struct Member {
         address addr;
-        uint256 bufferBalance;      // Collateral buffer deposited
-        uint256 lockedDividends;    // Accumulated yield and discount dividends
-        uint256 paidInstallments;   // Count of installments successfully paid
-        bool hasWon;                // Whether member has won a pot in a previous round
-        uint256 winRound;           // Round number won
-        bool isDefaulted;           // Mark if currently in default
+        uint256 bufferBalance;      // Deposited collateral buffer
+        uint256 lockedDividends;    // Accumulated yield & discount dividends
+        uint256 paidInstallments;   // Count of installments paid in total
+        bool hasPaidCurrentRound;   // Flag for current round collection
+        bool hasWon;                // Whether member won a pot previously
+        uint256 winRound;           // Round won
+        bool isDefaulted;           // Marked if currently unresolved in default
     }
 
     struct BidCommitment {
@@ -37,6 +39,7 @@ contract ChitGroup is ReentrancyGuard {
     struct RevealedBid {
         uint256 bidAmount;
         bool revealed;
+        uint256 timestamp;
     }
 
     // Immutable Parameters
@@ -44,9 +47,9 @@ contract ChitGroup is ReentrancyGuard {
     uint256 public immutable memberCount;
     uint256 public immutable installmentAmount;
     uint256 public immutable cycleDuration;
-    uint256 public immutable discountCapBps;    // e.g. 3000 = 30% max discount
-    uint256 public immutable reserveFeeBps;     // e.g. 500 = 5% to group reserve
-    uint256 public immutable safetyFactorBps;   // e.g. 12000 = 120% collateral solvency ratio
+    uint256 public immutable discountCapBps;    // e.g., 3000 = 30% max discount (discount floor)
+    uint256 public immutable reserveFeeBps;     // e.g., 500 = 5% of discount to group reserve fund
+    uint256 public immutable safetyFactorBps;   // e.g., 12000 = 120% collateral solvency ratio
 
     address public immutable factory;
     VouchRegistry public immutable vouchRegistry;
@@ -58,12 +61,13 @@ contract ChitGroup is ReentrancyGuard {
     uint256 public phaseStartTime;
     uint256 public reserveFundBalance;
     uint256 public currentPot;
+    uint256 public activeYieldShares;
 
     address[] public memberList;
     mapping(address => Member) public members;
     mapping(address => bool) public isMember;
 
-    // Round auction state
+    // Auction State per round
     mapping(uint256 => mapping(address => BidCommitment)) public roundCommits;
     mapping(uint256 => mapping(address => RevealedBid)) public roundReveals;
     address public lowestBidder;
@@ -71,12 +75,14 @@ contract ChitGroup is ReentrancyGuard {
 
     // Events
     event MemberJoined(address indexed member, uint256 bufferDeposit);
-    event PhaseChanged(GroupState newState, uint256 round);
-    event InstallmentCollected(address indexed member, uint256 round, uint256 amount);
-    event BidCommitted(address indexed member, uint256 round, bytes32 commitmentHash);
-    event BidRevealed(address indexed member, uint256 round, uint256 bidAmount);
-    event AuctionSettled(uint256 indexed round, address indexed winner, uint256 payout, uint256 dividendPerMember);
-    event DefaultAbsorbed(address indexed defaulter, uint256 round, uint8 tierUsed, uint256 amount);
+    event PhaseChanged(GroupState indexed newState, uint256 indexed round);
+    event InstallmentCollected(address indexed member, uint256 indexed round, uint256 amount);
+    event BidCommitted(address indexed member, uint256 indexed round, bytes32 commitmentHash);
+    event BidRevealed(address indexed member, uint256 indexed round, uint256 bidAmount);
+    event AuctionSettled(uint256 indexed round, address indexed winner, uint256 payout, uint256 dividendPerMember, uint256 reserveAdded, uint256 yieldEarned);
+    event DefaultAbsorbed(address indexed defaulter, uint256 indexed round, uint8 tierUsed, uint256 amount);
+    event SolvencyEnforced(address indexed member, uint256 requiredBacking, uint256 actualBacking, uint256 topUpHeld);
+    event BalancesWithdrawn(address indexed member, uint256 bufferReturned, uint256 dividendsPaid);
     event GroupClosed();
 
     modifier onlyMember() {
@@ -85,7 +91,7 @@ contract ChitGroup is ReentrancyGuard {
     }
 
     modifier inState(GroupState state) {
-        require(currentState == state, "Invalid phase state");
+        require(currentState == state, "Invalid phase state for operation");
         _;
     }
 
@@ -102,7 +108,8 @@ contract ChitGroup is ReentrancyGuard {
     ) {
         require(_memberCount > 1, "Member count must be > 1");
         require(_discountCapBps <= 5000, "Discount cap cannot exceed 50%");
-        
+        require(_installmentAmount > 0, "Installment must be > 0");
+
         groupName = _groupName;
         memberCount = _memberCount;
         installmentAmount = _installmentAmount;
@@ -112,7 +119,7 @@ contract ChitGroup is ReentrancyGuard {
         safetyFactorBps = _safetyFactorBps > 0 ? _safetyFactorBps : 10000;
 
         factory = msg.sender;
-        vouchRegistry = VouchRegistry(_vouchRegistry);
+        vouchRegistry = VouchRegistry(payable(_vouchRegistry));
         yieldStrategy = IYieldStrategy(_yieldStrategy);
 
         currentState = GroupState.Forming;
@@ -121,12 +128,12 @@ contract ChitGroup is ReentrancyGuard {
     }
 
     /**
-     * @dev Join group and deposit initial buffer during Forming phase
+     * @dev Join group during Forming phase and deposit initial buffer
      */
     function joinGroup() external payable inState(GroupState.Forming) nonReentrant {
-        require(!isMember[msg.sender], "Already a member");
-        require(memberList.length < memberCount, "Group full");
-        require(msg.value >= installmentAmount, "Buffer must be >= 1 installment");
+        require(!isMember[msg.sender], "Already a member of this group");
+        require(memberList.length < memberCount, "ChitGroup is full");
+        require(msg.value >= installmentAmount, "Buffer deposit must be at least 1 installment");
 
         isMember[msg.sender] = true;
         memberList.push(msg.sender);
@@ -135,6 +142,7 @@ contract ChitGroup is ReentrancyGuard {
             bufferBalance: msg.value,
             lockedDividends: 0,
             paidInstallments: 0,
+            hasPaidCurrentRound: false,
             hasWon: false,
             winRound: 0,
             isDefaulted: false
@@ -142,45 +150,157 @@ contract ChitGroup is ReentrancyGuard {
 
         emit MemberJoined(msg.sender, msg.value);
 
+        // Transition from Forming to Collect (Round 1) when full
         if (memberList.length == memberCount) {
             currentState = GroupState.Collect;
             currentRound = 1;
             phaseStartTime = block.timestamp;
+            _resetRoundFlags();
             emit PhaseChanged(GroupState.Collect, currentRound);
         }
     }
 
     /**
-     * @dev Collect monthly installment from active members
+     * @dev Pay monthly installment in the Collect phase
      */
     function payInstallment() external payable onlyMember inState(GroupState.Collect) nonReentrant {
-        require(msg.value == installmentAmount, "Incorrect installment amount");
         Member storage m = members[msg.sender];
+        require(!m.hasPaidCurrentRound, "Installment already paid for this round");
+        require(msg.value == installmentAmount, "Incorrect installment amount sent");
+
         m.paidInstallments += 1;
+        m.hasPaidCurrentRound = true;
         currentPot += msg.value;
 
         emit InstallmentCollected(msg.sender, currentRound, msg.value);
+
+        // Auto-advance to Commit if all members paid
+        if (_allMembersPaid()) {
+            _transitionToCommit();
+        }
     }
 
     /**
-     * @dev Advance to auction commit phase once collections complete or timer expires
+     * @dev Handle default for any unpaid members via the 5-Step Waterfall
+     */
+    function handleMemberDefault(address defaulter) public inState(GroupState.Collect) nonReentrant {
+        require(isMember[defaulter], "Target is not a member");
+        Member storage m = members[defaulter];
+        require(!m.hasPaidCurrentRound, "Member already paid for this round");
+
+        uint256 deficit = installmentAmount;
+
+        // --- Layer 1: Member Collateral Buffer ---
+        if (deficit > 0 && m.bufferBalance > 0) {
+            uint256 absorbed = deficit > m.bufferBalance ? m.bufferBalance : deficit;
+            m.bufferBalance -= absorbed;
+            currentPot += absorbed;
+            deficit -= absorbed;
+            emit DefaultAbsorbed(defaulter, currentRound, 1, absorbed);
+        }
+
+        // --- Layer 2: Defaulter's Locked Dividends ---
+        if (deficit > 0 && m.lockedDividends > 0) {
+            uint256 absorbed = deficit > m.lockedDividends ? m.lockedDividends : deficit;
+            m.lockedDividends -= absorbed;
+            currentPot += absorbed;
+            deficit -= absorbed;
+            emit DefaultAbsorbed(defaulter, currentRound, 2, absorbed);
+        }
+
+        // --- Layer 3: Staked Voucher Capital ---
+        if (deficit > 0 && address(vouchRegistry) != address(0)) {
+            uint256 slashed = vouchRegistry.slashForMember(defaulter, deficit);
+            if (slashed > 0) {
+                currentPot += slashed;
+                deficit -= (deficit > slashed ? slashed : deficit);
+                emit DefaultAbsorbed(defaulter, currentRound, 3, slashed);
+            }
+        }
+
+        // --- Layer 4: Protocol / Group Reserve Fund ---
+        if (deficit > 0 && reserveFundBalance > 0) {
+            uint256 absorbed = deficit > reserveFundBalance ? reserveFundBalance : deficit;
+            reserveFundBalance -= absorbed;
+            currentPot += absorbed;
+            deficit -= absorbed;
+            emit DefaultAbsorbed(defaulter, currentRound, 4, absorbed);
+        }
+
+        // --- Layer 5: Pro-Rata Haircut across solvent members ---
+        if (deficit > 0) {
+            uint256 solventCount = 0;
+            for (uint256 i = 0; i < memberList.length; i++) {
+                if (memberList[i] != defaulter && !members[memberList[i]].isDefaulted) {
+                    solventCount += 1;
+                }
+            }
+
+            if (solventCount > 0) {
+                uint256 haircutPerMember = deficit / solventCount;
+                for (uint256 i = 0; i < memberList.length; i++) {
+                    address solventAddr = memberList[i];
+                    if (solventAddr != defaulter && !members[solventAddr].isDefaulted) {
+                        if (members[solventAddr].lockedDividends >= haircutPerMember) {
+                            members[solventAddr].lockedDividends -= haircutPerMember;
+                        } else if (members[solventAddr].bufferBalance >= haircutPerMember) {
+                            members[solventAddr].bufferBalance -= haircutPerMember;
+                        }
+                    }
+                }
+                currentPot += deficit;
+                emit DefaultAbsorbed(defaulter, currentRound, 5, deficit);
+                deficit = 0;
+            }
+        }
+
+        m.isDefaulted = true;
+        m.hasPaidCurrentRound = true; // Handled via waterfall
+
+        if (_allMembersPaid()) {
+            _transitionToCommit();
+        }
+    }
+
+    /**
+     * @dev Advance to auction commit phase once collections complete or timer triggers
      */
     function advanceToCommit() external nonReentrant {
-        require(currentState == GroupState.Collect, "Not in Collect phase");
+        require(currentState == GroupState.Collect, "Must be in Collect phase");
+        
+        // Handle defaults for anyone who didn't pay
+        for (uint256 i = 0; i < memberList.length; i++) {
+            if (!members[memberList[i]].hasPaidCurrentRound) {
+                handleMemberDefault(memberList[i]);
+            }
+        }
+
+        _transitionToCommit();
+    }
+
+    function _transitionToCommit() internal {
         currentState = GroupState.Commit;
         phaseStartTime = block.timestamp;
         lowestBidAmount = type(uint256).max;
         lowestBidder = address(0);
+
+        // Put pot funds into yield vault while auction runs
+        if (address(yieldStrategy) != address(0) && currentPot > 0 && activeYieldShares == 0) {
+            try yieldStrategy.deposit{value: currentPot}(currentPot) returns (uint256 shares) {
+                activeYieldShares = shares;
+            } catch {}
+        }
+
         emit PhaseChanged(GroupState.Commit, currentRound);
     }
 
     /**
-     * @dev Commit a secret bid hash during auction
+     * @dev Commit secret bid hash: keccak256(abi.encodePacked(bidAmount, salt, msg.sender))
      */
     function commitBid(bytes32 commitmentHash) external onlyMember inState(GroupState.Commit) {
         Member storage m = members[msg.sender];
-        require(!m.hasWon, "Member already won a pot");
-        require(!roundCommits[currentRound][msg.sender].committed, "Already committed");
+        require(!m.hasWon, "Member already won in a previous round");
+        require(!roundCommits[currentRound][msg.sender].committed, "Already committed for this round");
 
         roundCommits[currentRound][msg.sender] = BidCommitment({
             commitmentHash: commitmentHash,
@@ -193,34 +313,37 @@ contract ChitGroup is ReentrancyGuard {
     /**
      * @dev Advance to auction reveal phase
      */
-    function advanceToReveal() external nonReentrant {
-        require(currentState == GroupState.Commit, "Not in Commit phase");
+    function advanceToReveal() external inState(GroupState.Commit) nonReentrant {
         currentState = GroupState.Reveal;
         phaseStartTime = block.timestamp;
         emit PhaseChanged(GroupState.Reveal, currentRound);
     }
 
     /**
-     * @dev Reveal secret bid
+     * @dev Reveal secret bid amount and salt
      */
     function revealBid(uint256 bidAmount, bytes32 salt) external onlyMember inState(GroupState.Reveal) {
         BidCommitment storage commit = roundCommits[currentRound][msg.sender];
-        require(commit.committed, "No commitment found");
-        require(!roundReveals[currentRound][msg.sender].revealed, "Already revealed");
+        require(commit.committed, "No valid commitment found for member");
+        require(!roundReveals[currentRound][msg.sender].revealed, "Bid already revealed");
         require(
             keccak256(abi.encodePacked(bidAmount, salt, msg.sender)) == commit.commitmentHash,
-            "Invalid reveal salt or amount"
+            "Invalid reveal salt or bid amount"
         );
 
         uint256 totalPot = memberCount * installmentAmount;
-        uint256 minBid = totalPot - (totalPot * discountCapBps / 10000);
-        require(bidAmount >= minBid && bidAmount <= totalPot, "Bid outside allowed discount range");
+        uint256 minBid = totalPot - ((totalPot * discountCapBps) / 10000); // Discount floor rule
+
+        require(bidAmount >= minBid, "Bid violates maximum discount floor");
+        require(bidAmount <= totalPot, "Bid cannot exceed full pot");
 
         roundReveals[currentRound][msg.sender] = RevealedBid({
             bidAmount: bidAmount,
-            revealed: true
+            revealed: true,
+            timestamp: block.timestamp
         });
 
+        // Lowest bid wins the reverse auction
         if (bidAmount < lowestBidAmount) {
             lowestBidAmount = bidAmount;
             lowestBidder = msg.sender;
@@ -230,35 +353,42 @@ contract ChitGroup is ReentrancyGuard {
     }
 
     /**
-     * @dev Settle round auction and distribute dividends
+     * @dev Settle round: calculate payout, enforce solvency, distribute dividends & roll yield
      */
-    function settleRound() external nonReentrant {
-        require(currentState == GroupState.Reveal, "Not in Reveal phase");
-        address winner = lowestBidder != address(0) ? lowestBidder : memberList[currentRound - 1];
+    function settleRound() external inState(GroupState.Reveal) nonReentrant {
         uint256 totalPot = memberCount * installmentAmount;
-        uint256 payout = lowestBidAmount < totalPot ? lowestBidAmount : totalPot;
+        uint256 yieldEarned = _harvestYield();
+
+        // Determine winner
+        address winner = lowestBidder;
+        if (winner == address(0)) {
+            for (uint256 i = 0; i < memberList.length; i++) {
+                if (!members[memberList[i]].hasWon) {
+                    winner = memberList[i];
+                    lowestBidAmount = totalPot;
+                    break;
+                }
+            }
+        }
+        require(winner != address(0), "No eligible winner found");
 
         Member storage w = members[winner];
         w.hasWon = true;
         w.winRound = currentRound;
 
-        uint256 discount = totalPot > payout ? totalPot - payout : 0;
-        uint256 reserveSlice = (discount * reserveFeeBps) / 10000;
-        reserveFundBalance += reserveSlice;
+        uint256 basePayout = lowestBidAmount <= totalPot ? lowestBidAmount : totalPot;
+        uint256 discount = totalPot > basePayout ? totalPot - basePayout : 0;
 
-        uint256 dividendPool = discount - reserveSlice;
-        uint256 dividendPerMember = dividendPool / memberCount;
+        (uint256 dividendPerMember, uint256 reserveSlice) = _distributeDividendsAndReserve(discount, yieldEarned);
 
-        for (uint256 i = 0; i < memberList.length; i++) {
-            members[memberList[i]].lockedDividends += dividendPerMember;
-        }
+        uint256 finalPayout = _enforceWinnerSolvency(winner, basePayout);
+        currentPot = 0;
 
-        (bool sent, ) = winner.call{value: payout}("");
+        (bool sent, ) = winner.call{value: finalPayout}("");
         require(sent, "Winner payout transfer failed");
 
-        emit AuctionSettled(currentRound, winner, payout, dividendPerMember);
+        emit AuctionSettled(currentRound, winner, finalPayout, dividendPerMember, reserveSlice, yieldEarned);
 
-        currentPot = 0;
         if (currentRound >= memberCount) {
             currentState = GroupState.Closed;
             emit GroupClosed();
@@ -266,25 +396,128 @@ contract ChitGroup is ReentrancyGuard {
             currentRound += 1;
             currentState = GroupState.Collect;
             phaseStartTime = block.timestamp;
+            _resetRoundFlags();
             emit PhaseChanged(GroupState.Collect, currentRound);
         }
     }
 
+    function _harvestYield() internal returns (uint256 yieldEarned) {
+        if (address(yieldStrategy) != address(0) && activeYieldShares > 0) {
+            try yieldStrategy.withdraw(activeYieldShares) returns (uint256 amountWithYield) {
+                if (amountWithYield > currentPot) {
+                    yieldEarned = amountWithYield - currentPot;
+                }
+                activeYieldShares = 0;
+            } catch {
+                activeYieldShares = 0;
+            }
+        }
+    }
+
+    function _distributeDividendsAndReserve(uint256 discount, uint256 yieldEarned) internal returns (uint256 dividendPerMember, uint256 reserveSlice) {
+        reserveSlice = (discount * reserveFeeBps) / 10000;
+        reserveFundBalance += reserveSlice;
+
+        uint256 dividendPool = (discount - reserveSlice) + yieldEarned;
+        dividendPerMember = dividendPool / memberCount;
+
+        for (uint256 i = 0; i < memberList.length; i++) {
+            members[memberList[i]].lockedDividends += dividendPerMember;
+        }
+    }
+
+    function _enforceWinnerSolvency(address winner, uint256 payout) internal returns (uint256) {
+        (bool isSolvent, uint256 totalBacking, uint256 requiredBacking) = checkSolvency(winner);
+        if (!isSolvent && requiredBacking > totalBacking) {
+            uint256 deficit = requiredBacking - totalBacking;
+            uint256 topUpHeld = deficit > payout ? payout : deficit;
+            members[winner].bufferBalance += topUpHeld;
+            emit SolvencyEnforced(winner, requiredBacking, totalBacking, topUpHeld);
+            return payout - topUpHeld;
+        }
+        return payout;
+    }
+
     /**
-     * @dev Solvency calculation formula checking if a member has enough backing for future rounds
+     * @dev Withdraw remaining collateral buffers and unlocked dividends once group is Closed
      */
-    function checkSolvency(address memberAddr) public view returns (bool isSolvent, uint256 totalBacking, uint256 requiredBacking) {
+    function withdrawFinalBalances() external onlyMember inState(GroupState.Closed) nonReentrant {
+        Member storage m = members[msg.sender];
+        uint256 bufferPayout = m.bufferBalance;
+        uint256 dividendPayout = m.lockedDividends;
+        uint256 totalWithdraw = bufferPayout + dividendPayout;
+
+        require(totalWithdraw > 0, "No remaining balance to withdraw");
+
+        m.bufferBalance = 0;
+        m.lockedDividends = 0;
+
+        (bool sent, ) = msg.sender.call{value: totalWithdraw}("");
+        require(sent, "Final balance transfer failed");
+
+        emit BalancesWithdrawn(msg.sender, bufferPayout, dividendPayout);
+    }
+
+    /**
+     * @dev Solvency calculation invariant for any member
+     */
+    function checkSolvency(address memberAddr) public view returns (
+        bool isSolvent,
+        uint256 totalBacking,
+        uint256 requiredBacking
+    ) {
         Member storage m = members[memberAddr];
         uint256 remainingRounds = currentRound <= memberCount ? (memberCount - currentRound) : 0;
         uint256 futureObligation = remainingRounds * installmentAmount;
         requiredBacking = (futureObligation * safetyFactorBps) / 10000;
 
-        totalBacking = m.bufferBalance + m.lockedDividends;
+        uint256 voucherBacking = 0;
+        if (address(vouchRegistry) != address(0)) {
+            voucherBacking = vouchRegistry.getMemberVouchBacking(memberAddr, address(this));
+        }
+
+        totalBacking = m.bufferBalance + m.lockedDividends + voucherBacking;
         isSolvent = totalBacking >= requiredBacking;
+    }
+
+    function _resetRoundFlags() internal {
+        for (uint256 i = 0; i < memberList.length; i++) {
+            members[memberList[i]].hasPaidCurrentRound = false;
+        }
+    }
+
+    function _allMembersPaid() internal view returns (bool) {
+        for (uint256 i = 0; i < memberList.length; i++) {
+            if (!members[memberList[i]].hasPaidCurrentRound) {
+                return false;
+            }
+        }
+        return true;
     }
 
     function getMembers() external view returns (address[] memory) {
         return memberList;
+    }
+
+    function getMemberDetails(address memberAddr) external view returns (
+        uint256 bufferBalance,
+        uint256 lockedDividends,
+        uint256 paidInstallments,
+        bool hasPaidCurrentRound,
+        bool hasWon,
+        uint256 winRound,
+        bool isDefaulted
+    ) {
+        Member storage m = members[memberAddr];
+        return (
+            m.bufferBalance,
+            m.lockedDividends,
+            m.paidInstallments,
+            m.hasPaidCurrentRound,
+            m.hasWon,
+            m.winRound,
+            m.isDefaulted
+        );
     }
 
     receive() external payable {}

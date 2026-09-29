@@ -1,0 +1,119 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "voucher", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "StakeDeposited",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "voucher", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "StakeWithdrawn",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "bytes32", "name": "recordId", "type": "bytes32" },
+      { "indexed": true, "internalType": "address", "name": "voucher", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "vouchee", "type": "address" },
+      { "indexed": false, "internalType": "address", "name": "chitGroup", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "VouchRegistered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "voucher", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "vouchee", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "chitGroup", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "VoucherSlashed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "chitGroup", "type": "address" },
+      { "indexed": false, "internalType": "bool", "name": "status", "type": "bool" }
+    ],
+    "name": "GroupAuthorized",
+    "type": "event"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "voucher", "type": "address" }],
+    "name": "vouchers",
+    "outputs": [
+      { "internalType": "uint256", "name": "totalStaked", "type": "uint256" },
+      { "internalType": "uint256", "name": "lockedStake", "type": "uint256" },
+      { "internalType": "uint256", "name": "reputationScore", "type": "uint256" },
+      { "internalType": "uint256", "name": "activeVoucheeCount", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "bytes32", "name": "recordId", "type": "bytes32" }],
+    "name": "records",
+    "outputs": [
+      { "internalType": "address", "name": "voucher", "type": "address" },
+      { "internalType": "address", "name": "vouchee", "type": "address" },
+      { "internalType": "address", "name": "chitGroup", "type": "address" },
+      { "internalType": "uint256", "name": "stakedAmount", "type": "uint256" },
+      { "internalType": "bool", "name": "active", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "voucher", "type": "address" }],
+    "name": "getFreeStake",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "depositStake",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }],
+    "name": "withdrawStake",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "vouchee", "type": "address" },
+      { "internalType": "address", "name": "chitGroup", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "registerVouch",
+    "outputs": [{ "internalType": "bytes32", "name": "recordId", "type": "bytes32" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "recordId", "type": "bytes32" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "slashVoucher",
+    "outputs": [{ "internalType": "uint256", "name": "slashed", "type": "uint256" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]
