@@ -42,104 +42,81 @@ export const MandateModal: React.FC<MandateModalProps> = ({
     }
   };
 
+  const features = [
+    { icon: <Clock className="w-4 h-4 text-[#f5a623]" />, title: "Never miss a cycle", desc: "Your monthly deposit arrives on time so your standing stays green." },
+    { icon: <ShieldCheck className="w-4 h-4 text-[#2dd4a8]" />, title: "Full transparency", desc: `Funds go directly to the ${groupName} autonomous pool. You earn dividends every round.` },
+    { icon: <Lock className="w-4 h-4 text-[#8b5cf6]" />, title: "Cancel anytime", desc: "You maintain full ownership of your deposit and accumulated savings." },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="cred-card max-w-md w-full p-6 sm:p-7 border-emerald-500/20 relative">
+    <div className="v-overlay">
+      <div className="v-modal p-6 sm:p-7 max-w-md">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+        <div className="flex items-center justify-between pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-              <Zap className="w-5 h-5 stroke-[2.5]" />
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(245, 166, 35, 0.1)', border: '1px solid rgba(245, 166, 35, 0.2)' }}>
+              <Zap className="w-5 h-5 text-[#f5a623] stroke-[2.5]" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white font-display">Setup Auto-Debit Mandate</h2>
-              <p className="text-xs text-slate-400">UPI Autopay & Seamless Monthly Contributions</p>
+              <h2 className="text-base font-bold text-white font-display">Setup Auto-Debit</h2>
+              <p className="text-xs text-[#5f6578]">Seamless monthly contributions</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
-          >
+          <button onClick={onClose} className="p-2 rounded-xl text-[#5f6578] hover:text-white hover:bg-white/5 transition-all duration-200">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="space-y-4 my-5">
-          {/* Amount Card */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#12151d] to-[#0d0f14] border border-white/10 text-center">
-            <p className="text-xs text-slate-400 font-medium mb-1">Monthly Contribution Amount</p>
-            <p className="text-3xl font-extrabold text-white font-display tracking-tight">
+        <div className="space-y-4 mt-5">
+          {/* Amount */}
+          <div className="p-5 rounded-2xl text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <p className="text-xs text-[#5f6578] font-medium mb-1">Monthly Contribution</p>
+            <p className="text-3xl font-bold text-white font-display tracking-tight">
               {inrInstallment}
             </p>
-            <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-semibold text-emerald-400">
+            <div className="v-badge v-badge-green mt-3 mx-auto" style={{ width: 'fit-content' }}>
               <CheckCircle2 className="w-3.5 h-3.5" />
               Auto-debits on cycle start
             </div>
           </div>
 
-          {/* Mandate Summary Points */}
-          <div className="space-y-2.5 text-xs text-slate-300">
-            <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5">
-              <Clock className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-white">Never miss a cycle</p>
-                <p className="text-slate-400 text-[11px]">
-                  Ensures your monthly deposit arrives on time so your credit reputation stays in Good Standing.
-                </p>
+          {/* Features */}
+          <div className="space-y-2.5 stagger-children">
+            {features.map((f, i) => (
+              <div key={i} className="flex items-start gap-3 p-3.5 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div className="mt-0.5 flex-shrink-0">{f.icon}</div>
+                <div>
+                  <p className="text-xs font-semibold text-white">{f.title}</p>
+                  <p className="text-[11px] text-[#5f6578] mt-0.5">{f.desc}</p>
+                </div>
               </div>
-            </div>
-
-            <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-white">Full Security & Transparency</p>
-                <p className="text-slate-400 text-[11px]">
-                  Funds go directly to the {groupName} autonomous pool. You earn monthly savings dividends on every round.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5">
-              <Lock className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-white">Cancel anytime</p>
-                <p className="text-slate-400 text-[11px]">
-                  You maintain full ownership of your security deposit and accumulated savings.
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
 
-          {/* Technical Details Box (Opt-in) */}
+          {/* Technical */}
           {isTechnicalMode && (
-            <div className="tech-details-box text-[11px] text-indigo-300 space-y-1">
-              <p className="font-bold flex items-center gap-1 text-indigo-400">
+            <div className="v-tech-box text-[11px] space-y-1">
+              <p className="font-bold text-[#8b5cf6] flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3" /> Protocol Mandate Execution
               </p>
-              <p>• Smart Contract: <code className="text-slate-200">ChitGroup.payInstallment()</code></p>
-              <p>• Raw Amount: <code className="text-slate-200">{installmentAmount} tMSTC</code></p>
-              <p>• Auto-triggers Commit transition once all {totalMembers} members execute.</p>
+              <p className="text-[#9ca3b4]">• Smart Contract: <code className="text-white/80">ChitGroup.payInstallment()</code></p>
+              <p className="text-[#9ca3b4]">• Raw Amount: <code className="text-white/80">{installmentAmount} tMSTC</code></p>
+              <p className="text-[#9ca3b4]">• Auto-triggers Commit transition once all {totalMembers} members execute.</p>
             </div>
           )}
         </div>
 
         {/* Actions */}
-        <div className="pt-2 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-cred-secondary text-xs"
-          >
-            Cancel
-          </button>
+        <div className="pt-5 flex items-center justify-end gap-3">
+          <button type="button" onClick={onClose} className="v-btn-secondary text-xs">Cancel</button>
           <button
             type="button"
             onClick={handleConfirm}
             disabled={isProcessing}
-            className="btn-cred-primary text-xs w-full sm:w-auto"
+            className="v-btn-primary text-xs w-full sm:w-auto"
           >
-            {isProcessing ? "Authorizing..." : isMandateActive ? "Mandate Already Active" : "Confirm Auto-Debit Mandate"}
+            {isProcessing ? "Authorizing..." : isMandateActive ? "Mandate Already Active" : "Confirm Auto-Debit"}
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

@@ -26,32 +26,38 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   const formatTransaction = (ev: LedgerEvent) => {
     let title = "Transaction";
     let isCredit = false;
-    let icon = <ArrowUpRight className="w-4 h-4 text-slate-400" />;
+    let icon = <ArrowUpRight className="w-4 h-4 text-[#9ca3b4]" />;
     let inrAmount = formatINR(ev.amount.split(" ")[0]);
+    let iconBg = 'rgba(255,255,255,0.05)';
 
     if (ev.eventName === "InstallmentCollected") {
       title = `Month ${ev.round} Contribution Paid`;
       isCredit = false;
-      icon = <ArrowUpRight className="w-4 h-4 text-slate-400" />;
+      icon = <ArrowUpRight className="w-4 h-4 text-[#f5a623]" />;
+      iconBg = 'rgba(245, 166, 35, 0.1)';
     } else if (ev.eventName === "AuctionSettled") {
-      title = `Month ${ev.round} Community Draw Payout`;
+      title = `Month ${ev.round} Draw Payout`;
       isCredit = true;
-      icon = <ArrowDownLeft className="w-4 h-4 text-emerald-400" />;
+      icon = <ArrowDownLeft className="w-4 h-4 text-[#2dd4a8]" />;
+      iconBg = 'rgba(45, 212, 168, 0.1)';
     } else if (ev.eventName === "DefaultAbsorbed") {
       title = `Backup Layer Absorbed Deficit`;
       isCredit = false;
-      icon = <ShieldCheck className="w-4 h-4 text-amber-400" />;
+      icon = <ShieldCheck className="w-4 h-4 text-[#f43f5e]" />;
+      iconBg = 'rgba(244, 63, 94, 0.1)';
     } else if (ev.eventName === "MemberJoined") {
       title = `Security Deposit Confirmed`;
       isCredit = false;
-      icon = <ShieldCheck className="w-4 h-4 text-emerald-400" />;
+      icon = <ShieldCheck className="w-4 h-4 text-[#8b5cf6]" />;
+      iconBg = 'rgba(139, 92, 246, 0.1)';
     } else if (ev.eventName === "BalancesWithdrawn") {
-      title = `Final Deposit & Savings Refunded`;
+      title = `Deposit & Savings Refunded`;
       isCredit = true;
-      icon = <ArrowDownLeft className="w-4 h-4 text-emerald-400" />;
+      icon = <ArrowDownLeft className="w-4 h-4 text-[#2dd4a8]" />;
+      iconBg = 'rgba(45, 212, 168, 0.1)';
     }
 
-    return { title, isCredit, icon, inrAmount };
+    return { title, isCredit, icon, inrAmount, iconBg };
   };
 
   const sampleEvents: LedgerEvent[] = events.length > 0 ? events : [
@@ -85,68 +91,71 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   ];
 
   return (
-    <div className="cred-card p-6 sm:p-7 border-white/5 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-white/5">
+    <div className="v-card p-6 sm:p-7 space-y-5 anim-fade-up">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-bold text-white font-display">Transaction History</h3>
-          <p className="text-xs text-slate-400">Statement of all monthly contributions, draws, and savings credits</p>
+          <p className="text-xs text-[#9ca3b4] mt-0.5">Contributions, draws, and savings credits</p>
         </div>
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-400">
+        <div className="v-badge v-badge-green">
           <CheckCircle2 className="w-3.5 h-3.5" />
-          Live Bank-Grade Verification
+          Verified On-Chain
         </div>
       </div>
 
       {/* Transaction List */}
-      <div className="divide-y divide-white/5">
-        {sampleEvents.map((ev) => {
-          const { title, isCredit, icon, inrAmount } = formatTransaction(ev);
+      <div className="space-y-1">
+        {sampleEvents.map((ev, index) => {
+          const { title, isCredit, icon, inrAmount, iconBg } = formatTransaction(ev);
 
           return (
             <div
               key={ev.id}
-              className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] -mx-2 px-2 rounded-xl transition-colors"
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl transition-all duration-200 hover:bg-white/[0.02] group"
+              style={{ animationDelay: `${index * 60}ms` }}
             >
-              {/* Left: Icon + Title + Date */}
+              {/* Left */}
               <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/5 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105" style={{ background: iconBg }}>
                   {icon}
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm font-bold text-white font-display">{title}</p>
-                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
+                  <p className="text-sm font-semibold text-white">{title}</p>
+                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#5f6578]">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
                       {ev.timestamp}
                     </span>
-                    <span>•</span>
+                    <span>·</span>
                     <a
                       href={`${MST_TESTNET.explorerUrl}/tx/${ev.txHash}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-0.5 font-medium"
+                      className="inline-flex items-center gap-0.5 font-medium transition-colors duration-200"
+                      style={{ color: '#2dd4a8' }}
                     >
-                      Verify on blockchain
+                      Verify
                       <ExternalLink className="w-2.5 h-2.5" />
                     </a>
                   </div>
                 </div>
               </div>
 
-              {/* Right: Amount & Token Equivalent */}
+              {/* Right */}
               <div className="text-right pl-12 sm:pl-0">
-                <p className={`text-sm font-extrabold font-display ${isCredit ? 'text-emerald-400' : 'text-slate-200'}`}>
+                <p className={`text-sm font-bold font-display ${isCredit ? 'text-[#2dd4a8]' : 'text-white'}`}>
                   {isCredit ? `+${inrAmount}` : inrAmount}
                 </p>
-                <p className="text-[10px] text-slate-500 font-mono">
+                <p className="text-[10px] text-[#5f6578] font-mono">
                   {ev.amount}
                 </p>
               </div>
 
-              {/* Technical Mode Detail (if enabled) */}
+              {/* Technical */}
               {isTechnicalMode && (
-                <div className="w-full text-[10px] font-mono text-indigo-300/80 pt-1 flex items-center gap-2">
-                  <Code2 className="w-3 h-3 text-indigo-400" />
+                <div className="w-full text-[10px] font-mono flex items-center gap-2 pt-1" style={{ color: 'rgba(139, 92, 246, 0.6)' }}>
+                  <Code2 className="w-3 h-3" />
                   <span>Event: {ev.eventName}</span>
                   <span>|</span>
                   <span className="truncate">Tx: {ev.txHash}</span>

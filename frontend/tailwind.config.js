@@ -7,27 +7,36 @@ export default {
   theme: {
     extend: {
       colors: {
-        black: "#000000",
-        dark: {
-          950: "#050505",
-          900: "#0c0c0c",
-          850: "#121212",
-          800: "#181818",
-          700: "#222222",
+        surface: {
+          DEFAULT: '#161920',
+          raised: '#1c1f29',
+          overlay: '#222631',
         },
-        royal: {
-          50: "#fdf2f2",
-          100: "#fde8e8",
-          200: "#fbd5d5",
-          300: "#f8b4b4",
-          400: "#f98080",
-          500: "#9b111e", // Royal Carmine / Ruby
-          600: "#880d19", // Deep Royal Red
-          700: "#750a14",
-          800: "#60060e",
-          900: "#4c050a",
-        }
-      }
+        accent: {
+          teal: '#2dd4a8',
+          amber: '#f5a623',
+          violet: '#8b5cf6',
+          rose: '#f43f5e',
+          sky: '#38bdf8',
+        },
+      },
+      fontFamily: {
+        sans: ['"DM Sans"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        display: ['"Space Grotesk"', 'sans-serif'],
+      },
+      borderRadius: {
+        'v-sm': '8px',
+        'v-md': '14px',
+        'v-lg': '20px',
+        'v-xl': '28px',
+      },
+      animation: {
+        'fade-up': 'fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both',
+        'fade-in': 'fadeIn 0.4s ease both',
+        'scale-in': 'scaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both',
+        'slide-down': 'slideDown 0.3s ease both',
+        'pulse-soft': 'pulse-soft 2.5s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

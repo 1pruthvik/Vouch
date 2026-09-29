@@ -13,7 +13,7 @@ import { useWallet } from "./hooks/useWallet";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
 import { fetchLedgerEvents } from "./services/indexerService";
-import { Plus, UserPlus, Shield, CheckCircle2, RefreshCw, AlertCircle, Sparkles, Zap, Layers, History } from "lucide-react";
+import { Plus, UserPlus, Shield, CheckCircle2, RefreshCw, AlertCircle, Sparkles, Zap, Layers, History, Home } from "lucide-react";
 
 export function App() {
   const {
@@ -213,8 +213,15 @@ export function App() {
     }
   };
 
+  const tabs = [
+    { id: "home" as const, label: "Circle Home", icon: <Home className="w-4 h-4" /> },
+    { id: "draw" as const, label: "This Month's Draw", icon: <Sparkles className="w-4 h-4" /> },
+    { id: "standing" as const, label: "Your Standing", icon: <Shield className="w-4 h-4" /> },
+    { id: "history" as const, label: "Transactions", icon: <History className="w-4 h-4" /> },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#08090c] text-slate-100 selection:bg-emerald-500 selection:text-black">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
       {/* Header */}
       <Header
         account={account}
@@ -228,91 +235,48 @@ export function App() {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Toast / Notification Banner */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+        {/* Toast */}
         {notification && (
-          <div
-            className={`p-4 rounded-2xl flex items-center justify-between text-xs sm:text-sm font-semibold transition-all shadow-lg animate-fadeIn ${
-              notification.isError
-                ? "bg-red-500/15 border border-red-500/30 text-red-300"
-                : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
-            }`}
-          >
-            <div className="flex items-center gap-2">
+          <div className={`v-toast ${notification.isError ? 'v-toast-error' : 'v-toast-success'}`}>
+            <div className="flex items-center gap-2.5">
               {notification.isError ? (
-                <AlertCircle className="w-4 h-4 text-red-400" />
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
               ) : (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
               )}
               <span>{notification.message}</span>
             </div>
             <button
               onClick={() => setNotification(null)}
-              className="text-slate-400 hover:text-white"
+              className="text-inherit opacity-60 hover:opacity-100 ml-4 transition-opacity"
             >
               ✕
             </button>
           </div>
         )}
 
-        {/* Navigation Tabs (CRED-style pill switcher) */}
-        <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-3">
-          <div className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar">
-            <button
-              onClick={() => setActiveTab("home")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-                activeTab === "home"
-                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
-                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5" />
-              Circle Home
-            </button>
-
-            <button
-              onClick={() => setActiveTab("draw")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-                activeTab === "draw"
-                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
-                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              This Month's Draw
-            </button>
-
-            <button
-              onClick={() => setActiveTab("standing")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-                activeTab === "standing"
-                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
-                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              Your Standing
-            </button>
-
-            <button
-              onClick={() => setActiveTab("history")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-                activeTab === "history"
-                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
-                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <History className="w-3.5 h-3.5" />
-              Transaction History
-            </button>
+        {/* Navigation Tabs */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`v-nav-pill ${activeTab === tab.id ? 'v-nav-pill--active' : 'v-nav-pill--inactive'}`}
+              >
+                {tab.icon}
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            ))}
           </div>
 
           <div className="hidden sm:flex items-center gap-2">
             <button
               onClick={() => setIsJoinModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold border border-white/5 flex items-center gap-1.5 transition-all"
+              className="v-btn-ghost text-xs"
             >
-              <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
+              <UserPlus className="w-3.5 h-3.5 text-[#2dd4a8]" />
               Join Circle
             </button>
           </div>
@@ -320,7 +284,7 @@ export function App() {
 
         {/* Tab 1: Circle Home */}
         {activeTab === "home" && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-5 anim-fade-up">
             <MemberDashboard
               account={account}
               groupDetails={groupDetails}
@@ -333,7 +297,7 @@ export function App() {
               onJoinGroup={() => setIsJoinModalOpen(true)}
             />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <div className="lg:col-span-2">
                 <LedgerView
                   events={ledgerEvents.slice(0, 4)}
@@ -353,7 +317,7 @@ export function App() {
 
         {/* Tab 2: This Month's Draw */}
         {activeTab === "draw" && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-5 anim-fade-up">
             <AuctionBidding
               currentRound={groupDetails?.currentRound || 1}
               totalPot={groupDetails?.currentPot || "2.5"}
@@ -373,7 +337,7 @@ export function App() {
 
         {/* Tab 3: Your Standing */}
         {activeTab === "standing" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 anim-fade-up">
             <div className="lg:col-span-2">
               <MemberDashboard
                 account={account}
@@ -399,7 +363,7 @@ export function App() {
 
         {/* Tab 4: Transaction History */}
         {activeTab === "history" && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-5 anim-fade-up">
             <LedgerView
               events={ledgerEvents}
               isTechnicalMode={isTechnicalMode}

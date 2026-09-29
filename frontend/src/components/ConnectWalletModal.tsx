@@ -35,7 +35,7 @@ export const ConnectWalletModal: React.FC<ConnectWalletModalProps> = ({
       onClose();
     } else {
       setLocalError(
-        "No browser wallet extension detected. Please install BridgeKey extension or connect with Private Key below."
+        "No browser wallet detected. Install BridgeKey extension or use the Private Key tab below."
       );
     }
   };
@@ -51,59 +51,58 @@ export const ConnectWalletModal: React.FC<ConnectWalletModalProps> = ({
       setPrivateKey("");
       onClose();
     } else {
-      setLocalError("Failed to connect with private key. Ensure valid format.");
+      setLocalError("Failed to connect. Please check your private key format.");
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
-      <div className="bg-[#0e0e0e] max-w-md w-full p-8 rounded-xl relative shadow-2xl space-y-6">
-        <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
-          <div className="flex items-center gap-2">
-            <Wallet className="w-5 h-5 text-neutral-300" />
-            <h2 className="text-lg font-bold text-white font-display">Connect to MST Testnet</h2>
+    <div className="v-overlay">
+      <div className="v-modal p-7 space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(45, 212, 168, 0.1)' }}>
+              <Wallet className="w-5 h-5 text-[#2dd4a8]" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white font-display">Connect Account</h2>
+              <p className="text-xs text-[#5f6578]">Link your MST Testnet wallet</p>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-neutral-400 hover:text-white transition-colors"
-          >
+          <button onClick={onClose} className="p-2 rounded-xl text-[#5f6578] hover:text-white hover:bg-white/5 transition-all duration-200">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tab Selection */}
-        <div className="flex rounded-lg bg-black p-1">
+        {/* Tab Toggle */}
+        <div className="flex rounded-2xl p-1" style={{ background: 'rgba(255,255,255,0.04)' }}>
           <button
-            onClick={() => {
-              setTab("extension");
-              setLocalError(null);
-            }}
-            className={`flex-1 py-2 rounded-md text-xs font-semibold transition-colors ${
-              tab === "extension" ? "bg-[#181818] text-white" : "text-neutral-400 hover:text-white"
-            }`}
+            onClick={() => { setTab("extension"); setLocalError(null); }}
+            className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200"
+            style={{ background: tab === "extension" ? 'rgba(255,255,255,0.08)' : 'transparent', color: tab === "extension" ? 'white' : '#5f6578' }}
           >
             Browser Extension
           </button>
           <button
-            onClick={() => {
-              setTab("privateKey");
-              setLocalError(null);
-            }}
-            className={`flex-1 py-2 rounded-md text-xs font-semibold transition-colors ${
-              tab === "privateKey" ? "bg-[#181818] text-white" : "text-neutral-400 hover:text-white"
-            }`}
+            onClick={() => { setTab("privateKey"); setLocalError(null); }}
+            className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200"
+            style={{ background: tab === "privateKey" ? 'rgba(255,255,255,0.08)' : 'transparent', color: tab === "privateKey" ? 'white' : '#5f6578' }}
           >
-            Private Key (Direct)
+            Private Key
           </button>
         </div>
 
+        {/* Error */}
         {(localError || error) && (
-          <div className="p-3 rounded-lg bg-black text-xs text-royal-300 flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-royal-400 mt-0.5 flex-shrink-0" />
-            <span>{localError || error}</span>
+          <div className="v-toast v-toast-error text-xs">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>{localError || error}</span>
+            </div>
           </div>
         )}
 
+        {/* Extension Tab */}
         {tab === "extension" && (
           <div className="space-y-3">
             {detectedProviders.length > 0 ? (
@@ -112,69 +111,70 @@ export const ConnectWalletModal: React.FC<ConnectWalletModalProps> = ({
                   key={prov.info.uuid}
                   onClick={() => handleExtensionClick(prov)}
                   disabled={isSubmitting}
-                  className="w-full p-4 rounded-xl bg-black hover:bg-[#181818] transition-colors flex items-center justify-between text-left"
+                  className="w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all duration-200"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
                 >
                   <div className="flex items-center gap-3">
                     {prov.info.icon ? (
-                      <img src={prov.info.icon} alt={prov.info.name} className="w-6 h-6 rounded" />
+                      <img src={prov.info.icon} alt={prov.info.name} className="w-7 h-7 rounded-lg" />
                     ) : (
-                      <Shield className="w-6 h-6 text-neutral-300" />
+                      <Shield className="w-7 h-7 text-[#9ca3b4]" />
                     )}
                     <div>
-                      <p className="text-sm font-bold text-white">{prov.info.name}</p>
-                      <p className="text-xs text-neutral-400">EIP-6963 Injected</p>
+                      <p className="text-sm font-semibold text-white">{prov.info.name}</p>
+                      <p className="text-[11px] text-[#5f6578]">Detected Wallet</p>
                     </div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-neutral-500" />
+                  <ArrowRight className="w-4 h-4 text-[#5f6578]" />
                 </button>
               ))
             ) : (
               <button
                 onClick={() => handleExtensionClick()}
                 disabled={isSubmitting}
-                className="w-full p-4 rounded-xl bg-black hover:bg-[#181818] transition-colors flex items-center justify-between text-left"
+                className="w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all duration-200"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
               >
                 <div className="flex items-center gap-3">
-                  <Shield className="w-6 h-6 text-neutral-300" />
+                  <Shield className="w-7 h-7 text-[#9ca3b4]" />
                   <div>
-                    <p className="text-sm font-bold text-white">BridgeKey / Web3 Extension</p>
-                    <p className="text-xs text-neutral-400">Connect via standard browser wallet</p>
+                    <p className="text-sm font-semibold text-white">BridgeKey / Web3 Wallet</p>
+                    <p className="text-[11px] text-[#5f6578]">Connect via browser extension</p>
                   </div>
                 </div>
-                <ArrowRight className="w-4 h-4 text-neutral-500" />
+                <ArrowRight className="w-4 h-4 text-[#5f6578]" />
               </button>
             )}
 
-            <div className="p-4 rounded-lg bg-black text-xs text-neutral-400 text-center">
-              If your wallet is not appearing, switch to the <strong>Private Key</strong> tab to connect your testnet account directly.
-            </div>
+            <p className="text-xs text-[#5f6578] text-center py-2">
+              Wallet not appearing? Switch to the <strong className="text-[#9ca3b4]">Private Key</strong> tab.
+            </p>
           </div>
         )}
 
+        {/* Private Key Tab */}
         {tab === "privateKey" && (
           <form onSubmit={handlePrivateKeySubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                MST Testnet Private Key
-              </label>
+              <label className="block text-xs font-semibold text-[#9ca3b4] mb-2">MST Testnet Private Key</label>
               <input
                 type="password"
                 placeholder="0x..."
                 value={privateKey}
                 onChange={(e) => setPrivateKey(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-xs font-mono focus:outline-none"
+                className="v-input font-mono text-xs"
                 required
               />
-              <p className="text-xs text-neutral-400 mt-1">
-                Key is only kept in local browser memory and connected directly to MST Testnet RPC.
+              <p className="text-[11px] text-[#5f6578] mt-1.5">
+                Key stays in your browser memory only. Never sent to any server.
               </p>
             </div>
 
-            <div className="pt-2 flex justify-end gap-3">
-              <button type="button" onClick={onClose} className="btn-secondary">
+            <div className="flex justify-end gap-3 pt-1">
+              <button type="button" onClick={onClose} className="v-btn-secondary text-xs">
                 Cancel
               </button>
-              <button type="submit" disabled={isSubmitting} className="btn-primary">
+              <button type="submit" disabled={isSubmitting} className="v-btn-primary text-xs">
                 <Key className="w-4 h-4" />
                 {isSubmitting ? "Connecting..." : "Connect"}
               </button>
