@@ -133,6 +133,15 @@ export function createApiRouter(indexer: IndexerService, keeper: KeeperBot): Rou
     });
   });
 
+  router.get("/invitations/:id", (req: Request, res: Response) => {
+    const { id } = req.params;
+    const invitation = db.getInvitationById(id);
+    if (!invitation) {
+      return res.status(404).json({ error: "Invitation not found" });
+    }
+    res.json(invitation);
+  });
+
   router.patch("/invitations/:id", (req: Request, res: Response) => {
     const { id } = req.params;
     const { status } = req.body;

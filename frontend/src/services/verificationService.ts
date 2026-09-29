@@ -617,4 +617,87 @@ export class VerificationService {
       console.warn("Backend deleteCircle error:", err);
     }
   }
+
+  // --- Group Invitations API Methods ---
+
+  public static async createInvitation(params: {
+    groupAddress: string;
+    name: string;
+    email: string;
+    walletAddress: string;
+  }): Promise<{ success: boolean; invitation: any }> {
+    const cleanGroup = params.groupAddress.toLowerCase();
+    const cleanWallet = params.walletAddress.toLowerCase();
+
+    // 1. Post to backend invitations
+    const res = await fetch(`${API_URL}/groups/${cleanGroup}/invitations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: params.name,
+        email: params.email,
+        wallet_address: cleanWallet,
+        status: "INVITED",
+      }),
+    });
+
+    const data = await res.json();
+
+    // 2. Also automatically whitelist in circle allowed members
+    await this.addAllowedMember(cleanGroup, cleanWallet, "Owner");
+
+    return data;
+  }
+
+  public static async fetchInvitations(groupAddress: string): Promise<any[]> {
+    if (!groupAddress) return [];
+    const cleanGroup = groupAddress.toLowerCase();
+    try {
+      const res = await fetch(`${API_URL}/groups/${cleanGroup}/invitations`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.warn("fetchInvitations error:", err);
+    }
+    return [];
+  }
+
+  public static async fetchInvitationById(id: string): Promise<any | null> {
+    if (!id) return null;
+    try {
+      const res = await fetch(`${API_URL}/invitations/${id}`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.warn("fetchInvitationById error:", err);
+    }
+    return null;
+  }
+
+  public static async updateInvitationStatus(id: string, status: string): Promise<void> {
+    if (!id || !status) return;
+    try {
+      await fetch(`${API_URL}/invitations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+    } catch (err) {
+      console.warn("updateInvitationStatus error:", err);
+    }
+  }
+
+  public static async deleteInvitation(id: string): Promise<void> {
+    if (!id) return;
+    try {
+      await fetch(`${API_URL}/invitations/${id}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.warn("deleteInvitation error:", err);
+    }
+  }
 }
+

@@ -601,6 +601,18 @@ class DatabaseManager {
     return results;
   }
 
+  public getInvitationById(id: string): any | null {
+    if (!this.db || !id) return null;
+    const stmt = this.db.prepare("SELECT * FROM invitations WHERE id = ?");
+    stmt.bind([id]);
+    let result: any = null;
+    if (stmt.step()) {
+      result = stmt.getAsObject();
+    }
+    stmt.free();
+    return result;
+  }
+
   public updateInvitationStatus(id: string, status: string): void {
     if (!this.db) return;
     const now = Math.floor(Date.now() / 1000);

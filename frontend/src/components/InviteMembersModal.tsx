@@ -1,358 +1,277 @@
 import React, { useState } from "react";
-import { UserPlus, Plus, Trash2, Shield, Mail, Wallet, AlertCircle, Sparkles, Check } from "lucide-react";
-import { isAddress } from "viem";
+import { UserPlus, Plus, Trash2, Mail, Wallet, AlertCircle, Check, Copy, Share2, Shield } from "lucide-react";
+import { ethers } from "ethers";
 import { Modal } from "./ui/Modal";
-import { CircleData, ParticipantInput } from "../services/circleLifecycleService";
+import { VerificationService } from "../services/verificationService";
 
 interface InviteMembersModalProps {
   isOpen: boolean;
   onClose: () => void;
-  circle: CircleData | null;
-  onSendInvitations: (participants: ParticipantInput[]) => void;
-}
-
-interface ParticipantFormRow {
-  id: string;
-  name: string;
-  email: string;
-  walletAddress: string;
+  circleAddress: string;
+  circleName: string;
+  memberCount: number;
+  currentMembersCount: number;
+  existingWalletAddresses?: string[];
+  onInvitationSent?: () => void;
+  onShowNotification?: (msg: string, isError?: boolean) => void;
 }
 
 export const InviteMembersModal: React.FC<InviteMembersModalProps> = ({
   isOpen,
   onClose,
-  circle,
-  onSendInvitations,
+  circleAddress,
+  circleName,
+  memberCount,
+  currentMembersCount,
+  existingWalletAddresses = [],
+  onInvitationSent,
+  onShowNotification,
 }) => {
-  const [participants, setParticipants] = useState<ParticipantFormRow[]>([
-    { id: "row-1", name: "", email: "", walletAddress: "" },
-  ]);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  if (!circle) return null;
+  if (!isOpen) return null;
 
-  const currentMembersCount = circle.members.length;
-  const pendingInvitesCount = circle.invitations.filter((i) => i.status === "PENDING").length;
-  const remainingSlots = Math.max(0, circle.memberCount - (currentMembersCount + pendingInvitesCount));
+  const remainingSlots = Math.max(0, memberCount - currentMembersCount);
 
-  const handleAddRow = () => {
-    setErrorMsg(null);
-    if (participants.length >= remainingSlots) {
-      setErrorMsg(`Cannot add more than ${remainingSlots} participant${remainingSlots === 1 ? "" : "s"}. Circle capacity is ${circle.memberCount}.`);
-      return;
-    }
-    setParticipants([
-      ...participants,
-      {
-        id: `row-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-        name: "",
-        email: "",
-        walletAddress: "",
-      },
-    ]);
+  const validateEmail = (val: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
   };
 
-  const handleRemoveRow = (id: string) => {
-    setErrorMsg(null);
-    if (participants.length <= 1) {
-      // Clear instead of removing last row
-      setParticipants([{ id: "row-1", name: "", email: "", walletAddress: "" }]);
-      return;
-    }
-    setParticipants(participants.filter((p) => p.id !== id));
-  };
-
-  const handleChangeField = (id: string, field: "name" | "email" | "walletAddress", value: string) => {
-    setErrorMsg(null);
-    setParticipants((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
-    );
-  };
-
-  // Quick helper to fill a sample valid participant for rapid demo presentation
-  const handleQuickFillSample = (index: number) => {
-    const samples = [
-      { name: "Rahul N", email: "rahul.n@gmail.com", walletAddress: "0x91F221A378D33B037A6668fOd128c4BBA28bb659" },
-      { name: "Ananya Rao", email: "ananya.rao@gmail.com", walletAddress: "0x58f91a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f" },
-      { name: "Vikram Patel", email: "vikram.patel@gmail.com", walletAddress: "0xb794f5ea0ba39494ce839613fffba74279579268" },
-      { name: "Sneha Iyer", email: "sneha.iyer@gmail.com", walletAddress: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512" },
-      { name: "Priya Sharma", email: "priya.sharma@gmail.com", walletAddress: "0x39A88F110B74f5ea0ba39494ce839613fffba742" },
-    ];
-
-    const sample = samples[index % samples.length];
-    setParticipants((prev) =>
-      prev.map((p, i) => (i === index ? { ...p, ...sample } : p))
-    );
-  };
-
-  const handleFillAllRemainingSlots = () => {
-    const samples = [
-      { name: "Rahul N", email: "rahul.n@gmail.com", walletAddress: "0x91F221A378D33B037A6668fOd128c4BBA28bb659" },
-      { name: "Ananya Rao", email: "ananya.rao@gmail.com", walletAddress: "0x58f91a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f" },
-      { name: "Vikram Patel", email: "vikram.patel@gmail.com", walletAddress: "0xb794f5ea0ba39494ce839613fffba74279579268" },
-      { name: "Sneha Iyer", email: "sneha.iyer@gmail.com", walletAddress: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512" },
-      { name: "Priya Sharma", email: "priya.sharma@gmail.com", walletAddress: "0x39A88F110B74f5ea0ba39494ce839613fffba742" },
-    ];
-
-    const filled: ParticipantFormRow[] = [];
-    const countToFill = Math.min(samples.length, remainingSlots);
-    for (let i = 0; i < countToFill; i++) {
-      filled.push({
-        id: `row-fill-${i}`,
-        ...samples[i],
-      });
-    }
-    setParticipants(filled);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    setGeneratedLink(null);
 
-    // Validate inputs
-    const cleanList: ParticipantInput[] = [];
-    const emailsSeen = new Set<string>();
-    const addressesSeen = new Set<string>();
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanWallet = walletAddress.trim();
 
-    for (let i = 0; i < participants.length; i++) {
-      const p = participants[i];
-      const name = p.name.trim();
-      const email = p.email.trim().toLowerCase();
-      const wallet = p.walletAddress.trim();
-
-      if (!name) {
-        setErrorMsg(`Participant #${i + 1}: Full Name is required.`);
-        return;
-      }
-
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        setErrorMsg(`Participant #${i + 1} (${name}): Please provide a valid email address.`);
-        return;
-      }
-
-      if (!wallet || !isAddress(wallet)) {
-        setErrorMsg(
-          `Participant #${i + 1} (${name}): Invalid EVM wallet address ("${wallet}"). Must be a valid 0x-prefixed 40-hex-character address.`
-        );
-        return;
-      }
-
-      if (emailsSeen.has(email)) {
-        setErrorMsg(`Duplicate email address "${email}" in your invitation list.`);
-        return;
-      }
-      if (addressesSeen.has(wallet.toLowerCase())) {
-        setErrorMsg(`Duplicate wallet address "${wallet}" in your invitation list.`);
-        return;
-      }
-
-      emailsSeen.add(email);
-      addressesSeen.add(wallet.toLowerCase());
-      cleanList.push({ name, email, walletAddress: wallet });
-    }
-
-    if (cleanList.length === 0) {
-      setErrorMsg("Please add at least one participant to invite.");
+    if (!cleanName) {
+      setErrorMsg("Participant Name is required.");
       return;
     }
 
-    if (cleanList.length > remainingSlots) {
-      setErrorMsg(`Cannot invite ${cleanList.length} participants. Only ${remainingSlots} open slot${remainingSlots === 1 ? "" : "s"} available.`);
+    if (!validateEmail(cleanEmail)) {
+      setErrorMsg("Please provide a valid email address.");
+      return;
+    }
+
+    if (!cleanWallet.startsWith("0x") || cleanWallet.length !== 42 || !ethers.isAddress(cleanWallet)) {
+      setErrorMsg("Please enter a valid 42-character EVM-compatible BridgeKey wallet address (0x...).");
+      return;
+    }
+
+    const checksummed = ethers.getAddress(cleanWallet);
+
+    // Duplicate check
+    const isDuplicate = existingWalletAddresses.some(
+      (existing) => existing.toLowerCase() === checksummed.toLowerCase()
+    );
+    if (isDuplicate) {
+      setErrorMsg("This wallet address is already an invited participant or member in this circle.");
       return;
     }
 
     setIsSubmitting(true);
-    onSendInvitations(cleanList);
-    setIsSubmitting(false);
+    try {
+      const result = await VerificationService.createInvitation({
+        groupAddress: circleAddress,
+        name: cleanName,
+        email: cleanEmail,
+        walletAddress: checksummed,
+      });
+
+      const invId = result.invitation?.id || `inv-${Date.now()}`;
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const fullInviteLink = `${origin}/grouplink?circle=${circleAddress}&invite=${invId}`;
+      setGeneratedLink(fullInviteLink);
+
+      setName("");
+      setEmail("");
+      setWalletAddress("");
+
+      if (onShowNotification) {
+        onShowNotification(`Invitation created for ${cleanName}! Link generated.`);
+      }
+      if (onInvitationSent) {
+        onInvitationSent();
+      }
+    } catch (err: any) {
+      console.error("Failed to create invitation:", err);
+      setErrorMsg(err.message || "Failed to record invitation on backend.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const copyInviteLink = () => {
+    if (!generatedLink) return;
+    navigator.clipboard.writeText(generatedLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+    if (onShowNotification) {
+      onShowNotification("Invitation link copied to clipboard!");
+    }
+  };
+
+  const handleCloseAndReset = () => {
+    setName("");
+    setEmail("");
+    setWalletAddress("");
+    setErrorMsg(null);
+    setGeneratedLink(null);
     onClose();
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
-      title="Invite Circle Participants"
-      description={`Add real participant details to invite them to ${circle.name} (${currentMembersCount}/${circle.memberCount} members)`}
-      icon={<UserPlus className="w-5 h-5 text-[#946800]" />}
-      maxWidth="max-w-2xl"
+      onClose={handleCloseAndReset}
+      title={
+        <div className="flex items-center gap-2 text-white font-display">
+          <UserPlus className="w-5 h-5 text-red-500" />
+          <span>Invite Participant</span>
+        </div>
+      }
+      description={
+        <span className="text-xs text-neutral-400">
+          Add a member to <strong className="text-neutral-200">{circleName}</strong>. Capacity: {currentMembersCount} / {memberCount}
+        </span>
+      }
+      maxWidth="max-w-lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-        {/* Capacity Telemetry & Quick Fill Tool */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-2xl bg-black/[0.02] border border-black/[0.05]">
-          <div>
-            <span className="text-[11px] text-[#5F6368] font-medium">Circle Capacity Status:</span>
-            <p className="text-xs font-bold text-[#121316]">
-              {circle.memberCount} Total Slots · {currentMembersCount} Joined · {pendingInvitesCount} Pending
-            </p>
+      <div className="space-y-5 text-xs">
+        {errorMsg && (
+          <div className="p-3 bg-red-950/40 border border-red-900/50 rounded-xl flex items-center gap-2.5 text-red-300">
+            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <span>{errorMsg}</span>
           </div>
+        )}
 
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-[#137333] font-semibold border border-emerald-200">
-              {remainingSlots} spots available
-            </span>
-            {remainingSlots > 1 && (
+        {generatedLink ? (
+          <div className="p-4 bg-black border border-neutral-900 rounded-xl space-y-3">
+            <div className="flex items-center gap-2 text-green-400 font-semibold text-xs">
+              <Check className="w-4 h-4" />
+              <span>Invitation Created Successfully</span>
+            </div>
+            <p className="text-neutral-400 text-[11px]">
+              Share this direct invitation link with the invited participant. They will connect their BridgeKey wallet to verify and join.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={generatedLink}
+                className="flex-1 bg-neutral-900 rounded-lg px-3 py-2 text-xs font-mono text-neutral-300 border-none focus:outline-none"
+              />
               <button
                 type="button"
-                onClick={handleFillAllRemainingSlots}
-                className="text-[11px] text-[#946800] hover:text-[#7A5400] font-semibold flex items-center gap-1 hover:underline"
-                title="Quickly fill sample valid addresses for demo"
+                onClick={copyInviteLink}
+                className="btn-primary px-4 py-2 text-xs flex items-center gap-1.5 cursor-pointer"
               >
-                <Sparkles className="w-3 h-3" />
-                Fill Sample Data
+                {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? "Copied" : "Copy Link"}</span>
               </button>
-            )}
+            </div>
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setGeneratedLink(null)}
+                className="text-xs text-red-400 hover:text-red-300 bg-transparent border-none cursor-pointer"
+              >
+                + Invite Another Participant
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-neutral-300 font-semibold mb-1.5">
+                Participant Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. John Doe"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setErrorMsg(null);
+                }}
+                className="w-full bg-neutral-900 rounded-lg px-3.5 py-2.5 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500 border-none"
+              />
+            </div>
 
-        {errorMsg && (
-          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-            <span className="leading-snug">{errorMsg}</span>
-          </div>
-        )}
-
-        {/* Dynamic Participant Entry List */}
-        <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1 no-scrollbar">
-          {participants.map((p, index) => (
-            <div
-              key={p.id}
-              className="p-3.5 sm:p-4 rounded-2xl bg-white border border-black/[0.08] shadow-2xs space-y-3 relative group"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-[#121316] text-white text-[10px] font-bold flex items-center justify-center">
-                    {index + 1}
-                  </span>
-                  <span className="font-bold text-xs text-[#121316]">
-                    Participant #{index + 1}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickFillSample(index)}
-                    className="text-[10px] text-[#946800] hover:text-[#7A5400] px-2 py-0.5 rounded-md hover:bg-[#E9B949]/10 transition-colors"
-                  >
-                    Sample Preset
-                  </button>
-                  {participants.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveRow(p.id)}
-                      className="p-1 rounded-md text-[#8F959E] hover:text-red-600 hover:bg-red-50 transition-colors"
-                      title="Remove participant"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Form Fields for Name, Email, Wallet Address */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Full Name */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#5F6368] mb-1">
-                    Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={p.name}
-                    onChange={(e) => handleChangeField(p.id, "name", e.target.value)}
-                    placeholder="e.g. Rahul N"
-                    className="v-input text-xs"
-                    required
-                  />
-                </div>
-
-                {/* Email Address */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#5F6368] mb-1">
-                    Email Address <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-3.5 h-3.5 text-[#8F959E] absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="email"
-                      value={p.email}
-                      onChange={(e) => handleChangeField(p.id, "email", e.target.value)}
-                      placeholder="e.g. rahul@gmail.com"
-                      className="v-input pl-8 text-xs"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Wallet Address (Full width) */}
-                <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-semibold text-[#5F6368] mb-1 flex items-center justify-between">
-                    <span>
-                      Blockchain Wallet Address (MST Testnet / EVM) <span className="text-red-500">*</span>
-                    </span>
-                    {p.walletAddress && isAddress(p.walletAddress) && (
-                      <span className="text-[10px] text-emerald-600 font-normal flex items-center gap-1">
-                        <Check className="w-3 h-3" /> Valid EVM Address
-                      </span>
-                    )}
-                  </label>
-                  <div className="relative">
-                    <Wallet className="w-3.5 h-3.5 text-[#8F959E] absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={p.walletAddress}
-                      onChange={(e) => handleChangeField(p.id, "walletAddress", e.target.value)}
-                      placeholder="0x91F221A378D33B037A6668fOd128c4BBA28bb659"
-                      className="v-input pl-8 font-mono text-[11px]"
-                      required
-                    />
-                  </div>
-                </div>
+            <div>
+              <label className="block text-neutral-300 font-semibold mb-1.5">
+                Participant Email <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-neutral-500 absolute left-3 top-3" />
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. john.doe@workplace.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setErrorMsg(null);
+                  }}
+                  className="w-full bg-neutral-900 rounded-lg pl-9 pr-3.5 py-2.5 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500 border-none"
+                />
               </div>
             </div>
-          ))}
-        </div>
 
-        {/* Add Another Participant Button */}
-        {participants.length < remainingSlots && (
-          <button
-            type="button"
-            onClick={handleAddRow}
-            className="w-full py-2.5 rounded-2xl border border-dashed border-black/[0.15] hover:border-black/[0.3] hover:bg-black/[0.02] text-xs font-semibold text-[#121316] transition-all flex items-center justify-center gap-1.5"
-          >
-            <Plus className="w-4 h-4 text-[#946800]" />
-            + Add Another Participant ({participants.length}/{remainingSlots} slots)
-          </button>
+            <div>
+              <label className="block text-neutral-300 font-semibold mb-1.5">
+                BridgeKey Wallet Address <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Wallet className="w-4 h-4 text-neutral-500 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  required
+                  placeholder="0x..."
+                  value={walletAddress}
+                  onChange={(e) => {
+                    setWalletAddress(e.target.value);
+                    setErrorMsg(null);
+                  }}
+                  className="w-full bg-neutral-900 rounded-lg pl-9 pr-3.5 py-2.5 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500 border-none"
+                />
+              </div>
+              <span className="text-[10px] text-neutral-500 mt-1 block">
+                Must be an EVM-compatible public address (42 hex characters).
+              </span>
+            </div>
+
+            <div className="pt-3 border-t border-neutral-900 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleCloseAndReset}
+                className="px-4 py-2.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-xs font-semibold transition-colors border-none cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                disabled={isSubmitting || remainingSlots <= 0}
+                className="btn-primary px-5 py-2.5 text-xs font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>{isSubmitting ? "Creating Invitation..." : "Send Invitation"}</span>
+              </button>
+            </div>
+          </form>
         )}
-
-        {/* Actions */}
-        <div className="flex items-center justify-between pt-3 border-t border-black/[0.06]">
-          <span className="text-[11px] text-[#5F6368] font-mono">
-            Inviting: <strong>{participants.filter((p) => p.name && p.email && p.walletAddress).length}</strong> / {remainingSlots}
-          </span>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="v-btn-secondary text-xs px-4 py-2"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || participants.length === 0}
-              className="v-btn-primary text-xs px-5 py-2.5 flex items-center gap-1.5"
-            >
-              <UserPlus className="w-3.5 h-3.5 text-[#E9B949]" />
-              {isSubmitting
-                ? "Sending..."
-                : `Send ${participants.length} Invitation${participants.length === 1 ? "" : "s"}`}
-            </button>
-          </div>
-        </div>
-      </form>
+      </div>
     </Modal>
   );
 };

@@ -1152,8 +1152,15 @@ export const CircleWorkspace: React.FC<CircleWorkspaceProps> = ({
       <InviteMembersModal
         isOpen={isInviteModalOpen}
         onClose={() => setIsInviteModalOpen(false)}
-        circle={circle}
-        onSendInvitations={handleSendInvitations}
+        circleAddress={circle.address}
+        circleName={circle.name}
+        memberCount={circle.memberCount}
+        currentMembersCount={circle.members.length}
+        existingWalletAddresses={circle.members.map((m) => m.address)}
+        onInvitationSent={() => {
+          const updated = CircleLifecycleService.getCircleByIdOrAddress(circle.id);
+          if (updated) setCircle(updated);
+        }}
       />
     </div>
   );
