@@ -1,6 +1,25 @@
-import React, { useState } from "react";
-import { X, Sparkles, Plus, ArrowRight, ShieldCheck, HelpCircle, Layers } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import {
+  X,
+  Sparkles,
+  Plus,
+  ArrowRight,
+  ShieldCheck,
+  HelpCircle,
+  Layers,
+  Key,
+  Lock,
+  Copy,
+  Check,
+  Eye,
+  EyeOff
+} from "lucide-react";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
+import {
+  generateGroupCode,
+  generateAdminSecret,
+  GroupGatekeeperService
+} from "../services/groupGatekeeperService";
 
 interface CreateGroupModalProps {
   isOpen: boolean;
@@ -12,6 +31,8 @@ interface CreateGroupModalProps {
     cycleDuration: number;
     discountCapBps: number;
     reserveFeeBps: number;
+    groupCode: string;
+    adminSecret: string;
   }) => void;
   isTechnicalMode?: boolean;
 }
@@ -31,6 +52,29 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const [cycleDurationMonths, setCycleDurationMonths] = useState<number | "">(1);
   const [discountCapPercent, setDiscountCapPercent] = useState<number | "">(30);
 
+  // Group Code & Admin Gatekeeper State
+  const [groupCode, setGroupCode] = useState("");
+  const [adminSecret, setAdminSecret] = useState("");
+  const [showSecret, setShowSecret] = useState(false);
+  const [requireSecretApproval, setRequireSecretApproval] = useState(true);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Auto-generate fresh codes whenever modal opens or group name changes
+  useEffect(() => {
+    if (isOpen) {
+      const initialCode = generateGroupCode(groupName || "COMMUNITY", "0x9156");
+      setGroupCode(initialCode);
+      const initialSecret = generateAdminSecret();
+      setAdminSecret(initialSecret);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (groupName.trim()) {
+      setGroupCode(generateGroupCode(groupName, "0x9156"));
+    }
+  }, [groupName]);
+
   if (!isOpen) return null;
 
   const numInstallmentInr = Number(installmentInr) || 0;
@@ -46,6 +90,12 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const numMonths = Number(cycleDurationMonths) || 1;
   const cycleDurationSeconds = numMonths * 30 * 24 * 3600;
 
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(id);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!groupName || !memberCount || !installmentInr) return;
@@ -56,13 +106,15 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       cycleDuration: cycleDurationSeconds,
       discountCapBps: (Number(discountCapPercent) || 30) * 100,
       reserveFeeBps: calculatedReserveFeeBps,
+      groupCode: groupCode || generateGroupCode(groupName, "0x9156"),
+      adminSecret: adminSecret || generateAdminSecret(),
     });
     onClose();
   };
 
   return (
     <div className="v-overlay">
-      <div className="v-modal p-6 sm:p-8 max-w-xl">
+      <div className="v-modal p-6 sm:p-8 max-w-xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
           <div className="flex items-center gap-3.5">
@@ -80,7 +132,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                 <h2 className="text-lg font-bold text-white font-display">Create Community Chain</h2>
                 <span className="v-badge v-badge-cyan text-[10px]">Smart Contract</span>
               </div>
-              <p className="text-xs text-[#7A889B] mt-0.5">Deploy a self-executing chit fund on MST Protocol</p>
+              <p className="text-xs text-[#7A889B] mt-0.5">Deploy an autonomous chit fund with gated member approval</p>
             </div>
           </div>
           <button
@@ -178,6 +230,81 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             </div>
           </div>
 
+          {/* ── CRYPTOGRAPHIC GROUP CODE & ADMIN SECRET PASSCODE ── */}
+          <div
+            className="p-4 rounded-2xl space-y-3"
+            style={{
+              background: "rgba(13, 19, 31, 0.85)",
+              border: "1px solid rgba(0, 245, 160, 0.25)",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-white flex items-center gap-1.5 text-xs">
+                <ShieldCheck className="w-4 h-4 text-[#00F5A0]" />
+                Hashed Group Code & Admin Gatekeeper
+              </span>
+              <span className="v-badge v-badge-emerald text-[9px]">Cryptographic Gating</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {/* Generated Hashed Group Code */}
+              <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
+                <span className="text-[10px] text-[#7A889B] font-semibold block">Shareable Group Code</span>
+                <div className="flex items-center justify-between gap-1">
+                  <code className="text-[#00F5A0] font-mono font-bold text-xs truncate">{groupCode}</code>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(groupCode, "modal-grp-code")}
+                    className="p-1 rounded text-[#7A889B] hover:text-white"
+                  >
+                    {copiedKey === "modal-grp-code" ? <Check className="w-3.5 h-3.5 text-[#00F5A0]" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Generated Admin Secret Passcode */}
+              <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-[#A78BFA] font-semibold block">Your Admin Secret Key</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowSecret(!showSecret)}
+                    className="text-[10px] text-[#00D9F5] hover:underline"
+                  >
+                    {showSecret ? "Hide" : "Show"}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  <code className="text-[#A78BFA] font-mono font-bold text-xs truncate">
+                    {showSecret ? adminSecret : "••••••••••••"}
+                  </code>
+                  {showSecret && (
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(adminSecret, "modal-adm-sec")}
+                      className="p-1 rounded text-[#7A889B] hover:text-white"
+                    >
+                      {copiedKey === "modal-adm-sec" ? <Check className="w-3.5 h-3.5 text-[#00F5A0]" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="gatingToggle"
+                checked={requireSecretApproval}
+                onChange={(e) => setRequireSecretApproval(e.target.checked)}
+                className="rounded text-[#00F5A0] bg-black/50 border-white/20 focus:ring-0 cursor-pointer"
+              />
+              <label htmlFor="gatingToggle" className="text-[11px] text-[#E6EDF3] cursor-pointer">
+                Require Admin Secret Passcode to approve joining members (prevents unauthorized access)
+              </label>
+            </div>
+          </div>
+
           {/* Calculated Summary Card */}
           <div
             className="p-4 rounded-2xl space-y-2.5"
@@ -264,4 +391,5 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     </div>
   );
 };
+
 

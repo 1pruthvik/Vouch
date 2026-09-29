@@ -12,6 +12,7 @@ import { AvailableCircle } from "./components/MemberDashboard";
 import { LedgerView, LedgerEvent } from "./components/LedgerView";
 import { CreateGroupModal } from "./components/CreateGroupModal";
 import { JoinGroupModal } from "./components/JoinGroupModal";
+import { AdminGatekeeperModal } from "./components/AdminGatekeeperModal";
 import { ConnectWalletModal } from "./components/ConnectWalletModal";
 import { MandateModal } from "./components/MandateModal";
 import { AccountModal } from "./components/AccountModal";
@@ -20,6 +21,7 @@ import { useWallet } from "./hooks/useWallet";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
 import { fetchLedgerEvents, fetchIndexedGroups } from "./services/indexerService";
+import { GroupGatekeeperService } from "./services/groupGatekeeperService";
 import {
   UserPlus,
   Shield,
@@ -31,7 +33,8 @@ import {
   History,
   Building,
   TrendingUp,
-  ArrowLeft
+  ArrowLeft,
+  Key
 } from "lucide-react";
 
 export function App() {
@@ -76,6 +79,7 @@ export function App() {
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [isGatekeeperModalOpen, setIsGatekeeperModalOpen] = useState(false);
   const [isMandateModalOpen, setIsMandateModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
@@ -135,7 +139,22 @@ export function App() {
         },
       ];
 
-      baseCircles.forEach((c) => combinedMap.set(c.address.toLowerCase(), c));
+      // Also register gatekeeper records for base circles
+      baseCircles.forEach((c) => {
+        combinedMap.set(c.address.toLowerCase(), c);
+        if (!GroupGatekeeperService.getRecordByAddress(c.address)) {
+          GroupGatekeeperService.registerGroup({
+            groupAddress: c.address,
+            groupName: c.name,
+            groupCode: `VOUCH-${c.name.split(" ")[0].toUpperCase()}-${c.address.substring(2, 6).toUpperCase()}`,
+            adminAddress: "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+            adminSecretHash: "ADM-ALPHA-99",
+            adminSecretPlain: "ADM-9942-SEC",
+            isGatekeeperEnabled: true,
+            createdAt: Date.now(),
+          });
+        }
+      });
       customSaved.forEach((c) => combinedMap.set(c.address.toLowerCase(), c));
 
       if (Array.isArray(indexed)) {
@@ -175,7 +194,7 @@ export function App() {
 
   const showNotification = (message: string, isError: boolean = false) => {
     setNotification({ message, isError });
-    setTimeout(() => setNotification(null), 5000);
+    setTimeout(() => setNotification(null), 6000);
   };
 
   // Initialize ContractService
@@ -240,7 +259,7 @@ export function App() {
     }
   }, [activeGroupAddress, onboardingState, refreshData]);
 
-  // Handler: Create Group
+  // Handler: Create Group with Hashed Group Code and Admin Secret
   const handleCreateGroup = async (params: {
     groupName: string;
     memberCount: number;
@@ -248,9 +267,12 @@ export function App() {
     cycleDuration: number;
     discountCapBps: number;
     reserveFeeBps: number;
+    groupCode: string;
+    adminSecret: string;
   }) => {
     if (!contractService || !account) {
       setIsConnectModalOpen(true);
+      showNotification("Please connect your BridgeKey or Web3 wallet first.", true);
       return;
     }
     try {
@@ -267,7 +289,19 @@ export function App() {
         customSaved.unshift(newCircle);
         localStorage.setItem("vouch_custom_groups", JSON.stringify(customSaved));
 
-        // Register with indexer
+        // Register Gatekeeper Record
+        GroupGatekeeperService.registerGroup({
+          groupAddress: result.groupAddress,
+          groupName: params.groupName,
+          groupCode: params.groupCode,
+          adminAddress: account,
+          adminSecretHash: params.adminSecret,
+          adminSecretPlain: params.adminSecret,
+          isGatekeeperEnabled: true,
+          createdAt: Date.now(),
+        });
+
+        // Register with backend indexer
         fetch("http://localhost:4000/api/groups/index", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -276,7 +310,9 @@ export function App() {
 
         loadAvailableGroups();
         setActiveGroupAddress(result.groupAddress);
-        showNotification(`Circle "${params.groupName}" deployed at ${result.groupAddress.substring(0, 10)}...`);
+        showNotification(
+          `Chain "${params.groupName}" deployed! Group Code: ${params.groupCode} | Admin Passcode: ${params.adminSecret}`
+        );
         setOnboardingState("portal");
       } else {
         showNotification("Group creation transaction confirmed.");
@@ -292,6 +328,7 @@ export function App() {
   const handleJoinGroup = async (groupAddr: string, bufferDeposit: string) => {
     if (!contractService || !account) {
       setIsConnectModalOpen(true);
+      showNotification("Please connect your BridgeKey or Web3 wallet first.", true);
       return;
     }
     try {
@@ -415,7 +452,14 @@ export function App() {
               setIsAccountModalOpen(true);
             }
           }}
-          onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
+          onOpenCreateGroupModal={() => {
+            if (!account) {
+              setIsConnectModalOpen(true);
+              showNotification("Connect your BridgeKey or Web3 wallet to create a chain.");
+            } else {
+              setIsCreateModalOpen(true);
+            }
+          }}
           onReturnToHub={() => setOnboardingState("hub")}
         />
 
@@ -435,15 +479,31 @@ export function App() {
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <HubChoiceScreen
             userProfile={userProfile}
+            account={account}
             availableGroups={availableGroups}
-            onSelectJoinOption={() => setIsJoinModalOpen(true)}
-            onSelectCreateOption={() => setIsCreateModalOpen(true)}
+            onSelectJoinOption={() => {
+              if (!account) {
+                setIsConnectModalOpen(true);
+                showNotification("Connect your BridgeKey or Web3 wallet to join a chain with your private tokens.");
+              } else {
+                setIsJoinModalOpen(true);
+              }
+            }}
+            onSelectCreateOption={() => {
+              if (!account) {
+                setIsConnectModalOpen(true);
+                showNotification("Connect your BridgeKey or Web3 wallet to deploy your community chain.");
+              } else {
+                setIsCreateModalOpen(true);
+              }
+            }}
             onQuickJoinCircle={(address) => handleSelectGroup(address)}
             onReVerifyKYC={() => {
               localStorage.removeItem("vouch_user_kyc");
               setUserProfile(null);
               setOnboardingState("kyc");
             }}
+            onOpenConnectModal={() => setIsConnectModalOpen(true)}
           />
         </main>
 
@@ -469,9 +529,20 @@ export function App() {
           isOpen={isJoinModalOpen}
           onClose={() => setIsJoinModalOpen(false)}
           defaultGroupAddress={activeGroupAddress}
-          defaultDepositINR={5000}
+          defaultDepositINR={10000}
+          userProfile={userProfile}
+          account={account}
           onJoin={handleJoinGroup}
           isTechnicalMode={isTechnicalMode}
+        />
+
+        <AdminGatekeeperModal
+          isOpen={isGatekeeperModalOpen}
+          onClose={() => setIsGatekeeperModalOpen(false)}
+          groupAddress={activeGroupAddress}
+          groupName={groupDetails?.name || "Alpha Savings Circle"}
+          currentAccount={account}
+          onMemberApproved={() => refreshData()}
         />
 
         <AccountModal
@@ -501,6 +572,7 @@ export function App() {
         groupName={groupDetails?.name || "Community Chain"}
         userName={userProfile?.fullName}
         isTechnicalMode={isTechnicalMode}
+        isGroupAdmin={true}
         onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
         onOpenAccountModal={() => {
           if (!account) {
@@ -511,6 +583,7 @@ export function App() {
           }
         }}
         onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
+        onOpenGatekeeperModal={() => setIsGatekeeperModalOpen(true)}
         onReturnToHub={() => setOnboardingState("hub")}
         onSwitchGroup={() => setOnboardingState("hub")}
       />
@@ -553,6 +626,15 @@ export function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsGatekeeperModalOpen(true)}
+              className="v-btn-secondary text-xs flex items-center gap-1.5 text-[#A78BFA] border-violet-500/30"
+              title="Open Gatekeeper Member Approvals"
+            >
+              <Key className="w-3.5 h-3.5 text-[#A78BFA]" />
+              <span className="hidden sm:inline">Gatekeeper Panel</span>
+            </button>
+
             <button
               onClick={() => setOnboardingState("hub")}
               className="v-btn-secondary text-xs flex items-center gap-1.5"
@@ -678,9 +760,20 @@ export function App() {
         isOpen={isJoinModalOpen}
         onClose={() => setIsJoinModalOpen(false)}
         defaultGroupAddress={activeGroupAddress}
-        defaultDepositINR={groupDetails ? Math.round(parseFloat(groupDetails.installmentAmount) * 1000) : 5000}
+        defaultDepositINR={groupDetails ? Math.round(parseFloat(groupDetails.installmentAmount) * 1000) : 10000}
+        userProfile={userProfile}
+        account={account}
         onJoin={handleJoinGroup}
         isTechnicalMode={isTechnicalMode}
+      />
+
+      <AdminGatekeeperModal
+        isOpen={isGatekeeperModalOpen}
+        onClose={() => setIsGatekeeperModalOpen(false)}
+        groupAddress={activeGroupAddress}
+        groupName={groupDetails?.name || "Community Chain"}
+        currentAccount={account}
+        onMemberApproved={() => refreshData()}
       />
 
       <MandateModal
@@ -718,4 +811,5 @@ export function App() {
   );
 }
 export default App;
+
 

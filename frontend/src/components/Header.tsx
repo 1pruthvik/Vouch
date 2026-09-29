@@ -1,5 +1,5 @@
 import React from "react";
-import { ShieldCheck, Code2, Plus, Wallet, Sparkles, UserCheck, Grid } from "lucide-react";
+import { ShieldCheck, Code2, Plus, Wallet, Sparkles, UserCheck, Grid, Key } from "lucide-react";
 import { formatINR } from "../utils/formatters";
 
 interface HeaderProps {
@@ -9,9 +9,11 @@ interface HeaderProps {
   groupName?: string;
   userName?: string;
   isTechnicalMode: boolean;
+  isGroupAdmin?: boolean;
   onToggleTechnicalMode: () => void;
   onOpenAccountModal: () => void;
   onOpenCreateGroupModal: () => void;
+  onOpenGatekeeperModal?: () => void;
   onReturnToHub?: () => void;
   onSwitchGroup?: () => void;
 }
@@ -23,9 +25,11 @@ export const Header: React.FC<HeaderProps> = ({
   groupName,
   userName,
   isTechnicalMode,
+  isGroupAdmin,
   onToggleTechnicalMode,
   onOpenAccountModal,
   onOpenCreateGroupModal,
+  onOpenGatekeeperModal,
   onReturnToHub,
   onSwitchGroup,
 }) => {
@@ -114,6 +118,23 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Controls */}
         <div className="flex items-center gap-2.5">
+          {/* Admin Gatekeeper Button */}
+          {onOpenGatekeeperModal && (
+            <button
+              onClick={onOpenGatekeeperModal}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+              style={{
+                background: "rgba(121, 40, 202, 0.15)",
+                border: "1px solid rgba(121, 40, 202, 0.35)",
+                color: "#A78BFA",
+              }}
+              title="Open Gatekeeper Member Approvals & Group Code"
+            >
+              <Key className="w-3.5 h-3.5 text-[#A78BFA]" />
+              <span className="hidden sm:inline">Gatekeeper</span>
+            </button>
+          )}
+
           {/* Verified KYC Tag */}
           {userName && (
             <div
@@ -194,4 +215,5 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+
 
