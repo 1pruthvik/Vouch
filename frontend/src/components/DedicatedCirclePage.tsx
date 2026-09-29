@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, Shield, Share2, Copy, Check, Users, Clock, CheckCircle2, AlertCircle, Coins, ArrowRight, XCircle, CheckCheck, Lock, UserPlus, Trash2, KeyRound, Edit3 } from "lucide-react";
+import { ArrowLeft, Shield, Share2, Copy, Check, Users, Clock, CheckCircle2, AlertCircle, Coins, ArrowRight, XCircle, CheckCheck, Lock, UserPlus, Trash2, KeyRound, Edit3, ExternalLink, Mail, Wallet, Plus } from "lucide-react";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 import { VerificationService, CircleRegistryEntry, JoinRequest } from "../services/verificationService";
 import { ContractService, GroupDetails, MemberDetails } from "../services/contractService";
 import { extractCircleAddress } from "./JoinCircleView";
 import { EditCircleModal } from "./EditCircleModal";
+import { InviteMembersModal } from "./InviteMembersModal";
 import { MSTChainVisualizer3D } from "./MSTChainVisualizer3D";
+import { MST_TESTNET } from "../config/network";
 import { ethers } from "ethers";
 
 interface DedicatedCirclePageProps {
@@ -31,14 +33,17 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
   const [memberDetails, setMemberDetails] = useState<MemberDetails | null>(null);
   const [pendingRequests, setPendingRequests] = useState<JoinRequest[]>([]);
   const [verifiedRequests, setVerifiedRequests] = useState<JoinRequest[]>([]);
+  const [invitations, setInvitations] = useState<any[]>([]);
   const [allowedMembers, setAllowedMembers] = useState<string[]>([]);
   const [newPublicKeyInput, setNewPublicKeyInput] = useState<string>("");
   const [isAddingKey, setIsAddingKey] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
+  const [copiedInvId, setCopiedInvId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   const loadCircleData = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
@@ -61,18 +66,27 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
         setVerifiedRequests(remoteReqs.filter((r) => r.status === "verified"));
       }
 
-      // 3. Allowed IDs list
+      // 3. Invitations List
+      const remoteInvs = await VerificationService.fetchInvitations(cleanCircleAddress);
+      if (Array.isArray(remoteInvs)) {
+        setInvitations(remoteInvs);
+      }
+
+      // 4. Allowed IDs list
       const allowed = await VerificationService.fetchAllowedMembers(cleanCircleAddress);
       setAllowedMembers(allowed);
 
-      // 4. On-chain Details
-      if (contractService && cleanCircleAddress.startsWith("0x")) {
+      // 5. On-chain Details
+      if (cleanCircleAddress.startsWith("0x") && cleanCircleAddress.length === 42) {
         try {
-          const gDetails = await contractService.getGroupDetails(cleanCircleAddress);
+          const srv = contractService || new ContractService();
+          const gDetails = await srv.getGroupDetails(cleanCircleAddress);
           setGroupDetails(gDetails);
 
-          const mDetails = await contractService.getMemberDetails(cleanCircleAddress, account);
-          setMemberDetails(mDetails);
+          if (account) {
+            const mDetails = await srv.getMemberDetails(cleanCircleAddress, account);
+            setMemberDetails(mDetails);
+          }
         } catch (chainErr) {
           console.warn("On-chain details fetch error:", chainErr);
         }
@@ -102,8 +116,8 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
     const candidate = newPublicKeyInput.trim();
     if (!candidate) return;
 
-    if (!candidate.startsWith("0x") || candidate.length < 42) {
-      onShowNotification("Please enter a valid 0x public key address (42 characters)", true);
+    if (!candidate.startsWith("0x") || candidate.length < 42 || !ethers.isAddress(candidate)) {
+      onShowNotification("Please enter a valid EVM public key address (0x... 42 characters)", true);
       return;
     }
 
@@ -187,6 +201,15 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
     onShowNotification("Circle address copied to clipboard!");
   };
 
+  const copyIndividualInvite = (invId: string) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const fullLink = `${origin}/grouplink?circle=${cleanCircleAddress}&invite=${invId}`;
+    navigator.clipboard.writeText(fullLink);
+    setCopiedInvId(invId);
+    setTimeout(() => setCopiedInvId(null), 2500);
+    onShowNotification("Participant invitation link copied to clipboard!");
+  };
+
   const circleName = registryCircle?.name || groupDetails?.name || "Savings Circle";
   const memberCount = registryCircle?.memberCount || groupDetails?.memberCount || 5;
   const installmentMst = registryCircle?.installmentAmount || groupDetails?.installmentAmount || "1.0";
@@ -194,10 +217,20 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
   const totalPotInr = memberCount * installmentInr;
   const currentPhase = groupDetails?.currentState || "Forming";
 
+  // Genuine active on-chain members from deployed contract
+  const onChainMembers = groupDetails?.members || [];
+  const activeMembersCount = onChainMembers.length;
+
   const isCircleStarted = groupDetails
     ? groupDetails.currentState !== "Forming" ||
-      (groupDetails.members && groupDetails.members.length >= groupDetails.memberCount && groupDetails.members.length > 0)
+      (activeMembersCount >= memberCount && activeMembersCount > 0)
     : false;
+
+  const existingWallets = [
+    ...onChainMembers,
+    ...invitations.map((i) => i.wallet_address || ""),
+    ...allowedMembers,
+  ].filter(Boolean);
 
   return (
     <div className="max-w-3xl mx-auto py-4 sm:py-8 px-4 space-y-8">
@@ -216,7 +249,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
           {isInitializer ? (
             <span className="px-2.5 py-1 rounded-full bg-red-950/40 text-red-400 font-semibold text-[11px] flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5" />
-              <span>Circle Initializer</span>
+              <span>Circle Owner / Initializer</span>
             </span>
           ) : (
             <span className="px-2.5 py-1 rounded-full bg-neutral-900 text-neutral-300 font-semibold text-[11px] flex items-center gap-1.5">
@@ -224,10 +257,15 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
               <span>Circle Member</span>
             </span>
           )}
-          {isCircleStarted && (
+          {isCircleStarted ? (
             <span className="px-2.5 py-1 rounded-full bg-green-950/40 text-green-400 font-semibold text-[11px] flex items-center gap-1.5">
               <Lock className="w-3.5 h-3.5" />
-              <span>Started & Locked</span>
+              <span>Active & Locked</span>
+            </span>
+          ) : (
+            <span className="px-2.5 py-1 rounded-full bg-yellow-950/40 text-yellow-400 font-semibold text-[11px] flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Forming ({activeMembersCount}/{memberCount} Joined)</span>
             </span>
           )}
         </div>
@@ -238,7 +276,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider">
-              Autonomous Rotating Pool
+              Autonomous Rotating Pool • MST Blockchain
             </span>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-display mt-0.5">
               {circleName}
@@ -258,33 +296,44 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
             {isInitializer && !isCircleStarted && (
-              <button
-                type="button"
-                onClick={() => setIsEditModalOpen(true)}
-                className="p-2.5 rounded-xl bg-black hover:bg-neutral-900 text-neutral-300 hover:text-white transition-colors border border-neutral-900 cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
-                title="Edit Circle Configuration"
-              >
-                <Edit3 className="w-3.5 h-3.5 text-red-500" />
-                <span>Edit Circle</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsInviteModalOpen(true)}
+                  className="btn-primary py-2.5 px-3.5 text-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Invite Participant</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="p-2.5 rounded-xl bg-black hover:bg-neutral-900 text-neutral-300 hover:text-white transition-colors border border-neutral-900 cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                  title="Edit Circle Configuration"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-red-500" />
+                  <span>Edit</span>
+                </button>
+              </>
             )}
 
             <button
               type="button"
               onClick={copyLink}
-              className="btn-primary py-2.5 px-4 text-xs flex items-center gap-2 cursor-pointer"
+              className="p-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-200 hover:text-white transition-colors border border-neutral-800 cursor-pointer flex items-center gap-2 text-xs font-semibold"
             >
               {copiedLink ? (
                 <>
                   <Check className="w-4 h-4 text-green-400" />
-                  <span>Link Copied</span>
+                  <span>Copied</span>
                 </>
               ) : (
                 <>
                   <Share2 className="w-4 h-4" />
-                  <span>Share Group Link</span>
+                  <span>Share</span>
                 </>
               )}
             </button>
@@ -311,10 +360,13 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
           </div>
 
           <div className="p-3 bg-black rounded-xl space-y-1">
-            <span className="text-[11px] text-neutral-500">Total Members</span>
+            <span className="text-[11px] text-neutral-500">Active Members</span>
             <p className="text-base sm:text-lg font-bold text-white font-display">
-              {groupDetails?.members ? `${groupDetails.members.length} / ${memberCount}` : `${memberCount} Max`}
+              {activeMembersCount} / {memberCount}
             </p>
+            <span className="text-[10px] text-neutral-500 block">
+              {activeMembersCount === 0 ? "0 On-chain Members" : `${activeMembersCount} Confirmed`}
+            </span>
           </div>
 
           <div className="p-3 bg-black rounded-xl space-y-1">
@@ -388,28 +440,194 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
       ) : (
         <>
           {/* ── View 2: Whitelist & Access Console ── */}
-          {isInitializer && (
-            <div className="p-6 bg-neutral-950 rounded-2xl space-y-6 text-xs">
+          {/* ── Section: Active On-Chain Members ── */}
+      <div className="p-6 bg-neutral-950 rounded-2xl space-y-4 text-xs">
+        <div className="flex items-center justify-between border-b border-neutral-900 pb-3">
+          <div className="space-y-0.5">
+            <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
+              <Users className="w-4 h-4 text-red-500" />
+              <span>Active On-Chain Members ({activeMembersCount}/{memberCount})</span>
+            </h3>
+            <p className="text-neutral-400 text-[11px]">
+              Members who have verified their BridgeKey wallet and deposited collateral on MST Blockchain.
+            </p>
+          </div>
+          <span className="px-2.5 py-1 rounded bg-neutral-900 text-neutral-300 font-mono text-[11px]">
+            {activeMembersCount} Active
+          </span>
+        </div>
+
+        {activeMembersCount === 0 ? (
+          <div className="p-6 bg-black rounded-xl text-center space-y-3">
+            <div className="p-3 rounded-full bg-neutral-900 w-12 h-12 mx-auto flex items-center justify-center text-neutral-500">
+              <Users className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-white">No Active On-Chain Members Yet</p>
+              <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+                This circle starts with 0 members. Invite participants with their BridgeKey wallet addresses to join.
+              </p>
+            </div>
+            {isInitializer && !isCircleStarted && (
+              <button
+                type="button"
+                onClick={() => setIsInviteModalOpen(true)}
+                className="btn-primary py-2 px-4 text-xs inline-flex items-center gap-1.5 cursor-pointer mt-2"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Invite First Participant</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {onChainMembers.map((addr, idx) => {
+              const isCurrent = addr.toLowerCase() === cleanAccount;
+              const isInit = (registryCircle && registryCircle.initializer.toLowerCase() === addr.toLowerCase()) || idx === 0;
+              return (
+                <div
+                  key={addr}
+                  className="p-3.5 bg-black rounded-xl flex items-center justify-between gap-3 border border-neutral-900"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-neutral-900 flex items-center justify-center text-red-400 font-bold text-xs">
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-white text-xs font-semibold">
+                          {addr.substring(0, 8)}...{addr.substring(addr.length - 6)}
+                        </span>
+                        {isCurrent && (
+                          <span className="px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300 text-[10px]">
+                            You
+                          </span>
+                        )}
+                        {isInit && (
+                          <span className="px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 text-[10px] font-semibold">
+                            Initializer
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-green-400 flex items-center gap-1 mt-0.5">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Collateral Buffer Deposited • Active</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <a
+                    href={`${MST_TESTNET.explorerUrl}/address/${addr}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-2 text-neutral-500 hover:text-white transition-colors"
+                    title="View on MST Explorer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Section: Participant Invitations & Whitelist Tracking ── */}
+      {isInitializer && (
+        <div className="p-6 bg-neutral-950 rounded-2xl space-y-6 text-xs">
+>>>>>>> origin/nivish
           <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
             <div className="space-y-0.5">
               <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
-                <Shield className="w-4 h-4 text-red-500" />
-                <span>Initializer Whitelist & Access Console</span>
+                <UserPlus className="w-4 h-4 text-red-500" />
+                <span>Participant Invitations ({invitations.length})</span>
               </h3>
               <p className="text-neutral-400 text-[11px]">
-                People with BridgeKey public keys in the Allowed List are granted access to <span className="text-white font-mono">localhost:3000/grouplink</span>.
+                Invited participants must connect their matching BridgeKey wallet to join the smart contract.
               </p>
             </div>
-            <span className="px-2.5 py-1 rounded bg-red-950/30 text-red-400 font-semibold text-[11px]">
-              {pendingRequests.length} Pending
-            </span>
+            <button
+              type="button"
+              onClick={() => setIsInviteModalOpen(true)}
+              className="btn-primary py-2 px-3 text-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Invitation</span>
+            </button>
           </div>
 
-          {/* Direct Add Public Key Form */}
-          <div className="p-4 bg-black rounded-xl space-y-3">
+          {/* Invitations List */}
+          {invitations.length === 0 ? (
+            <p className="text-[11px] text-neutral-600 italic py-1">
+              No individual invitations sent yet. Click "Invite Participant" above to add real participants.
+            </p>
+          ) : (
+            <div className="space-y-2.5">
+              {invitations.map((inv) => {
+                const isOnChainActive = onChainMembers.some(
+                  (m) => m.toLowerCase() === (inv.wallet_address || "").toLowerCase()
+                );
+                const displayStatus = isOnChainActive ? "ACTIVE" : (inv.status || "INVITED");
+
+                return (
+                  <div
+                    key={inv.id}
+                    className="p-3.5 bg-black rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-neutral-900"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-white text-xs">{inv.name}</span>
+                        <span className="text-neutral-500 text-[11px]">({inv.email})</span>
+                      </div>
+                      <div className="flex items-center gap-2 font-mono text-[11px] text-neutral-400">
+                        <Wallet className="w-3 h-3 text-neutral-500" />
+                        <span>{inv.wallet_address}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-semibold flex items-center gap-1 ${
+                          displayStatus === "ACTIVE"
+                            ? "bg-green-950/40 text-green-400"
+                            : displayStatus === "WALLET_VERIFIED"
+                            ? "bg-blue-950/40 text-blue-400"
+                            : "bg-yellow-950/40 text-yellow-400"
+                        }`}
+                      >
+                        {displayStatus === "ACTIVE" ? (
+                          <CheckCircle2 className="w-3 h-3" />
+                        ) : (
+                          <Clock className="w-3 h-3" />
+                        )}
+                        <span>{displayStatus}</span>
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => copyIndividualInvite(inv.id)}
+                        className="px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-[11px] font-semibold flex items-center gap-1 transition-colors border-none cursor-pointer"
+                        title="Copy participant join link"
+                      >
+                        {copiedInvId === inv.id ? (
+                          <Check className="w-3 h-3 text-green-400" />
+                        ) : (
+                          <Share2 className="w-3 h-3" />
+                        )}
+                        <span>{copiedInvId === inv.id ? "Copied" : "Copy Link"}</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Whitelist ID Manual Form */}
+          <div className="pt-4 border-t border-neutral-900 space-y-3">
             <div className="flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-red-500" />
-              <h4 className="font-semibold text-white text-xs">Add Member Public Key (BridgeKey ID)</h4>
+              <h4 className="font-semibold text-white text-xs">Direct Public Key Whitelist (BridgeKey ID)</h4>
             </div>
             <form onSubmit={handleAddPublicKey} className="flex gap-2">
               <input
@@ -425,23 +643,18 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
                 className="btn-primary px-4 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>{isAddingKey ? "Adding..." : "Add to Allowed List"}</span>
+                <span>{isAddingKey ? "Adding..." : "Add to Whitelist"}</span>
               </button>
             </form>
           </div>
 
           {/* Pending Verification Requests */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-neutral-300 text-xs">Pending Join Requests ({pendingRequests.length})</h4>
-              <span className="text-[10px] text-neutral-500 font-mono">Auto-syncing live</span>
-            </div>
-
-            {pendingRequests.length === 0 ? (
-              <p className="text-[11px] text-neutral-600 italic py-1">
-                No pending join requests. Add public keys directly above or share your group link.
-              </p>
-            ) : (
+          {pendingRequests.length > 0 && (
+            <div className="space-y-3 pt-4 border-t border-neutral-900">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-neutral-300 text-xs">Pending Join Requests ({pendingRequests.length})</h4>
+                <span className="text-[10px] text-neutral-500 font-mono">Live</span>
+              </div>
               <div className="space-y-2">
                 {pendingRequests.map((req) => (
                   <div
@@ -478,8 +691,8 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Allowed IDs Whitelist List */}
           <div className="pt-4 border-t border-neutral-900 space-y-2.5">
@@ -584,6 +797,21 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
         </button>
       </div>
       </>
+      )}
+
+      {/* Invite Modal */}
+      {isInviteModalOpen && (
+        <InviteMembersModal
+          isOpen={isInviteModalOpen}
+          onClose={() => setIsInviteModalOpen(false)}
+          circleAddress={cleanCircleAddress}
+          circleName={circleName}
+          memberCount={memberCount}
+          currentMembersCount={activeMembersCount}
+          existingWalletAddresses={existingWallets}
+          onInvitationSent={() => loadCircleData(true)}
+          onShowNotification={onShowNotification}
+        />
       )}
 
       {/* Edit Circle Modal */}

@@ -37,22 +37,8 @@ export function App() {
   const [activeCircleAddress, setActiveCircleAddress] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; isError?: boolean } | null>(null);
 
-  // Check URL query parameters & pathname for invitation links (e.g. /grouplink?circle=0x...)
-  const [activeTab, setActiveTab] = useState<"join" | "create" | "my-circles">(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      if (
-        window.location.pathname.includes("grouplink") ||
-        params.get("circle") ||
-        params.get("grouplink") ||
-        params.get("join") ||
-        params.get("id")
-      ) {
-        return "join";
-      }
-    }
-    return "join";
-  });
+  // Check URL query parameters & pathname for circle links (e.g. /grouplink?circle=0x...)
+  const [activeTab, setActiveTab] = useState<"create" | "my-circles">("my-circles");
 
   const [initialCircleId, setInitialCircleId] = useState<string>(() => {
     if (typeof window !== "undefined") {
@@ -81,11 +67,9 @@ export function App() {
         params.get("grouplink") ||
         params.get("join") ||
         params.get("id");
-      if (urlCircle || window.location.pathname.includes("grouplink")) {
-        if (urlCircle) {
-          setInitialCircleId(urlCircle);
-        }
-        setActiveTab("join");
+      if (urlCircle) {
+        setInitialCircleId(urlCircle);
+        setActiveCircleAddress(urlCircle);
       }
     }
   }, []);
@@ -159,6 +143,10 @@ export function App() {
         });
         localStorage.setItem("vouch_custom_groups", JSON.stringify(saved));
         showNotification(`Savings Circle deployed successfully at ${cleanAddr}!`);
+        setActiveCircleAddress(cleanAddr);
+        if (typeof window !== "undefined") {
+          window.history.pushState({}, "", `?circle=${cleanAddr}`);
+        }
         return cleanAddr;
       } else {
         showNotification("Group creation transaction confirmed on blockchain.");
@@ -176,6 +164,9 @@ export function App() {
   const handleJoinSuccess = (circleAddr: string) => {
     showNotification(`Joined circle ${circleAddr.substring(0, 10)}...`);
     setActiveCircleAddress(circleAddr);
+    if (typeof window !== "undefined") {
+      window.history.pushState({}, "", `?circle=${circleAddr}`);
+    }
   };
 
   // If not connected to wallet, render ConnectWalletPage
@@ -233,26 +224,19 @@ export function App() {
             circleAddress={activeCircleAddress}
             account={account}
             contractService={contractService}
-            onBack={() => setActiveCircleAddress(null)}
+            onBack={() => {
+              setActiveCircleAddress(null);
+              if (typeof window !== "undefined") {
+                window.history.pushState({}, "", window.location.pathname);
+              }
+            }}
             onShowNotification={showNotification}
           />
         ) : (
-          <>
-            {/* ── 3 Main Navigation Tabs: Join, Create, and My Circles ── */}
-            <div className="flex items-center justify-center gap-6 sm:gap-12 pt-2 pb-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setActiveTab("join")}
-                className={`px-1 py-1 text-xs sm:text-sm md:text-base flex items-center gap-2 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
-                  activeTab === "join"
-                    ? "text-red-500 font-bold scale-110 -translate-y-1 drop-shadow-[0_0_10px_rgba(255,23,68,0.5)]"
-                    : "text-neutral-500 font-medium scale-100 translate-y-0 hover:text-neutral-300 hover:-translate-y-0.5"
-                }`}
-              >
-                <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Join a Circle</span>
-              </button>
 
+          <>
+            {/* ── 2 Main Navigation Tabs: Create and My Circles ── */}
+            <div className="flex items-center justify-center gap-6 sm:gap-12 pt-2 pb-2 flex-wrap">
               <button
                 type="button"
                 onClick={() => setActiveTab("create")}
@@ -281,15 +265,7 @@ export function App() {
             </div>
 
             {/* ── Content View ── */}
-            {activeTab === "join" ? (
-              <JoinCircleView
-                account={account}
-                contractService={contractService}
-                onJoinSuccess={handleJoinSuccess}
-                initialCircleId={initialCircleId}
-                onShowNotification={showNotification}
-              />
-            ) : activeTab === "create" ? (
+            {activeTab === "create" ? (
               <CreateGroupView
                 account={account}
                 onCreateGroup={handleCreateGroup}
