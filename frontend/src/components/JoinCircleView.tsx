@@ -150,11 +150,10 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
         <div className="flex gap-2">
           <input
             type="text"
-            placeholder="Paste 0x... circle address"
             value={groupIdInput}
             onChange={(e) => setGroupIdInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLookup(groupIdInput)}
-            className="flex-1 bg-neutral-950 rounded-lg px-4 py-3.5 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500 border-none transition-all"
+            className="flex-1 bg-neutral-950 rounded-lg px-4 py-3.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-red-500 border-none transition-all"
           />
           <button
             type="button"

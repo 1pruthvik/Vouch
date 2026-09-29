@@ -28,11 +28,10 @@ export const CreateGroupView: React.FC<CreateGroupViewProps> = ({
   onShowNotification,
 }) => {
   const [groupName, setGroupName] = useState("");
-  const [memberCount, setMemberCount] = useState<number | "">(5);
-  const [installmentInr, setInstallmentInr] = useState<number | "">(5000);
-  const [reserveFeeInr, setReserveFeeInr] = useState<number | "">(250);
-  const [cycleDurationMonths, setCycleDurationMonths] = useState<number | "">(1);
-  const [discountCapPercent, setDiscountCapPercent] = useState<number | "">(30);
+  const [memberCount, setMemberCount] = useState<number | "">("");
+  const [installmentInr, setInstallmentInr] = useState<number | "">("");
+  const [cycleDurationMonths, setCycleDurationMonths] = useState<number | "">("");
+  const [minWalletAmtInr, setMinWalletAmtInr] = useState<number | "">("");
 
   const [initializedCircles, setInitializedCircles] = useState<CircleRegistryEntry[]>([]);
   const [circleRequests, setCircleRequests] = useState<{ [circleAddr: string]: JoinRequest[] }>({});
@@ -54,43 +53,51 @@ export const CreateGroupView: React.FC<CreateGroupViewProps> = ({
     loadInitializerData();
   }, [account, deployedCircleAddress]);
 
-  const numInstallmentInr = Number(installmentInr) || 0;
-  const numMembers = Number(memberCount) || 1;
-  const installmentTokens = (numInstallmentInr / INR_PER_TMSTC).toFixed(4);
-  const totalPotInr = numMembers * numInstallmentInr;
-  const numReserveFeeInr = Number(reserveFeeInr) || 0;
+  const numMembers = typeof memberCount === "number" ? memberCount : 0;
+  const numInstallment = typeof installmentInr === "number" ? installmentInr : 0;
+  const numMinWalletAmt = typeof minWalletAmtInr === "number" ? minWalletAmtInr : 0;
+  const totalPotInr = numMembers * numInstallment;
+  const installmentTokens = numInstallment > 0 ? (numInstallment / INR_PER_TMSTC).toFixed(4) : "0.0000";
 
-  const calculatedReserveFeeBps =
-    totalPotInr > 0
-      ? Math.min(2000, Math.max(100, Math.round((numReserveFeeInr / totalPotInr) * 10000)))
-      : 500;
-
-  const numMonths = Number(cycleDurationMonths) || 1;
+  const numMonths = typeof cycleDurationMonths === "number" ? cycleDurationMonths : 1;
   const cycleDurationSeconds = numMonths * 30 * 24 * 3600;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!groupName || !memberCount || !installmentInr) return;
+    if (!groupName.trim() || !numMembers || !numInstallment) {
+      onShowNotification("Please fill in all required circle fields.", true);
+      return;
+    }
+
+    const calculatedReserveFeeBps =
+      totalPotInr > 0
+        ? Math.min(2000, Math.max(100, Math.round((numMinWalletAmt / totalPotInr) * 10000)))
+        : 500;
 
     const newAddress = await onCreateGroup({
-      groupName,
-      memberCount: Number(memberCount),
+      groupName: groupName.trim(),
+      memberCount: numMembers,
       installmentAmount: installmentTokens,
       cycleDuration: cycleDurationSeconds,
-      discountCapBps: (Number(discountCapPercent) || 30) * 100,
+      discountCapBps: 3000,
       reserveFeeBps: calculatedReserveFeeBps,
     });
 
     if (newAddress) {
       VerificationService.registerCircle({
         address: newAddress,
-        name: groupName,
-        memberCount: Number(memberCount),
+        name: groupName.trim(),
+        memberCount: numMembers,
         installmentAmount: installmentTokens,
         cycleDuration: cycleDurationSeconds,
         initializer: account,
         createdAt: Date.now(),
       });
+      setGroupName("");
+      setMemberCount("");
+      setInstallmentInr("");
+      setCycleDurationMonths("");
+      setMinWalletAmtInr("");
       loadInitializerData();
     }
   };
@@ -142,7 +149,6 @@ export const CreateGroupView: React.FC<CreateGroupViewProps> = ({
             <input
               type="text"
               required
-              placeholder="e.g. Friends & Family Chit Fund"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
               disabled={isDeploying}
@@ -209,16 +215,16 @@ export const CreateGroupView: React.FC<CreateGroupViewProps> = ({
 
             <div>
               <label className="block text-xs font-semibold text-neutral-300 mb-2">
-                Max Draw Discount (%)
+                Min Wallet Amt (₹)
               </label>
               <input
                 type="number"
-                min="5"
-                max="50"
+                min="0"
+                step="100"
                 required
-                value={discountCapPercent}
+                value={minWalletAmtInr}
                 onChange={(e) =>
-                  setDiscountCapPercent(e.target.value === "" ? "" : parseInt(e.target.value))
+                  setMinWalletAmtInr(e.target.value === "" ? "" : parseFloat(e.target.value))
                 }
                 disabled={isDeploying}
                 className="w-full bg-neutral-950 rounded-lg px-4 py-3.5 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500 border-none transition-all"
@@ -234,14 +240,23 @@ export const CreateGroupView: React.FC<CreateGroupViewProps> = ({
             </div>
             <div className="flex items-center justify-between text-neutral-500 text-[11px] font-mono">
               <span>Per Member Contribution:</span>
-              <span>≈ {installmentTokens} tMSTC / month</span>
+              <span>
+                {numInstallment > 0 ? `₹${numInstallment.toLocaleString("en-IN")}` : "₹0"}
+                {numInstallment > 0 ? ` (≈ ${installmentTokens} tMSTC / month)` : ""}
+              </span>
             </div>
+            {numMinWalletAmt > 0 && (
+              <div className="flex items-center justify-between text-neutral-500 text-[11px] font-mono">
+                <span>Min Wallet Requirement:</span>
+                <span>₹{numMinWalletAmt.toLocaleString("en-IN")}</span>
+              </div>
+            )}
           </div>
 
           {/* Deploy Button */}
           <button
             type="submit"
-            disabled={isDeploying || !account || !groupName}
+            disabled={isDeploying || !account || !groupName.trim() || !numMembers || !numInstallment}
             className="btn-primary w-full py-4 flex items-center justify-center gap-2 text-sm font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isDeploying ? (

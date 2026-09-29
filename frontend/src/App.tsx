@@ -6,6 +6,7 @@ import { JoinCircleView } from "./components/JoinCircleView";
 import { AccountModal } from "./components/AccountModal";
 import { useWallet } from "./hooks/useWallet";
 import { ContractService } from "./services/contractService";
+import { parseWalletError } from "./utils/formatters";
 import { CheckCircle2, AlertCircle, Plus, UserPlus } from "lucide-react";
 
 export function App() {
@@ -96,7 +97,7 @@ export function App() {
       }
     } catch (err: any) {
       console.error(err);
-      showNotification(err.message || "Failed to deploy group contract", true);
+      showNotification(parseWalletError(err), true);
       return undefined;
     } finally {
       setIsDeploying(false);
