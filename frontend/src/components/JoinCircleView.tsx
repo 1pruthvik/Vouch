@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { UserPlus, ArrowRight, Shield, CheckCircle2, Clock, XCircle, Search, Copy, Check } from "lucide-react";
-import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
+import { formatRawINR, MST_TO_INR_RATE, parseWalletError } from "../utils/formatters";
 import { VerificationService, CircleRegistryEntry } from "../services/verificationService";
 import { ContractService, GroupDetails } from "../services/contractService";
+import { ethers } from "ethers";
 
 interface JoinCircleViewProps {
   account: string;
@@ -27,13 +28,7 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
   const [isJoining, setIsJoining] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (initialCircleId) {
-      handleLookup(initialCircleId);
-    }
-  }, [initialCircleId]);
-
-  const handleLookup = async (targetId: string) => {
+  const handleLookup = useCallback(async (targetId: string) => {
     const cleanId = targetId.trim();
     if (!cleanId) return;
     setIsLoading(true);
@@ -47,10 +42,11 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
         setSearchedCircle(localCircle);
       }
 
-      // 2. Query on-chain if contract service exists
-      if (contractService && cleanId.startsWith("0x") && cleanId.length === 42) {
+      // 2. Query on-chain if valid address
+      if (cleanId.startsWith("0x") && cleanId.length === 42) {
         try {
-          const gDetails = await contractService.getGroupDetails(cleanId);
+          const srv = contractService || new ContractService();
+          const gDetails = await srv.getGroupDetails(cleanId);
           setChainGroupDetails(gDetails);
           if (!localCircle) {
             setSearchedCircle({
@@ -58,7 +54,7 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
               name: gDetails.name,
               memberCount: gDetails.memberCount,
               installmentAmount: gDetails.installmentAmount,
-              initializer: gDetails.members[0] || "Unknown",
+              initializer: gDetails.members[0] || "Unknown Initializer",
               createdAt: Date.now(),
             });
           }
@@ -76,7 +72,26 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [account, contractService, onShowNotification]);
+
+  useEffect(() => {
+    if (initialCircleId) {
+      setGroupIdInput(initialCircleId);
+      handleLookup(initialCircleId);
+    }
+  }, [initialCircleId, handleLookup]);
+
+  // Real-time synchronization for approvals from initializer
+  useEffect(() => {
+    const handleStorageChange = () => {
+      if (searchedCircle) {
+        const status = VerificationService.getApplicantStatus(searchedCircle.address, account);
+        setVerificationStatus(status);
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [searchedCircle, account]);
 
   const handleRequestVerification = () => {
     if (!searchedCircle || !account) return;
@@ -90,7 +105,7 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
   };
 
   const handleConfirmJoin = async () => {
-    if (!searchedCircle || !account || !contractService) return;
+    if (!searchedCircle || !account) return;
     if (verificationStatus !== "verified") {
       onShowNotification("You must be verified by the circle initializer before joining.", true);
       return;
@@ -98,15 +113,15 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
 
     setIsJoining(true);
     try {
-      // Collateral buffer is typically equal to 1 monthly installment
       const depositAmount = searchedCircle.installmentAmount || "1.0";
       onShowNotification("Depositing collateral and joining circle on blockchain...");
-      await contractService.joinGroup(searchedCircle.address, depositAmount);
+      const srv = contractService || new ContractService();
+      await srv.joinGroup(searchedCircle.address, depositAmount);
       onShowNotification("Successfully joined the savings circle!");
       onJoinSuccess(searchedCircle.address);
     } catch (err: any) {
       console.error(err);
-      onShowNotification(err.message || "Failed to join circle", true);
+      onShowNotification(parseWalletError(err), true);
     } finally {
       setIsJoining(false);
     }
@@ -224,7 +239,7 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
                 <span>You are the Initializer of this circle</span>
               </div>
               <p className="text-[11px] text-neutral-400">
-                You created this circle. You can manage join requests from the Initializer Console.
+                You created this circle. You can view it from your dedicated circle dashboard.
               </p>
             </div>
           ) : verificationStatus === "none" ? (
