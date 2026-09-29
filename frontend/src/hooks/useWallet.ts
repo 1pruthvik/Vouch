@@ -130,6 +130,7 @@ export function useWallet() {
         const userSigner = await browserProvider.getSigner();
         setSigner(userSigner);
         setIsPrivateKeyMode(false);
+        localStorage.removeItem("vouch_private_key");
 
         const currentChainId = await checkNetwork(browserProvider);
         if (currentChainId !== MST_TESTNET.chainId) {
@@ -148,8 +149,8 @@ export function useWallet() {
     return false;
   };
 
-  // Connect directly with Private Key on MST Testnet (Phase 0 Option)
-  const connectWithPrivateKey = async (privateKey: string) => {
+  // Connect directly with Private Key on MST Testnet
+  const connectWithPrivateKey = async (privateKey: string, remember: boolean = true) => {
     setError(null);
     try {
       setIsConnecting(true);
@@ -169,6 +170,10 @@ export function useWallet() {
       setChainId(MST_TESTNET.chainId);
       setIsPrivateKeyMode(true);
 
+      if (remember) {
+        localStorage.setItem("vouch_private_key", formattedKey);
+      }
+
       await updateBalance(wallet.address, rpcProvider);
       return true;
     } catch (err: any) {
@@ -179,6 +184,14 @@ export function useWallet() {
       setIsConnecting(false);
     }
   };
+
+  // Auto-restore private key session if saved
+  useEffect(() => {
+    const savedKey = localStorage.getItem("vouch_private_key");
+    if (savedKey && !account && !signer) {
+      connectWithPrivateKey(savedKey, true).catch(() => {});
+    }
+  }, []);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -192,6 +205,7 @@ export function useWallet() {
     setSigner(null);
     setIsPrivateKeyMode(false);
     setError(null);
+    localStorage.removeItem("vouch_private_key");
   };
 
   useEffect(() => {
@@ -244,3 +258,4 @@ export function useWallet() {
     isCorrectNetwork: isPrivateKeyMode || chainId === MST_TESTNET.chainId,
   };
 }
+
