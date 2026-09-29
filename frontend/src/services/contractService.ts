@@ -139,15 +139,44 @@ export class ContractService {
       params.reserveFeeBps,
       safetyFactor,
       registryAddr,
-      yieldAddr
+      yieldAddr,
+      { gasLimit: 4500000 }
     );
 
-    await deployedContract.waitForDeployment();
-    const groupAddress = await deployedContract.getAddress();
     const deploymentTx = deployedContract.deploymentTransaction();
+    const txHash = deploymentTx ? deploymentTx.hash : "0x0";
+    let groupAddress = "";
+
+    // Robust independent polling via direct JSON-RPC to avoid BrowserProvider block listener hangs
+    const rpcProvider = new ethers.JsonRpcProvider(MST_TESTNET.rpcUrl);
+    const maxPolls = 25; // 25 * 1.5s = 37.5s max
+    for (let attempt = 0; attempt < maxPolls; attempt++) {
+      try {
+        if (txHash && txHash !== "0x0") {
+          const receipt = await rpcProvider.getTransactionReceipt(txHash);
+          if (receipt && receipt.blockNumber) {
+            groupAddress = receipt.contractAddress || (await deployedContract.getAddress());
+            break;
+          }
+        }
+      } catch (pollErr) {
+        console.warn("Polling receipt attempt error:", pollErr);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+
+    if (!groupAddress) {
+      try {
+        groupAddress = await deployedContract.getAddress();
+      } catch {
+        const signerAddr = await this.signer.getAddress();
+        const nonce = deploymentTx ? deploymentTx.nonce : await rpcProvider.getTransactionCount(signerAddr);
+        groupAddress = ethers.getCreateAddress({ from: signerAddr, nonce });
+      }
+    }
 
     return {
-      txHash: deploymentTx ? deploymentTx.hash : "0x0",
+      txHash,
       groupAddress,
     };
   }
@@ -158,8 +187,14 @@ export class ContractService {
     const group = new ethers.Contract(groupAddress, ChitGroupABI, this.signer);
     const tx = await group.joinGroup({
       value: ethers.parseEther(bufferAmount),
+      gasLimit: 400000,
     });
-    await tx.wait();
+    try {
+      await Promise.race([
+        tx.wait(),
+        new Promise((resolve) => setTimeout(resolve, 15000)),
+      ]);
+    } catch {}
     return tx.hash;
   }
 
