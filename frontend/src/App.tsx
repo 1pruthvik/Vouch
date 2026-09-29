@@ -298,16 +298,8 @@ export function App() {
         account={account}
         balance={balance}
         isConnecting={isConnecting}
-        groupName={groupDetails?.name}
-        isTechnicalMode={isTechnicalMode}
-        onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
         onOpenAccountModal={() => setIsAccountModalOpen(true)}
         onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
-        onSwitchGroup={() => {
-          setActiveGroupAddress("");
-          setGroupDetails(null);
-          setActiveTab("home");
-        }}
       />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
