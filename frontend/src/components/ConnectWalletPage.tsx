@@ -75,9 +75,6 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
             <h1 className="text-3xl sm:text-4xl font-extrabold text-white font-display tracking-tight">
               Vouch
             </h1>
-            <p className="text-xs sm:text-sm text-neutral-400 max-w-sm mx-auto">
-              Autonomous Rotating Savings & Collateral Pool on MST Blockchain
-            </p>
           </div>
         </div>
 
@@ -153,26 +150,22 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
                 >
                   <Wallet className="w-5 h-5" />
                   <span className="font-semibold">
-                    {isConnecting ? "Connecting to Extension..." : "Connect Browser Extension"}
+                    {isConnecting ? "Connecting..." : "Connect Extension"}
                   </span>
                   <ArrowRight className="w-4 h-4 ml-1" />
                 </button>
               )}
-
-              <p className="text-[11px] text-neutral-500 pt-1">
-                Supports BridgeKey, MetaMask, and EIP-6963 compatible wallets on MST Testnet
-              </p>
             </div>
           ) : (
             <form onSubmit={handlePrivateKeySubmit} className="space-y-4 text-left">
               <div className="space-y-2">
                 <label className="text-xs text-neutral-400 font-medium block">
-                  Paste 64-Character Private Key
+                  Private Key
                 </label>
                 <div className="relative flex items-center">
                   <input
                     type={showKey ? "text" : "password"}
-                    placeholder="e.g. 0x4f3edf983ac636a65a842ce7c78d5aa706d401..."
+                    placeholder="Private Key (0x...)"
                     value={privateKey}
                     onChange={(e) => setPrivateKey(e.target.value)}
                     disabled={isConnecting}
@@ -188,9 +181,6 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
                     {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-[11px] text-neutral-500">
-                  Your private key is kept locally in memory and never stored or transmitted to external servers.
-                </p>
               </div>
 
               <button
@@ -199,7 +189,7 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
                 className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Key className="w-4 h-4" />
-                <span>{isConnecting ? "Importing & Connecting..." : "Import & Connect Wallet"}</span>
+                <span>{isConnecting ? "Connecting..." : "Connect Wallet"}</span>
               </button>
             </form>
           )}
@@ -223,12 +213,6 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
               </button>
             </div>
           )}
-        </div>
-
-        {/* MST Network Details Footer */}
-        <div className="pt-6 text-[11px] text-neutral-500 flex items-center justify-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          <span>MST Testnet • Chain ID 91562037</span>
         </div>
       </div>
     </div>

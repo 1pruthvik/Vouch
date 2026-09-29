@@ -189,7 +189,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <form onSubmit={handlePrivateKeyConnect} className="space-y-3 text-xs">
                 <input
                   type="password"
-                  placeholder="Paste 64-character private key..."
+                  placeholder="Private Key (0x...)"
                   value={privateKey}
                   onChange={(e) => setPrivateKey(e.target.value)}
                   className="w-full bg-neutral-950 rounded-lg px-4 py-3 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none"
@@ -199,7 +199,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   disabled={isSubmitting}
                   className="btn-primary w-full py-3"
                 >
-                  Import & Connect
+                  Connect Wallet
                 </button>
               </form>
             )}

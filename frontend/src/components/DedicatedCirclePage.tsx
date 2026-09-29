@@ -1,5 +1,29 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, Shield, Share2, Copy, Check, Users, Clock, CheckCircle2, AlertCircle, Coins, ArrowRight, XCircle, CheckCheck, Lock, UserPlus, Trash2, KeyRound, Edit3 } from "lucide-react";
+import {
+  ArrowLeft,
+  Shield,
+  Share2,
+  Copy,
+  Check,
+  Users,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Coins,
+  ArrowRight,
+  XCircle,
+  CheckCheck,
+  Lock,
+  UserPlus,
+  Trash2,
+  KeyRound,
+  Edit3,
+  Key,
+  ShieldCheck,
+  TrendingUp,
+  CreditCard,
+  Zap,
+} from "lucide-react";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 import { VerificationService, CircleRegistryEntry, JoinRequest } from "../services/verificationService";
 import { ContractService, GroupDetails, MemberDetails } from "../services/contractService";
@@ -23,6 +47,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
   onShowNotification,
 }) => {
   const cleanCircleAddress = extractCircleAddress(circleAddress);
+  const cleanAccount = (account || "").toLowerCase();
 
   const [registryCircle, setRegistryCircle] = useState<CircleRegistryEntry | null>(null);
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
@@ -33,6 +58,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
   const [newPublicKeyInput, setNewPublicKeyInput] = useState<string>("");
   const [isAddingKey, setIsAddingKey] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +69,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
     try {
       // 1. Registry Data (local + backend)
       const reg = VerificationService.getCircle(cleanCircleAddress);
-      setRegistryCircle(reg);
+      if (reg) setRegistryCircle(reg);
       VerificationService.fetchCircle(cleanCircleAddress).then((r) => {
         if (r) setRegistryCircle(r);
       });
@@ -61,16 +87,20 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
 
       // 3. Allowed IDs list
       const allowed = await VerificationService.fetchAllowedMembers(cleanCircleAddress);
-      setAllowedMembers(allowed);
+      if (Array.isArray(allowed)) {
+        setAllowedMembers(allowed);
+      }
 
       // 4. On-chain Details
       if (contractService && cleanCircleAddress.startsWith("0x")) {
         try {
           const gDetails = await contractService.getGroupDetails(cleanCircleAddress);
-          setGroupDetails(gDetails);
+          if (gDetails) setGroupDetails(gDetails);
 
-          const mDetails = await contractService.getMemberDetails(cleanCircleAddress, account);
-          setMemberDetails(mDetails);
+          if (account) {
+            const mDetails = await contractService.getMemberDetails(cleanCircleAddress, account);
+            if (mDetails) setMemberDetails(mDetails);
+          }
         } catch (chainErr) {
           console.warn("On-chain details fetch error:", chainErr);
         }
@@ -84,16 +114,31 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
     loadCircleData(false);
     const interval = setInterval(() => {
       loadCircleData(true);
-    }, 2500);
+    }, 3000);
     return () => clearInterval(interval);
   }, [loadCircleData]);
 
-  const cleanAccount = (account || "").toLowerCase();
-  const isInitializer =
-    (registryCircle && registryCircle.initializer.toLowerCase() === cleanAccount) ||
-    (groupDetails && groupDetails.members[0]?.toLowerCase() === cleanAccount) ||
-    (allowedMembers.length > 0 && allowedMembers[0]?.toLowerCase() === cleanAccount) ||
-    (registryCircle?.initializer === "Circle Initializer" && allowedMembers.includes(cleanAccount));
+  // Initializer determination
+  const initAddress = (
+    registryCircle?.initializer ||
+    groupDetails?.members[0] ||
+    (allowedMembers.length > 0 ? allowedMembers[0] : "")
+  ).toLowerCase();
+
+  const isInitializer = Boolean(
+    initAddress &&
+    (initAddress === cleanAccount || initAddress.includes(cleanAccount) || cleanAccount.includes(initAddress))
+  );
+
+  const isMemberOnChain = Boolean(
+    (memberDetails && memberDetails.isMember) ||
+    (groupDetails && groupDetails.members && groupDetails.members.some((m) => m.toLowerCase().includes(cleanAccount) || cleanAccount.includes(m.toLowerCase())))
+  );
+
+  const isWhitelisted = Boolean(
+    isInitializer ||
+    allowedMembers.some((m) => m.toLowerCase().includes(cleanAccount) || cleanAccount.includes(m.toLowerCase()))
+  );
 
   const handleAddPublicKey = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,6 +198,23 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
     }
   };
 
+  const handleJoinThisCircle = async () => {
+    if (!contractService || !account) return;
+    setIsJoining(true);
+    try {
+      onShowNotification("Depositing collateral buffer and joining circle on blockchain...");
+      const depositMst = installmentMst;
+      await contractService.joinGroup(cleanCircleAddress, depositMst);
+      onShowNotification("Successfully joined savings circle on blockchain!");
+      await loadCircleData(true);
+    } catch (err: any) {
+      console.error(err);
+      onShowNotification(err.message || "Failed to join circle on blockchain", true);
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
   const handlePayContribution = async () => {
     if (!contractService || !groupDetails) return;
     setIsPaying(true);
@@ -160,7 +222,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
       onShowNotification("Processing monthly contribution on blockchain...");
       await contractService.payInstallment(cleanCircleAddress, groupDetails.installmentAmount);
       onShowNotification("Monthly contribution confirmed!");
-      await loadCircleData();
+      await loadCircleData(true);
     } catch (err: any) {
       console.error(err);
       onShowNotification(err.message || "Payment failed", true);
@@ -210,22 +272,33 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
           <span>Back to Circles</span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {isInitializer ? (
             <span className="px-2.5 py-1 rounded-full bg-red-950/40 text-red-400 font-semibold text-[11px] flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5" />
-              <span>Circle Initializer</span>
+              <span>Initializer</span>
+            </span>
+          ) : isMemberOnChain ? (
+            <span className="px-2.5 py-1 rounded-full bg-neutral-900 text-neutral-300 font-semibold text-[11px] flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-neutral-400" />
+              <span>Member</span>
+            </span>
+          ) : isWhitelisted ? (
+            <span className="px-2.5 py-1 rounded-full bg-neutral-900 text-neutral-300 font-semibold text-[11px] flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5 text-neutral-400" />
+              <span>Whitelisted</span>
             </span>
           ) : (
-            <span className="px-2.5 py-1 rounded-full bg-neutral-900 text-neutral-300 font-semibold text-[11px] flex items-center gap-1.5">
+            <span className="px-2.5 py-1 rounded-full bg-neutral-900 text-neutral-400 font-semibold text-[11px] flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5 text-red-500" />
-              <span>Circle Member</span>
+              <span>Participant</span>
             </span>
           )}
+
           {isCircleStarted && (
-            <span className="px-2.5 py-1 rounded-full bg-green-950/40 text-green-400 font-semibold text-[11px] flex items-center gap-1.5">
-              <Lock className="w-3.5 h-3.5" />
-              <span>Started & Locked</span>
+            <span className="px-2.5 py-1 rounded-full bg-neutral-900 text-neutral-300 font-semibold text-[11px] flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-neutral-400" />
+              <span>Started</span>
             </span>
           )}
         </div>
@@ -235,9 +308,6 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
       <div className="p-6 bg-neutral-950 rounded-2xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider">
-              Autonomous Rotating Pool
-            </span>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-display mt-0.5">
               {circleName}
             </h1>
@@ -251,12 +321,12 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
                 className="p-1 text-neutral-500 hover:text-white bg-transparent border-none cursor-pointer"
                 title="Copy Circle ID"
               >
-                {copiedId ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedId ? <Check className="w-3.5 h-3.5 text-red-400" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
             {isInitializer && !isCircleStarted && (
               <button
                 type="button"
@@ -276,7 +346,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
             >
               {copiedLink ? (
                 <>
-                  <Check className="w-4 h-4 text-green-400" />
+                  <Check className="w-4 h-4 text-red-400" />
                   <span>Link Copied</span>
                 </>
               ) : (
@@ -316,7 +386,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
           </div>
 
           <div className="p-3 bg-black rounded-xl space-y-1">
-            <span className="text-[11px] text-neutral-500">Current Phase</span>
+            <span className="text-[11px] text-neutral-500">Phase</span>
             <p className="text-base sm:text-lg font-bold text-red-400 font-display">
               {currentPhase}
             </p>
@@ -324,18 +394,15 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
         </div>
       </div>
 
-      {/* ── Section for Initializer: Public Key Whitelist & Verification Console ── */}
+      {/* ── Section A: For Initializer Console ── */}
       {isInitializer && (
         <div className="p-6 bg-neutral-950 rounded-2xl space-y-6 text-xs">
           <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
             <div className="space-y-0.5">
               <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
                 <Shield className="w-4 h-4 text-red-500" />
-                <span>Initializer Whitelist & Access Console</span>
+                <span>Initializer Console</span>
               </h3>
-              <p className="text-neutral-400 text-[11px]">
-                People with BridgeKey public keys in the Allowed List are granted access to <span className="text-white font-mono">localhost:3000/grouplink</span>.
-              </p>
             </div>
             <span className="px-2.5 py-1 rounded bg-red-950/30 text-red-400 font-semibold text-[11px]">
               {pendingRequests.length} Pending
@@ -346,12 +413,12 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
           <div className="p-4 bg-black rounded-xl space-y-3">
             <div className="flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-red-500" />
-              <h4 className="font-semibold text-white text-xs">Add Member Public Key (BridgeKey ID)</h4>
+              <h4 className="font-semibold text-white text-xs">Add Member Public Key</h4>
             </div>
             <form onSubmit={handleAddPublicKey} className="flex gap-2">
               <input
                 type="text"
-                placeholder="Enter member public key address (0x...)"
+                placeholder="Public Key Address (0x...)"
                 value={newPublicKeyInput}
                 onChange={(e) => setNewPublicKeyInput(e.target.value)}
                 className="flex-1 bg-neutral-900 rounded-lg px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500 border-none"
@@ -362,7 +429,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
                 className="btn-primary px-4 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>{isAddingKey ? "Adding..." : "Add to Allowed List"}</span>
+                <span>{isAddingKey ? "Adding..." : "Add Key"}</span>
               </button>
             </form>
           </div>
@@ -371,14 +438,9 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="font-semibold text-neutral-300 text-xs">Pending Join Requests ({pendingRequests.length})</h4>
-              <span className="text-[10px] text-neutral-500 font-mono">Auto-syncing live</span>
             </div>
 
-            {pendingRequests.length === 0 ? (
-              <p className="text-[11px] text-neutral-600 italic py-1">
-                No pending join requests. Add public keys directly above or share your group link.
-              </p>
-            ) : (
+            {pendingRequests.length > 0 && (
               <div className="space-y-2">
                 {pendingRequests.map((req) => (
                   <div
@@ -390,7 +452,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
                         {req.applicantAddress}
                       </p>
                       <p className="text-[10px] text-neutral-500">
-                        Requested {new Date(req.requestedAt).toLocaleTimeString()}
+                        {new Date(req.requestedAt).toLocaleTimeString()}
                       </p>
                     </div>
 
@@ -398,10 +460,10 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
                       <button
                         type="button"
                         onClick={() => handleVerifyApplicant(req.applicantAddress)}
-                        className="px-3.5 py-1.5 rounded-lg bg-green-950/40 hover:bg-green-900/50 text-green-400 hover:text-green-300 font-semibold text-xs flex items-center gap-1 transition-all border-none cursor-pointer"
+                        className="px-3.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-200 font-semibold text-xs flex items-center gap-1 transition-all border-none cursor-pointer"
                       >
-                        <CheckCheck className="w-3.5 h-3.5" />
-                        <span>Approve & Whitelist</span>
+                        <CheckCheck className="w-3.5 h-3.5 text-red-400" />
+                        <span>Approve</span>
                       </button>
                       <button
                         type="button"
@@ -422,11 +484,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
           <div className="pt-4 border-t border-neutral-900 space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-neutral-300">
-                Allowed Public Keys Whitelist ({allowedMembers.length})
-              </span>
-              <span className="text-[10px] text-green-400 font-semibold flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>Granted Access</span>
+                Allowed Public Keys ({allowedMembers.length})
               </span>
             </div>
 
@@ -438,7 +496,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
                     key={addr}
                     className="px-3 py-1.5 rounded-lg bg-black text-neutral-200 font-mono text-[11px] flex items-center gap-2"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-neutral-400" />
                     <span>{addr.substring(0, 6)}...{addr.substring(addr.length - 4)}</span>
                     {isThisInit ? (
                       <span className="px-1.5 py-0.2 rounded bg-red-950/60 text-red-400 text-[9px] font-sans font-semibold">
@@ -464,10 +522,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
           {!isCircleStarted ? (
             <div className="pt-4 border-t border-neutral-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-red-950/10 p-4 rounded-xl">
               <div className="space-y-0.5">
-                <h5 className="font-semibold text-red-400 text-xs">Delete Savings Circle</h5>
-                <p className="text-[11px] text-neutral-400">
-                  Permanently delete this circle and remove all whitelist registrations.
-                </p>
+                <h5 className="font-semibold text-red-400 text-xs">Delete Circle</h5>
               </div>
               <button
                 type="button"
@@ -480,45 +535,157 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
             </div>
           ) : (
             <div className="pt-4 border-t border-neutral-900 flex items-center gap-3 bg-neutral-900/40 p-4 rounded-xl text-xs">
-              <Lock className="w-4 h-4 text-green-400 shrink-0" />
+              <Lock className="w-4 h-4 text-neutral-400 shrink-0" />
               <div>
-                <h5 className="font-semibold text-neutral-200 text-xs">Circle In Progress (Locked)</h5>
-                <p className="text-[11px] text-neutral-400">
-                  All members have contributed and agreed to start. Circle configuration, participants, and deletion are permanently locked.
-                </p>
+                <h5 className="font-semibold text-neutral-200 text-xs">Circle Started</h5>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* ── Section for Member: Contribution Payment ── */}
-      <div className="p-6 bg-neutral-950 rounded-2xl space-y-4 text-xs">
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
-              <Coins className="w-4 h-4 text-red-500" />
-              <span>Monthly Contribution</span>
-            </h3>
-            <p className="text-neutral-400 text-[11px]">
-              Contribute your monthly installment to the decentralized pool.
-            </p>
+      {/* ── Section B: For Members / Whitelisted Participants ── */}
+      {!isInitializer && (
+        <div className="space-y-6">
+          {/* Member Access / Whitelist Status Badge Card */}
+          <div className="p-6 bg-neutral-950 rounded-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-neutral-900 pb-3">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-red-500" />
+                  <span>Participant Access</span>
+                </h3>
+              </div>
+
+              {isWhitelisted ? (
+                <span className="px-2.5 py-1 rounded bg-neutral-900 text-neutral-300 font-semibold text-[11px] flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-neutral-400" />
+                  <span>Whitelisted</span>
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 rounded bg-neutral-900 text-neutral-400 font-semibold text-[11px]">
+                  Verification Required
+                </span>
+              )}
+            </div>
+
+            {/* If NOT yet joined on-chain */}
+            {!isMemberOnChain ? (
+              <div className="p-4 bg-black rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <h4 className="font-bold text-white text-xs">Join On-Chain</h4>
+                  </div>
+                  <span className="font-bold text-white text-sm">
+                    {formatRawINR(installmentInr)}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleJoinThisCircle}
+                  disabled={isJoining}
+                  className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 text-xs font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>{isJoining ? "Joining..." : `Join Circle (${installmentMst} tMSTC)`}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 bg-black rounded-xl space-y-0.5">
+                  <span className="text-[10px] text-neutral-500">Buffer Deposited</span>
+                  <p className="text-sm font-bold text-white font-display">
+                    {memberDetails?.bufferBalance ? `${memberDetails.bufferBalance} tMSTC` : `${installmentMst} tMSTC`}
+                  </p>
+                </div>
+                <div className="p-3 bg-black rounded-xl space-y-0.5">
+                  <span className="text-[10px] text-neutral-500">Paid Installments</span>
+                  <p className="text-sm font-bold text-white font-display">
+                    {memberDetails?.paidInstallments || 0} / {memberCount}
+                  </p>
+                </div>
+                <div className="p-3 bg-black rounded-xl space-y-0.5">
+                  <span className="text-[10px] text-neutral-500">Round Status</span>
+                  <p className={`text-sm font-bold font-display ${memberDetails?.hasPaidCurrentRound ? "text-neutral-200" : "text-red-400"}`}>
+                    {memberDetails?.hasPaidCurrentRound ? "Paid" : "Due"}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
-          <span className="text-white font-bold text-sm">
-            {formatRawINR(installmentInr)}
+          {/* Monthly Contribution Payment Card */}
+          <div className="p-6 bg-neutral-950 rounded-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
+                  <Coins className="w-4 h-4 text-red-500" />
+                  <span>Monthly Contribution</span>
+                </h3>
+              </div>
+
+              <span className="text-white font-bold text-sm">
+                {formatRawINR(installmentInr)}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handlePayContribution}
+              disabled={isPaying || currentPhase === "Closed" || !isMemberOnChain || memberDetails?.hasPaidCurrentRound}
+              className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 text-xs font-semibold cursor-pointer disabled:opacity-50"
+            >
+              <Coins className="w-4 h-4" />
+              <span>
+                {isPaying
+                  ? "Submitting Contribution..."
+                  : !isMemberOnChain
+                  ? "Join Circle First"
+                  : memberDetails?.hasPaidCurrentRound
+                  ? "Current Round Paid"
+                  : `Pay Contribution (${installmentMst} tMSTC)`}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Section C: Circle Participants Roster (Visible to all) ── */}
+      <div className="p-6 bg-neutral-950 rounded-2xl space-y-3 text-xs">
+        <div className="flex items-center justify-between border-b border-neutral-900 pb-2.5">
+          <span className="font-semibold text-neutral-300">
+            Participants ({allowedMembers.length})
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={handlePayContribution}
-          disabled={isPaying || currentPhase === "Closed"}
-          className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 text-xs font-semibold cursor-pointer disabled:opacity-50"
-        >
-          <Coins className="w-4 h-4" />
-          <span>{isPaying ? "Submitting Contribution..." : `Pay Contribution (${installmentMst} tMSTC)`}</span>
-        </button>
+        <div className="flex flex-wrap gap-2 pt-1">
+          {allowedMembers.map((addr) => {
+            const isInit = (registryCircle && registryCircle.initializer.toLowerCase() === addr.toLowerCase()) || (allowedMembers.length > 0 && allowedMembers[0].toLowerCase() === addr.toLowerCase());
+            const isMe = addr.toLowerCase() === cleanAccount;
+            return (
+              <span
+                key={addr}
+                className={`px-3 py-1.5 rounded-lg font-mono text-[11px] flex items-center gap-1.5 ${
+                  isMe ? "bg-red-950/40 text-red-300 border border-red-900/40" : "bg-black text-neutral-300"
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-neutral-400" />
+                <span>{addr.substring(0, 6)}...{addr.substring(addr.length - 4)}</span>
+                {isInit && (
+                  <span className="px-1.5 py-0.2 rounded bg-red-950 text-red-400 text-[9px] font-sans font-semibold">
+                    Initializer
+                  </span>
+                )}
+                {isMe && !isInit && (
+                  <span className="px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-300 text-[9px] font-sans font-semibold">
+                    You
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       {/* Edit Circle Modal */}

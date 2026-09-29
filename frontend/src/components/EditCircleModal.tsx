@@ -102,24 +102,16 @@ export const EditCircleModal: React.FC<EditCircleModalProps> = ({
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-xs font-semibold text-red-500">
             <Shield className="w-4 h-4" />
-            <span>Manage & Edit Circle</span>
+            <span>Manage Circle</span>
           </div>
           <h2 className="text-xl font-bold text-white font-display">
             Edit Circle Settings
           </h2>
-          <p className="text-xs text-neutral-400">
-            {isCircleStarted
-              ? "All members have contributed and the circle has started. Settings are locked."
-              : "Update circle name, minimum wallet requirement, and allowed member public keys."}
-          </p>
         </div>
 
         {isCircleStarted ? (
           <div className="p-4 bg-red-950/20 rounded-xl space-y-2 text-xs">
-            <p className="font-semibold text-red-400">🔒 Parameters are Immutable</p>
-            <p className="text-neutral-400">
-              The circle has already commenced with active contributions. To protect member funds, all configuration parameters and participant access lists are permanently locked.
-            </p>
+            <p className="font-semibold text-red-400">Circle Started (Locked)</p>
           </div>
         ) : (
           <form onSubmit={handleSave} className="space-y-5 text-xs">
@@ -131,6 +123,7 @@ export const EditCircleModal: React.FC<EditCircleModalProps> = ({
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                placeholder="Circle Name"
                 className="w-full bg-black rounded-lg px-4 py-3 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500 border-none"
               />
             </div>
@@ -146,7 +139,7 @@ export const EditCircleModal: React.FC<EditCircleModalProps> = ({
                 step="100"
                 value={minWalletAmt}
                 onChange={(e) => setMinWalletAmt(e.target.value)}
-                placeholder="Optional reserve balance requirement"
+                placeholder="Min Wallet Requirement (₹)"
                 className="w-full bg-black rounded-lg px-4 py-3 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500 border-none"
               />
             </div>
@@ -154,16 +147,13 @@ export const EditCircleModal: React.FC<EditCircleModalProps> = ({
             {/* Allowed Public Keys Whitelist */}
             <div className="space-y-2.5 pt-2 border-t border-neutral-900">
               <label className="block font-semibold text-neutral-300">
-                Allowed Public Keys (Group Link Access)
+                Allowed Public Keys
               </label>
-              <p className="text-[11px] text-neutral-500">
-                Only users with these public keys can view and join this group on localhost:3000/grouplink.
-              </p>
 
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Paste BridgeKey or 0x... Public Key"
+                  placeholder="BridgeKey or 0x Public Key"
                   value={newKeyInput}
                   onChange={(e) => setNewKeyInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -194,7 +184,7 @@ export const EditCircleModal: React.FC<EditCircleModalProps> = ({
                         key={key}
                         className="px-2.5 py-1.5 rounded-lg bg-black text-neutral-300 font-mono text-[11px] flex items-center gap-1.5"
                       >
-                        <Key className="w-3 h-3 text-red-500" />
+                        <Key className="w-3 h-3 text-neutral-400" />
                         <span>{key.substring(0, 6)}...{key.substring(key.length - 4)}</span>
                         {isInit ? (
                           <span className="text-[9px] font-sans text-red-400 font-semibold px-1 rounded bg-red-950/40">
