@@ -11,6 +11,7 @@ interface HeaderProps {
   onToggleTechnicalMode: () => void;
   onOpenAccountModal: () => void;
   onOpenCreateGroupModal: () => void;
+  onSwitchGroup?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTechnicalMode,
   onOpenAccountModal,
   onOpenCreateGroupModal,
+  onSwitchGroup,
 }) => {
   return (
     <header className="sticky top-0 z-40 border-b border-white/[0.06] px-5 sm:px-8 py-3" style={{ background: 'rgba(15, 17, 23, 0.85)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
@@ -43,12 +45,25 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Active Group */}
-          {groupName && (
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          {groupName ? (
+            <button
+              onClick={onSwitchGroup}
+              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-white/[0.08] transition-colors cursor-pointer"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+              title="Click to switch or view other Savings Circles"
+            >
               <span className="w-2 h-2 rounded-full bg-[#2dd4a8] anim-pulse-soft" />
               <span className="text-xs text-[#9ca3b4]">Circle:</span>
               <span className="text-xs font-semibold text-white">{groupName}</span>
-            </div>
+              <span className="text-[10px] text-[#2dd4a8] underline ml-1">Change</span>
+            </button>
+          ) : (
+            <button
+              onClick={onSwitchGroup}
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-[#9ca3b4] hover:text-white bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
+            >
+              <span>Explore Circles</span>
+            </button>
           )}
         </div>
 

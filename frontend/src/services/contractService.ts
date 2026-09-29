@@ -59,6 +59,19 @@ export class ContractService {
     }
   }
 
+  public async getDeployedGroupsFromFactory(): Promise<string[]> {
+    const factoryAddr = CONTRACT_ADDRESSES.ChitFactory;
+    if (!factoryAddr) return [];
+    try {
+      const factory = new ethers.Contract(factoryAddr, ChitFactoryABI, this.provider);
+      const groups = await factory.getDeployedGroups();
+      return groups || [];
+    } catch (err) {
+      console.warn("Could not fetch deployed groups from factory:", err);
+      return [];
+    }
+  }
+
   public async setSigner(signer: ethers.Signer) {
     this.signer = signer;
   }
@@ -110,7 +123,7 @@ export class ContractService {
       return { txHash: tx.hash, groupAddress };
     }
 
-    // 2. Direct on-chain deployment of ChitGroup from user wallet
+    // Direct on-chain deployment of ChitGroup from user wallet
     const { ChitGroupBytecode } = await import("../contracts/abis");
     const factory = new ethers.ContractFactory(ChitGroupABI, ChitGroupBytecode, this.signer);
 

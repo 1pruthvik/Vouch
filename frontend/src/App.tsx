@@ -47,14 +47,30 @@ export function App() {
   const [activeTab, setActiveTab] = useState<"home" | "draw" | "standing" | "network" | "history">("home");
 
   // State
-  const [activeGroupAddress, setActiveGroupAddress] = useState<string>("");
+  const [activeGroupAddress, setActiveGroupAddress] = useState<string>(() => {
+    return localStorage.getItem("vouch_active_group") || "0xAf378D33B037A6668fOd128c4BBA28bb65974D9b";
+  });
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
   const [memberDetails, setMemberDetails] = useState<MemberDetails | null>(null);
   const [ledgerEvents, setLedgerEvents] = useState<LedgerEvent[]>([]);
   const [riskAdvisory, setRiskAdvisory] = useState<RiskPredictionResponse | null>(null);
 
   const [notification, setNotification] = useState<{ message: string; isError?: boolean } | null>(null);
-  const [isMandateActive, setIsMandateActive] = useState(false);
+  const [isMandateActive, setIsMandateActive] = useState<boolean>(() => {
+    return localStorage.getItem("vouch_autopay_active") === "true";
+  });
+
+  // Persist activeGroupAddress
+  useEffect(() => {
+    if (activeGroupAddress) {
+      localStorage.setItem("vouch_active_group", activeGroupAddress);
+    }
+  }, [activeGroupAddress]);
+
+  // Persist AutoPay state
+  useEffect(() => {
+    localStorage.setItem("vouch_autopay_active", isMandateActive ? "true" : "false");
+  }, [isMandateActive]);
 
   const showNotification = (message: string, isError: boolean = false) => {
     setNotification({ message, isError });
@@ -237,6 +253,10 @@ export function App() {
           }
         }}
         onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
+        onSwitchGroup={() => {
+          setActiveGroupAddress("");
+          setGroupDetails(null);
+        }}
       />
 
       {/* Main Container */}
@@ -296,6 +316,10 @@ export function App() {
               memberDetails={memberDetails}
               riskAdvisory={riskAdvisory}
               isTechnicalMode={isTechnicalMode}
+              isMandateActive={isMandateActive}
+              onSelectGroup={(addr) => {
+                setActiveGroupAddress(addr);
+              }}
               onPayInstallment={handlePayInstallment}
               onOpenMandateModal={() => setIsMandateModalOpen(true)}
               onOpenDrawTab={() => setActiveTab("draw")}
@@ -353,6 +377,10 @@ export function App() {
                 memberDetails={memberDetails}
                 riskAdvisory={riskAdvisory}
                 isTechnicalMode={isTechnicalMode}
+                isMandateActive={isMandateActive}
+                onSelectGroup={(addr) => {
+                  setActiveGroupAddress(addr);
+                }}
                 onPayInstallment={handlePayInstallment}
                 onOpenMandateModal={() => setIsMandateModalOpen(true)}
                 onOpenDrawTab={() => setActiveTab("draw")}
@@ -432,6 +460,10 @@ export function App() {
         onActivateMandate={async () => {
           setIsMandateActive(true);
           showNotification("Auto-Debit Mandate authorized.");
+        }}
+        onCancelMandate={() => {
+          setIsMandateActive(false);
+          showNotification("Auto-Debit Mandate cancelled.");
         }}
         isTechnicalMode={isTechnicalMode}
       />
