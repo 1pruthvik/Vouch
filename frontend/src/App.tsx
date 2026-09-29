@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Header } from "./components/Header";
+import { LoginPage } from "./components/LoginPage";
 import { MemberDashboard, AvailableCircle } from "./components/MemberDashboard";
 import { AuctionBidding } from "./components/AuctionBidding";
 import { RiskAdvisorCard } from "./components/RiskAdvisorCard";
@@ -31,6 +32,12 @@ export function App() {
     clearError,
   } = useWallet();
 
+  // Authentication State
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; picture?: string } | null>(() => {
+    const saved = localStorage.getItem("vouch_user");
+    return saved ? JSON.parse(saved) : null;
+  });
+
   const [contractService, setContractService] = useState<ContractService | null>(null);
 
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
@@ -56,6 +63,16 @@ export function App() {
   const [isMandateActive, setIsMandateActive] = useState<boolean>(() => {
     return localStorage.getItem("vouch_autopay_active") === "true";
   });
+
+  const handleLoginSuccess = (user: { name: string; email: string; picture?: string }) => {
+    setCurrentUser(user);
+    localStorage.setItem("vouch_user", JSON.stringify(user));
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem("vouch_user");
+  };
 
   const loadAvailableGroups = useCallback(async () => {
     try {
@@ -118,8 +135,10 @@ export function App() {
   }, [contractService, activeGroupAddress]);
 
   useEffect(() => {
-    loadAvailableGroups();
-  }, [loadAvailableGroups]);
+    if (currentUser) {
+      loadAvailableGroups();
+    }
+  }, [currentUser, loadAvailableGroups]);
 
   useEffect(() => {
     if (activeGroupAddress) {
@@ -173,10 +192,10 @@ export function App() {
   }, [activeGroupAddress, contractService, account]);
 
   useEffect(() => {
-    if (activeGroupAddress) {
+    if (activeGroupAddress && currentUser) {
       refreshData();
     }
-  }, [activeGroupAddress, refreshData]);
+  }, [activeGroupAddress, currentUser, refreshData]);
 
   const handleCreateGroup = async (params: {
     groupName: string;
@@ -285,6 +304,18 @@ export function App() {
     }
   };
 
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+
+  // If not logged in, render LoginPage first
+  if (!currentUser) {
+    return (
+      <LoginPage
+        onLoginSuccess={handleLoginSuccess}
+        googleClientIdConfigured={Boolean(googleClientId)}
+      />
+    );
+  }
+
   const tabs = [
     { id: "home" as const, label: "Group Home", icon: <Home className="w-4 h-4" /> },
     { id: "draw" as const, label: "Reverse Auction", icon: <Sparkles className="w-4 h-4" /> },
@@ -298,6 +329,8 @@ export function App() {
         account={account}
         balance={balance}
         isConnecting={isConnecting}
+        currentUser={currentUser}
+        onLogout={handleLogout}
         onOpenAccountModal={() => setIsAccountModalOpen(true)}
         onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
       />
@@ -328,7 +361,7 @@ export function App() {
           </div>
         )}
 
-        {/* ── Tabs Navigation: Transparent background, scales up, raises a little, and turns red ── */}
+        {/* ── Tabs Navigation ── */}
         <div className="flex items-center justify-between gap-3 pb-2">
           <div className="flex items-center gap-5 sm:gap-7 flex-wrap py-2">
             {tabs.map((tab) => {
