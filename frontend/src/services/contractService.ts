@@ -129,25 +129,40 @@ export class ContractService {
       if (receipt && receipt.logs) {
         for (const log of receipt.logs) {
           try {
-            const parsed = factory.interface.parseLog(log);
+            const parsed = factory.interface.parseLog({ topics: [...log.topics], data: log.data });
             if (parsed && (parsed.name === "GroupCreated" || parsed.args?.groupAddress)) {
-              groupAddress = parsed.args.groupAddress;
+              groupAddress = ethers.getAddress(parsed.args.groupAddress);
               break;
             }
           } catch {}
+
+          if (!groupAddress && log.topics && log.topics.length >= 2) {
+            try {
+              const candidate = "0x" + log.topics[1].slice(-40);
+              if (ethers.isAddress(candidate)) {
+                groupAddress = ethers.getAddress(candidate);
+                break;
+              }
+            } catch {}
+          }
         }
       }
 
-      if (!groupAddress) {
+      if (!groupAddress || !ethers.isAddress(groupAddress)) {
         try {
-          const deployedList = await factory.getDeployedGroups();
+          const rpcProvider = new ethers.JsonRpcProvider(MST_TESTNET.rpcUrl);
+          const readonlyFactory = new ethers.Contract(factoryAddr, ChitFactoryABI, rpcProvider);
+          const deployedList = await readonlyFactory.getDeployedGroups();
           if (deployedList && deployedList.length > 0) {
-            groupAddress = deployedList[deployedList.length - 1];
+            const lastAddr = deployedList[deployedList.length - 1];
+            if (ethers.isAddress(lastAddr)) {
+              groupAddress = ethers.getAddress(lastAddr);
+            }
           }
         } catch {}
       }
 
-      return { txHash: tx.hash, groupAddress: groupAddress || tx.hash };
+      return { txHash: tx.hash, groupAddress: (groupAddress && ethers.isAddress(groupAddress)) ? groupAddress : undefined };
     }
 
     // Direct on-chain deployment of ChitGroup from user wallet

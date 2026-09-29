@@ -8,8 +8,10 @@ import { DedicatedCirclePage } from "./components/DedicatedCirclePage";
 import { AccountModal } from "./components/AccountModal";
 import { useWallet } from "./hooks/useWallet";
 import { ContractService } from "./services/contractService";
+import { VerificationService } from "./services/verificationService";
 import { parseWalletError } from "./utils/formatters";
 import { CheckCircle2, AlertCircle, Plus, UserPlus, Shield } from "lucide-react";
+
 
 export function App() {
   const {
@@ -93,19 +95,31 @@ export function App() {
     try {
       showNotification("Deploying Chit Group to MST Testnet...");
       const result = await contractService.createGroup(params);
-      if (result.groupAddress) {
-        setLastDeployedAddress(result.groupAddress);
-        setActiveCircleAddress(result.groupAddress);
+      if (result.groupAddress && result.groupAddress.startsWith("0x")) {
+        const cleanAddr = result.groupAddress.substring(0, 42);
+        setLastDeployedAddress(cleanAddr);
+        setActiveCircleAddress(cleanAddr);
+
+        await VerificationService.registerCircle({
+          address: cleanAddr,
+          name: params.groupName,
+          memberCount: params.memberCount,
+          installmentAmount: params.installmentAmount,
+          cycleDuration: params.cycleDuration,
+          initializer: account,
+          createdAt: Date.now(),
+        });
+
         const saved: any[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
         saved.push({
-          address: result.groupAddress,
+          address: cleanAddr,
           name: params.groupName,
           memberCount: params.memberCount,
           installmentAmount: params.installmentAmount,
         });
         localStorage.setItem("vouch_custom_groups", JSON.stringify(saved));
-        showNotification(`Savings Circle deployed successfully at ${result.groupAddress}!`);
-        return result.groupAddress;
+        showNotification(`Savings Circle deployed successfully at ${cleanAddr}!`);
+        return cleanAddr;
       } else {
         showNotification("Group creation transaction confirmed on blockchain.");
         return undefined;

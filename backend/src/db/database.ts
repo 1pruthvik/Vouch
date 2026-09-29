@@ -603,6 +603,12 @@ class DatabaseManager {
 
   // --- Circle Registrations & Join Requests ---
 
+  private sanitizeAddress(addr: string): string {
+    if (!addr) return "";
+    const match = addr.match(/0x[a-fA-F0-9]{40}/);
+    return match ? match[0].toLowerCase() : addr.trim().toLowerCase();
+  }
+
   public upsertCircleRegistration(entry: {
     address: string;
     name?: string;
@@ -614,6 +620,8 @@ class DatabaseManager {
     created_at?: number;
   }): void {
     if (!this.db) return;
+    const cleanAddr = this.sanitizeAddress(entry.address);
+    const cleanInit = this.sanitizeAddress(entry.initializer);
     const now = Math.floor(Date.now() / 1000);
     this.db.run(
       `INSERT INTO circle_registrations (address, name, member_count, installment_amount, cycle_duration, initializer, min_wallet_amt, created_at)
@@ -626,12 +634,12 @@ class DatabaseManager {
          initializer = excluded.initializer,
          min_wallet_amt = excluded.min_wallet_amt`,
       [
-        entry.address.toLowerCase(),
+        cleanAddr,
         entry.name || "Savings Circle",
         entry.member_count || 5,
         entry.installment_amount || "1.0",
         entry.cycle_duration || 0,
-        (entry.initializer || "").toLowerCase(),
+        cleanInit,
         entry.min_wallet_amt || "0",
         entry.created_at || now,
       ]
@@ -652,8 +660,9 @@ class DatabaseManager {
 
   public getCircleRegistration(address: string): any | null {
     if (!this.db || !address) return null;
-    const stmt = this.db.prepare("SELECT * FROM circle_registrations WHERE LOWER(address) = LOWER(?)");
-    stmt.bind([address]);
+    const cleanAddr = this.sanitizeAddress(address);
+    const stmt = this.db.prepare("SELECT * FROM circle_registrations WHERE LOWER(address) = ?");
+    stmt.bind([cleanAddr]);
     let result: any = null;
     if (stmt.step()) {
       result = stmt.getAsObject();
@@ -664,8 +673,9 @@ class DatabaseManager {
 
   public getCirclesByInitializer(initializer: string): any[] {
     if (!this.db || !initializer) return [];
-    const stmt = this.db.prepare("SELECT * FROM circle_registrations WHERE LOWER(initializer) = LOWER(?) ORDER BY created_at DESC");
-    stmt.bind([initializer]);
+    const cleanInit = this.sanitizeAddress(initializer);
+    const stmt = this.db.prepare("SELECT * FROM circle_registrations WHERE LOWER(initializer) = ? ORDER BY created_at DESC");
+    stmt.bind([cleanInit]);
     const results: any[] = [];
     while (stmt.step()) {
       results.push(stmt.getAsObject());
@@ -676,17 +686,17 @@ class DatabaseManager {
 
   public submitJoinRequest(circleAddress: string, applicantAddress: string, applicantName?: string): any {
     if (!this.db) return null;
-    const cleanCircle = circleAddress.toLowerCase();
-    const cleanApplicant = applicantAddress.toLowerCase();
+    const cleanCircle = this.sanitizeAddress(circleAddress);
+    const cleanApplicant = this.sanitizeAddress(applicantAddress);
     const now = Math.floor(Date.now() / 1000);
     const id = `${cleanCircle}_${cleanApplicant}`;
 
-    const existing = this.getApplicantJoinStatus(circleAddress, applicantAddress);
+    const existing = this.getApplicantJoinStatus(cleanCircle, cleanApplicant);
     if (existing && existing.status !== "none") {
       return existing;
     }
 
-    const defaultName = applicantName || `Member (${applicantAddress.substring(0, 6)}...)`;
+    const defaultName = applicantName || `Member (${cleanApplicant.substring(0, 6)}...)`;
     this.db.run(
       `INSERT OR REPLACE INTO circle_join_requests (id, circle_address, applicant_address, applicant_name, status, requested_at, updated_at)
        VALUES (?, ?, ?, ?, 'pending', ?, ?)`,
@@ -705,8 +715,9 @@ class DatabaseManager {
 
   public getJoinRequestsForCircle(circleAddress: string): any[] {
     if (!this.db || !circleAddress) return [];
-    const stmt = this.db.prepare("SELECT * FROM circle_join_requests WHERE LOWER(circle_address) = LOWER(?) ORDER BY requested_at DESC");
-    stmt.bind([circleAddress]);
+    const cleanCircle = this.sanitizeAddress(circleAddress);
+    const stmt = this.db.prepare("SELECT * FROM circle_join_requests WHERE LOWER(circle_address) = ? ORDER BY requested_at DESC");
+    stmt.bind([cleanCircle]);
     const results: any[] = [];
     while (stmt.step()) {
       const row: any = stmt.getAsObject();
@@ -725,8 +736,10 @@ class DatabaseManager {
 
   public getApplicantJoinStatus(circleAddress: string, applicantAddress: string): any {
     if (!this.db || !circleAddress || !applicantAddress) return { status: "none" };
-    const stmt = this.db.prepare("SELECT * FROM circle_join_requests WHERE LOWER(circle_address) = LOWER(?) AND LOWER(applicant_address) = LOWER(?)");
-    stmt.bind([circleAddress, applicantAddress]);
+    const cleanCircle = this.sanitizeAddress(circleAddress);
+    const cleanApplicant = this.sanitizeAddress(applicantAddress);
+    const stmt = this.db.prepare("SELECT * FROM circle_join_requests WHERE LOWER(circle_address) = ? AND LOWER(applicant_address) = ?");
+    stmt.bind([cleanCircle, cleanApplicant]);
     let result: any = null;
     if (stmt.step()) {
       const row: any = stmt.getAsObject();
@@ -745,8 +758,8 @@ class DatabaseManager {
 
   public updateJoinRequestStatus(circleAddress: string, applicantAddress: string, status: "verified" | "rejected"): any {
     if (!this.db) return null;
-    const cleanCircle = circleAddress.toLowerCase();
-    const cleanApplicant = applicantAddress.toLowerCase();
+    const cleanCircle = this.sanitizeAddress(circleAddress);
+    const cleanApplicant = this.sanitizeAddress(applicantAddress);
     const now = Math.floor(Date.now() / 1000);
     const id = `${cleanCircle}_${cleanApplicant}`;
 
@@ -754,7 +767,7 @@ class DatabaseManager {
       `INSERT INTO circle_join_requests (id, circle_address, applicant_address, applicant_name, status, requested_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`,
-      [id, cleanCircle, cleanApplicant, `Member (${applicantAddress.substring(0, 6)}...)`, status, now, now]
+      [id, cleanCircle, cleanApplicant, `Member (${cleanApplicant.substring(0, 6)}...)`, status, now, now]
     );
     this.save();
     return {
