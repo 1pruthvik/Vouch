@@ -123,8 +123,8 @@ export interface BlockchainNetwork3DProps {
   currentAccount?: string | null;
   groupDetails?: GroupDetails | null;
   memberDetails?: MemberDetails | null;
-  onPayDues?: (amount: string) => Promise<void>;
-  onCommitBid?: (bidAmount: string, salt: string) => Promise<void>;
+  onPayDues?: (amount?: string) => Promise<void>;
+  onCommitBid?: (bidAmount: string, salt?: string) => Promise<void>;
   onToggleViewMode?: () => void;
 }
 

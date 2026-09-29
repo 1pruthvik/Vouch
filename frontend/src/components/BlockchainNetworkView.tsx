@@ -104,12 +104,16 @@ const INITIAL_MEMBERS: MemberNode[] = [
   },
 ];
 
-interface BlockchainNetworkViewProps {
+export interface BlockchainNetworkViewProps {
   currentAccount?: string | null;
+  groupDetails?: any;
+  onCommitBid?: (bidAmountMST: string) => Promise<void>;
 }
 
 export const BlockchainNetworkView: React.FC<BlockchainNetworkViewProps> = ({
   currentAccount,
+  groupDetails,
+  onCommitBid,
 }) => {
   const [members, setMembers] = useState<MemberNode[]>(INITIAL_MEMBERS);
   const [currentRound, setCurrentRound] = useState<number>(3);

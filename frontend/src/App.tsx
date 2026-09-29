@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Header } from "./components/Header";
-import { MemberDashboard } from "./components/MemberDashboard";
+import { HomeView } from "./components/HomeView";
+import { PoolView } from "./components/PoolView";
 import { AuctionBidding } from "./components/AuctionBidding";
+import { TreasuryView } from "./components/TreasuryView";
+import { ActivityView } from "./components/ActivityView";
+import { StandingView } from "./components/StandingView";
+import { MemberDashboard, AvailableCircle } from "./components/MemberDashboard";
 import { RiskAdvisorCard } from "./components/RiskAdvisorCard";
 import { LedgerView, LedgerEvent } from "./components/LedgerView";
 import { CreateGroupModal } from "./components/CreateGroupModal";
@@ -14,20 +19,21 @@ import { BlockchainNetworkView } from "./components/BlockchainNetworkView";
 import { useWallet } from "./hooks/useWallet";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
-import { fetchLedgerEvents } from "./services/indexerService";
+import { fetchLedgerEvents, fetchIndexedGroups } from "./services/indexerService";
 import {
-  Plus,
   UserPlus,
   Shield,
   CheckCircle2,
-  RefreshCw,
   AlertCircle,
   Sparkles,
-  Zap,
-  Layers,
-  History,
+  Home,
   Box,
+  History,
+  Building,
+  TrendingUp,
+  Layers,
   LayoutGrid,
+  Zap,
 } from "lucide-react";
 
 export function App() {
@@ -42,7 +48,7 @@ export function App() {
     error: walletError,
     connectWallet,
     connectWithPrivateKey,
-    switchToMSTTestnet,
+    clearError,
   } = useWallet();
 
   const [contractService, setContractService] = useState<ContractService | null>(null);
@@ -54,23 +60,97 @@ export function App() {
   const [isMandateModalOpen, setIsMandateModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
-  // Progressive Disclosure: Technical / Pro Details Mode Toggle
+  // Progressive Disclosure: Technical Pro Mode Toggle
   const [isTechnicalMode, setIsTechnicalMode] = useState<boolean>(false);
 
-  // Tabs: Default to "network" so 3D is immediately visible on first load!
-  const [activeTab, setActiveTab] = useState<"network" | "home" | "draw" | "standing" | "history">("network");
+  // Tabs: Default to "network" so 3D WebGL model is immediately front-and-center
+  const [activeTab, setActiveTab] = useState<
+    "network" | "home" | "pool" | "draw" | "treasury" | "activity" | "standing"
+  >("network");
   const [networkViewMode, setNetworkViewMode] = useState<"3d" | "2d">("3d");
 
   // State
-  const [activeGroupAddress, setActiveGroupAddress] = useState<string>("");
+  const [activeGroupAddress, setActiveGroupAddress] = useState<string>(() => {
+    return localStorage.getItem("vouch_active_group") || "0xAf378D33B037A6668fOd128c4BBA28bb65974D9b";
+  });
+  const [availableGroups, setAvailableGroups] = useState<AvailableCircle[]>([]);
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
   const [memberDetails, setMemberDetails] = useState<MemberDetails | null>(null);
   const [ledgerEvents, setLedgerEvents] = useState<LedgerEvent[]>([]);
   const [riskAdvisory, setRiskAdvisory] = useState<RiskPredictionResponse | null>(null);
 
-  const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState<{ message: string; isError?: boolean } | null>(null);
-  const [isMandateActive, setIsMandateActive] = useState(true);
+  const [isMandateActive, setIsMandateActive] = useState<boolean>(() => {
+    return localStorage.getItem("vouch_autopay_active") === "true";
+  });
+
+  // Load available groups dynamically from backend and localStorage
+  const loadAvailableGroups = useCallback(async () => {
+    try {
+      const indexed = await fetchIndexedGroups();
+      const customSaved: AvailableCircle[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
+
+      const combinedMap = new Map<string, AvailableCircle>();
+
+      // Base active circles
+      const baseCircles: AvailableCircle[] = [
+        {
+          address: "0xAf378D33B037A6668fOd128c4BBA28bb65974D9b",
+          name: "Alpha Savings Circle",
+          memberCount: 5,
+          installmentAmount: "5.0",
+        },
+        {
+          address: "0xb794f5ea0ba39494ce839613fffba74279579268",
+          name: "Bangalore Techies Chit",
+          memberCount: 4,
+          installmentAmount: "10.0",
+        },
+        {
+          address: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+          name: "Family Emergency Pool",
+          memberCount: 5,
+          installmentAmount: "2.0",
+        },
+      ];
+
+      baseCircles.forEach((c) => combinedMap.set(c.address.toLowerCase(), c));
+      customSaved.forEach((c) => combinedMap.set(c.address.toLowerCase(), c));
+
+      if (Array.isArray(indexed)) {
+        indexed.forEach((g: any) => {
+          if (g.address) {
+            combinedMap.set(g.address.toLowerCase(), {
+              address: g.address,
+              name: g.group_name || g.name || "Community Pool",
+              memberCount: g.member_count || g.memberCount || 5,
+              installmentAmount: g.installment_amount || g.installmentAmount || "5.0",
+            });
+          }
+        });
+      }
+
+      setAvailableGroups(Array.from(combinedMap.values()));
+    } catch (err) {
+      console.warn("Could not load available groups:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAvailableGroups();
+  }, [loadAvailableGroups]);
+
+  // Persist activeGroupAddress
+  useEffect(() => {
+    if (activeGroupAddress) {
+      localStorage.setItem("vouch_active_group", activeGroupAddress);
+    }
+  }, [activeGroupAddress]);
+
+  // Persist AutoPay state
+  useEffect(() => {
+    localStorage.setItem("vouch_autopay_active", isMandateActive ? "true" : "false");
+  }, [isMandateActive]);
 
   const showNotification = (message: string, isError: boolean = false) => {
     setNotification({ message, isError });
@@ -79,7 +159,7 @@ export function App() {
 
   // Initialize ContractService
   useEffect(() => {
-    const srv = new ContractService(provider as any || undefined);
+    const srv = new ContractService((provider as any) || undefined);
     if (signer) {
       srv.setSigner(signer);
     }
@@ -90,7 +170,6 @@ export function App() {
   const refreshData = useCallback(async () => {
     if (!activeGroupAddress || !contractService) return;
     try {
-      setIsLoading(true);
       const gDetails = await contractService.getGroupDetails(activeGroupAddress);
       setGroupDetails(gDetails);
 
@@ -115,10 +194,23 @@ export function App() {
       setLedgerEvents(events);
     } catch (err: any) {
       console.warn("Could not load group details from chain:", err);
-    } finally {
-      setIsLoading(false);
     }
   }, [activeGroupAddress, contractService, account]);
+
+  const handleSelectGroup = async (addr: string) => {
+    setActiveGroupAddress(addr);
+    const srv = contractService || new ContractService((provider as any) || undefined);
+    try {
+      const g = await srv.getGroupDetails(addr);
+      setGroupDetails(g);
+      if (account) {
+        const m = await srv.getMemberDetails(addr, account);
+        setMemberDetails(m);
+      }
+    } catch (e) {
+      console.warn("Could not load group details on selection:", e);
+    }
+  };
 
   useEffect(() => {
     if (activeGroupAddress) {
@@ -140,13 +232,31 @@ export function App() {
       return;
     }
     try {
-      showNotification("Submitting Create Circle transaction to MST Testnet...");
+      showNotification("Deploying Chit Group to MST Testnet...");
       const result = await contractService.createGroup(params);
       if (result.groupAddress) {
+        const newCircle: AvailableCircle = {
+          address: result.groupAddress,
+          name: params.groupName,
+          memberCount: params.memberCount,
+          installmentAmount: params.installmentAmount,
+        };
+        const customSaved: AvailableCircle[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
+        customSaved.unshift(newCircle);
+        localStorage.setItem("vouch_custom_groups", JSON.stringify(customSaved));
+
+        // Register with indexer
+        fetch("http://localhost:4000/api/groups/index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: result.groupAddress }),
+        }).catch(() => {});
+
+        loadAvailableGroups();
         setActiveGroupAddress(result.groupAddress);
-        showNotification(`Circle created successfully!`);
+        showNotification(`Circle "${params.groupName}" deployed at ${result.groupAddress.substring(0, 10)}...`);
       } else {
-        showNotification(`Transaction submitted: ${result.txHash.substring(0, 10)}...`);
+        showNotification("Group creation transaction confirmed.");
       }
       await refreshData();
     } catch (err: any) {
@@ -162,10 +272,10 @@ export function App() {
       return;
     }
     try {
-      showNotification("Securing your spot with initial safety buffer...");
+      showNotification("Depositing collateral and joining group...");
       await contractService.joinGroup(groupAddr, bufferDeposit);
       setActiveGroupAddress(groupAddr);
-      showNotification("🎉 You have successfully joined the circle!");
+      showNotification("Successfully joined the group!");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -180,9 +290,9 @@ export function App() {
       return;
     }
     try {
-      showNotification(`Processing monthly contribution of ${groupDetails.installmentAmount} tMSTC...`);
+      showNotification(`Processing monthly installment of ${groupDetails.installmentAmount} tMSTC...`);
       await contractService.payInstallment(activeGroupAddress, groupDetails.installmentAmount);
-      showNotification("🎉 Monthly payment confirmed on blockchain!");
+      showNotification("Monthly contribution confirmed on blockchain!");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -192,14 +302,11 @@ export function App() {
 
   // Handler: Commit Early Payout Request
   const handleCommitBid = async (bidAmountMST: string) => {
-    if (!contractService || !activeGroupAddress) {
-      showNotification("Demonstration mode: simulated bid committed.");
-      return;
-    }
+    if (!contractService || !activeGroupAddress) return;
     try {
-      showNotification("Submitting encrypted early payout request...");
+      showNotification("Submitting secret encrypted bid...");
       await contractService.commitBid(activeGroupAddress, bidAmountMST);
-      showNotification("🎉 Early payout request submitted!");
+      showNotification("Bid committed successfully!");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -211,9 +318,9 @@ export function App() {
   const handleRevealBid = async (bidAmountMST: string) => {
     if (!contractService || !activeGroupAddress) return;
     try {
-      showNotification("Revealing draw request on chain...");
+      showNotification("Revealing bid on chain...");
       await contractService.revealBid(activeGroupAddress, bidAmountMST);
-      showNotification("🎉 Request verified!");
+      showNotification("Bid revealed successfully!");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -225,9 +332,9 @@ export function App() {
   const handleSettleRound = async () => {
     if (!contractService || !activeGroupAddress) return;
     try {
-      showNotification("Finalizing this month's draw and distributing savings...");
+      showNotification("Settling round and distributing dividends...");
       await contractService.settleRound(activeGroupAddress);
-      showNotification("🎉 Month draw settled! Savings distributed.");
+      showNotification("Round settled! Dividends distributed.");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -235,123 +342,92 @@ export function App() {
     }
   };
 
+  const tabs: {
+    id: "network" | "home" | "pool" | "draw" | "treasury" | "activity" | "standing";
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
+    { id: "network", label: "3D Network", icon: <Box className="w-4 h-4 text-emerald-400" /> },
+    { id: "home", label: "Home", icon: <Home className="w-4 h-4" /> },
+    { id: "pool", label: "Pool", icon: <Building className="w-4 h-4" /> },
+    { id: "draw", label: "Draw", icon: <Sparkles className="w-4 h-4" /> },
+    { id: "treasury", label: "Treasury", icon: <TrendingUp className="w-4 h-4" /> },
+    { id: "activity", label: "Activity", icon: <History className="w-4 h-4" /> },
+    { id: "standing", label: "Standing", icon: <Shield className="w-4 h-4" /> },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#08090c] text-slate-100 selection:bg-emerald-500 selection:text-black">
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-app)", color: "var(--text-primary)" }}>
       {/* Header */}
       <Header
         account={account}
         balance={balance}
-        groupName={groupDetails?.name || "Alpha Savings Circle"}
         isConnecting={isConnecting}
+        groupName={groupDetails?.name || "Community 07"}
         isTechnicalMode={isTechnicalMode}
         onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
-        onOpenAccountModal={() => setIsAccountModalOpen(true)}
+        onOpenAccountModal={() => {
+          if (!account) {
+            clearError();
+            setIsConnectModalOpen(true);
+          } else {
+            setIsAccountModalOpen(true);
+          }
+        }}
         onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
+        onSwitchGroup={() => {
+          setActiveGroupAddress("");
+          setGroupDetails(null);
+        }}
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Toast / Notification Banner */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+        {/* Toast */}
         {notification && (
-          <div
-            className={`p-4 rounded-2xl flex items-center justify-between text-xs sm:text-sm font-semibold transition-all shadow-lg animate-fadeIn ${
-              notification.isError
-                ? "bg-red-500/15 border border-red-500/30 text-red-300"
-                : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
-            }`}
-          >
-            <div className="flex items-center gap-2">
+          <div className={`v-toast ${notification.isError ? "v-toast-error" : "v-toast-success"}`}>
+            <div className="flex items-center gap-2.5">
               {notification.isError ? (
-                <AlertCircle className="w-4 h-4 text-red-400" />
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
               ) : (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
               )}
               <span>{notification.message}</span>
             </div>
             <button
               onClick={() => setNotification(null)}
-              className="text-slate-400 hover:text-white"
+              className="text-inherit opacity-60 hover:opacity-100 ml-4 transition-opacity"
             >
               ✕
             </button>
           </div>
         )}
 
-        {/* Navigation Tabs (3D Network & Vault FIRST + CRED Pills) */}
+        {/* Navigation Tabs Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
-          <div className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar">
-            {/* Primary 3D Tab */}
-            <button
-              onClick={() => setActiveTab("network")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-                activeTab === "network"
-                  ? "bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400"
-                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Box className="w-3.5 h-3.5 text-emerald-400" />
-              <span>3D Network & Vault</span>
-              <span className="text-[10px] bg-black/40 text-emerald-300 px-1.5 py-0.5 rounded font-bold">
-                {networkViewMode === "3d" ? "3D WEBGL" : "2D"}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("home")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-                activeTab === "home"
-                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
-                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5" />
-              Circle Home
-            </button>
-
-            <button
-              onClick={() => setActiveTab("draw")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-                activeTab === "draw"
-                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
-                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              This Month's Draw
-            </button>
-
-            <button
-              onClick={() => setActiveTab("standing")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-                activeTab === "standing"
-                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
-                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              Your Standing
-            </button>
-
-            <button
-              onClick={() => setActiveTab("history")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-                activeTab === "history"
-                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
-                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <History className="w-3.5 h-3.5" />
-              Transaction History
-            </button>
+          <div className="flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`v-nav-pill ${activeTab === tab.id ? "v-nav-pill--active" : "v-nav-pill--inactive"}`}
+              >
+                {tab.icon}
+                <span className="inline">{tab.label}</span>
+              </button>
+            ))}
           </div>
 
           <div className="flex items-center gap-2">
             {/* 3D vs 2D Switcher */}
             <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/5 text-xs">
               <button
-                onClick={() => setNetworkViewMode("3d")}
+                onClick={() => {
+                  setActiveTab("network");
+                  setNetworkViewMode("3d");
+                }}
                 className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${
-                  networkViewMode === "3d"
+                  activeTab === "network" && networkViewMode === "3d"
                     ? "bg-emerald-500 text-slate-950 font-bold shadow-sm"
                     : "text-slate-400 hover:text-white"
                 }`}
@@ -360,9 +436,12 @@ export function App() {
                 3D View
               </button>
               <button
-                onClick={() => setNetworkViewMode("2d")}
+                onClick={() => {
+                  setActiveTab("network");
+                  setNetworkViewMode("2d");
+                }}
                 className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${
-                  networkViewMode === "2d"
+                  activeTab === "network" && networkViewMode === "2d"
                     ? "bg-emerald-500 text-slate-950 font-bold shadow-sm"
                     : "text-slate-400 hover:text-white"
                 }`}
@@ -374,159 +453,129 @@ export function App() {
 
             <button
               onClick={() => setIsJoinModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold border border-white/5 flex items-center gap-1.5 transition-all"
+              className="v-btn-ghost text-xs"
             >
-              <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
+              <UserPlus className="w-3.5 h-3.5 text-[#2dd4a8]" />
               Join Circle
             </button>
           </div>
         </div>
 
-        {/* Tab 1: 3D Network & Vault (PRIMARY DEFAULT TAB) */}
+        {/* Tab 1: 3D Blockchain Network (Default Landing View) */}
         {activeTab === "network" && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-5 anim-fade-up">
             {networkViewMode === "3d" ? (
               <BlockchainNetwork3D
                 currentAccount={account}
                 groupDetails={groupDetails}
                 memberDetails={memberDetails}
-                onPayDues={async (amt) => {
-                  await handlePayInstallment();
-                }}
-                onCommitBid={async (bidAmount, salt) => {
-                  await handleCommitBid(bidAmount);
-                }}
+                onPayDues={handlePayInstallment}
+                onCommitBid={handleCommitBid}
                 onToggleViewMode={() => setNetworkViewMode("2d")}
               />
             ) : (
-              <BlockchainNetworkView currentAccount={account} />
+              <BlockchainNetworkView
+                currentAccount={account}
+                groupDetails={groupDetails}
+                onCommitBid={handleCommitBid}
+              />
             )}
           </div>
         )}
 
-        {/* Tab 2: Circle Home */}
+        {/* Tab 2: Home View */}
         {activeTab === "home" && (
-          <div className="space-y-6 animate-fadeIn">
-            {/* Embedded 3D Network Preview on Circle Home */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-                  <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
+          <div className="space-y-6 anim-fade-up">
+            {/* Quick 3D Blockchain preview banner on Home */}
+            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-slate-900 to-slate-900 border border-emerald-500/20">
+              <div className="flex items-center gap-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                <div>
+                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
                     <Box className="w-4 h-4 text-emerald-400" />
-                    3D Blockchain Peer Network & Pool Vault
-                  </h3>
+                    Interactive 3D Blockchain Peer Network & Monthly Pool Vault
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    Real-time WebGL visualization of pool staking nodes & dynamic 3x-blinking bidding blocks.
+                  </p>
                 </div>
-                <button
-                  onClick={() => setActiveTab("network")}
-                  className="text-xs text-emerald-400 hover:underline flex items-center gap-1"
-                >
-                  Open Full 3D Workstation →
-                </button>
               </div>
-
-              {networkViewMode === "3d" ? (
-                <BlockchainNetwork3D
-                  currentAccount={account}
-                  groupDetails={groupDetails}
-                  memberDetails={memberDetails}
-                  onPayDues={async () => {
-                    await handlePayInstallment();
-                  }}
-                  onCommitBid={async (bidAmount) => {
-                    await handleCommitBid(bidAmount);
-                  }}
-                  onToggleViewMode={() => setNetworkViewMode("2d")}
-                />
-              ) : (
-                <BlockchainNetworkView currentAccount={account} />
-              )}
+              <button
+                onClick={() => setActiveTab("network")}
+                className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all shadow-sm flex items-center gap-1 flex-shrink-0"
+              >
+                Launch 3D Workstation →
+              </button>
             </div>
 
-            <MemberDashboard
+            <HomeView
               account={account}
               groupDetails={groupDetails}
               memberDetails={memberDetails}
               riskAdvisory={riskAdvisory}
+              isMandateActive={isMandateActive}
               isTechnicalMode={isTechnicalMode}
               onPayInstallment={handlePayInstallment}
               onOpenMandateModal={() => setIsMandateModalOpen(true)}
               onOpenDrawTab={() => setActiveTab("draw")}
+              onOpenPoolTab={() => setActiveTab("pool")}
+              onOpenTreasuryTab={() => setActiveTab("treasury")}
+              onOpenActivityTab={() => setActiveTab("activity")}
               onJoinGroup={() => setIsJoinModalOpen(true)}
             />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <LedgerView
-                  events={ledgerEvents.slice(0, 4)}
-                  isTechnicalMode={isTechnicalMode}
-                />
-              </div>
-              <div>
-                <RiskAdvisorCard
-                  memberAddress={account || "0x000"}
-                  riskAdvisory={riskAdvisory}
-                  isTechnicalMode={isTechnicalMode}
-                />
-              </div>
-            </div>
           </div>
         )}
 
-        {/* Tab 3: This Month's Draw */}
+        {/* Tab 3: Pool Details & Members */}
+        {activeTab === "pool" && (
+          <PoolView
+            groupDetails={groupDetails}
+            memberDetails={memberDetails}
+            account={account}
+            isTechnicalMode={isTechnicalMode}
+            onOpenDrawTab={() => setActiveTab("draw")}
+            onOpenMandateModal={() => setIsMandateModalOpen(true)}
+          />
+        )}
+
+        {/* Tab 4: Monthly Draw & Reverse Auction */}
         {activeTab === "draw" && (
-          <div className="space-y-6 animate-fadeIn">
-            <AuctionBidding
-              currentRound={groupDetails?.currentRound || 1}
-              totalPot={groupDetails?.currentPot || "2.5"}
-              minBidAllowed={groupDetails?.minBid || "1.75"}
-              phase={groupDetails?.currentState || "Commit"}
-              hasCommitted={false}
-              hasRevealed={false}
-              hasWonPreviously={memberDetails?.hasWon || false}
-              isTechnicalMode={isTechnicalMode}
-              groupDetails={groupDetails}
-              onCommitBid={handleCommitBid}
-              onRevealBid={handleRevealBid}
-              onSettleRound={handleSettleRound}
-            />
-          </div>
+          <AuctionBidding
+            currentRound={groupDetails?.currentRound || 5}
+            totalPot={groupDetails?.currentPot || "500"}
+            minBidAllowed={groupDetails?.minBid || "350"}
+            phase={groupDetails?.currentState || "Commit"}
+            hasCommitted={false}
+            hasRevealed={false}
+            hasWonPreviously={memberDetails?.hasWon || false}
+            isTechnicalMode={isTechnicalMode}
+            groupDetails={groupDetails}
+            memberDetails={memberDetails}
+            onCommitBid={handleCommitBid}
+            onRevealBid={handleRevealBid}
+            onSettleRound={handleSettleRound}
+          />
         )}
 
-        {/* Tab 4: Your Standing */}
+        {/* Tab 5: Pool Treasury & Yield Engine */}
+        {activeTab === "treasury" && (
+          <TreasuryView isTechnicalMode={isTechnicalMode} />
+        )}
+
+        {/* Tab 6: Activity & Transaction History */}
+        {activeTab === "activity" && (
+          <ActivityView events={ledgerEvents} isTechnicalMode={isTechnicalMode} />
+        )}
+
+        {/* Tab 7: Standing & Trust Profile */}
         {activeTab === "standing" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
-            <div className="lg:col-span-2">
-              <MemberDashboard
-                account={account}
-                groupDetails={groupDetails}
-                memberDetails={memberDetails}
-                riskAdvisory={riskAdvisory}
-                isTechnicalMode={isTechnicalMode}
-                onPayInstallment={handlePayInstallment}
-                onOpenMandateModal={() => setIsMandateModalOpen(true)}
-                onOpenDrawTab={() => setActiveTab("draw")}
-                onJoinGroup={() => setIsJoinModalOpen(true)}
-              />
-            </div>
-            <div>
-              <RiskAdvisorCard
-                memberAddress={account || "0x000"}
-                riskAdvisory={riskAdvisory}
-                isTechnicalMode={isTechnicalMode}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Tab 5: Transaction History */}
-        {activeTab === "history" && (
-          <div className="space-y-6 animate-fadeIn">
-            <LedgerView
-              events={ledgerEvents}
-              isTechnicalMode={isTechnicalMode}
-            />
-          </div>
+          <StandingView
+            account={account}
+            memberDetails={memberDetails}
+            groupDetails={groupDetails}
+            riskAdvisory={riskAdvisory}
+            isTechnicalMode={isTechnicalMode}
+          />
         )}
       </main>
 
@@ -536,6 +585,7 @@ export function App() {
         onClose={() => setIsConnectModalOpen(false)}
         onConnectExtension={connectWallet}
         onConnectPrivateKey={connectWithPrivateKey}
+        onClearError={clearError}
         detectedProviders={detectedProviders}
         error={walletError}
       />
@@ -550,6 +600,8 @@ export function App() {
       <JoinGroupModal
         isOpen={isJoinModalOpen}
         onClose={() => setIsJoinModalOpen(false)}
+        defaultGroupAddress={activeGroupAddress}
+        defaultDepositINR={groupDetails ? Math.round(parseFloat(groupDetails.installmentAmount) * 1000) : 5000}
         onJoin={handleJoinGroup}
         isTechnicalMode={isTechnicalMode}
       />
@@ -557,14 +609,18 @@ export function App() {
       <MandateModal
         isOpen={isMandateModalOpen}
         onClose={() => setIsMandateModalOpen(false)}
-        groupName={groupDetails?.name || "Alpha Savings Circle"}
-        installmentAmount={groupDetails?.installmentAmount || "0.5"}
-        cycleDurationSeconds={groupDetails?.cycleDuration || 300}
-        totalMembers={groupDetails?.memberCount || 5}
+        groupName={groupDetails?.name || ""}
+        installmentAmount={groupDetails?.installmentAmount || "0"}
+        cycleDurationSeconds={groupDetails?.cycleDuration || 0}
+        totalMembers={groupDetails?.memberCount || 0}
         isMandateActive={isMandateActive}
         onActivateMandate={async () => {
           setIsMandateActive(true);
-          showNotification("🎉 Auto-Debit Mandate successfully registered!");
+          showNotification("Auto-Debit Mandate authorized.");
+        }}
+        onCancelMandate={() => {
+          setIsMandateActive(false);
+          showNotification("Auto-Debit Mandate cancelled.");
         }}
         isTechnicalMode={isTechnicalMode}
       />
@@ -575,15 +631,14 @@ export function App() {
         account={account}
         balance={balance}
         isCorrectNetwork={isCorrectNetwork}
-        onSwitchNetwork={switchToMSTTestnet}
-        onOpenConnectModal={() => {
-          setIsAccountModalOpen(false);
-          setIsConnectModalOpen(true);
-        }}
         isTechnicalMode={isTechnicalMode}
         onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
+        detectedProviders={detectedProviders}
+        onConnectExtension={connectWallet}
+        onConnectPrivateKey={connectWithPrivateKey}
       />
     </div>
   );
 }
+
 export default App;
