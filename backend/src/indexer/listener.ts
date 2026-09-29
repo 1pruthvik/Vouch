@@ -65,6 +65,13 @@ export class IndexerService {
     );
   }
 
+  public untrackGroup(groupAddress: string): void {
+    if (!groupAddress) return;
+    const addr = groupAddress.toLowerCase();
+    this.trackedGroups.delete(addr);
+    console.log(`➖ Indexer stopped tracking group: ${addr}`);
+  }
+
   private async discoverFactoryGroups(): Promise<void> {
     if (!this.factoryContract) return;
     try {

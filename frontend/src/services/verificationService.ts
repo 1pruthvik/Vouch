@@ -52,6 +52,69 @@ export class VerificationService {
     }
   }
 
+  // 1.1 Update an existing circle's configuration
+  public static async updateCircle(
+    address: string,
+    updates: Partial<CircleRegistryEntry>
+  ): Promise<CircleRegistryEntry | null> {
+    if (!address) return null;
+    const match = address.match(/0x[a-fA-F0-9]{40}/i);
+    const clean = match ? match[0].toLowerCase() : address.toLowerCase();
+
+    // 1. Local update
+    const circles = this.getAllCircles();
+    const idx = circles.findIndex((c) => {
+      const cAddr = (c.address || "").toLowerCase();
+      return cAddr === clean || cAddr.includes(clean) || clean.includes(cAddr);
+    });
+
+    let updatedEntry: CircleRegistryEntry | null = null;
+    if (idx >= 0) {
+      circles[idx] = { ...circles[idx], ...updates };
+      updatedEntry = circles[idx];
+      try {
+        localStorage.setItem(STORAGE_CIRCLES_KEY, JSON.stringify(circles));
+      } catch {}
+    }
+
+    // Also update custom groups cache
+    try {
+      const custom: any[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
+      const cIdx = custom.findIndex((g) => {
+        const gAddr = (g.address || "").toLowerCase();
+        return gAddr === clean || gAddr.includes(clean) || clean.includes(gAddr);
+      });
+      if (cIdx >= 0) {
+        custom[cIdx] = { ...custom[cIdx], ...updates };
+        localStorage.setItem("vouch_custom_groups", JSON.stringify(custom));
+      }
+    } catch {}
+
+    // 2. Backend update
+    try {
+      const res = await fetch(`${API_URL}/circles/${clean}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: updates.name,
+          minWalletAmt: updates.minWalletAmt,
+          memberCount: updates.memberCount,
+          installmentAmount: updates.installmentAmount,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.circle) {
+          return data.circle;
+        }
+      }
+    } catch (err) {
+      console.warn("Backend updateCircle error:", err);
+    }
+
+    return updatedEntry;
+  }
+
   // 2. Get all known registered circles (local cache)
   public static getAllCircles(): CircleRegistryEntry[] {
     try {
@@ -68,7 +131,7 @@ export class VerificationService {
       const res = await fetch(`${API_URL}/circles`);
       if (res.ok) {
         const circles: CircleRegistryEntry[] = await res.json();
-        if (Array.isArray(circles) && circles.length > 0) {
+        if (Array.isArray(circles)) {
           localStorage.setItem(STORAGE_CIRCLES_KEY, JSON.stringify(circles));
           return circles;
         }
@@ -82,18 +145,24 @@ export class VerificationService {
   // 4. Get circle by address / ID
   public static getCircle(address: string): CircleRegistryEntry | null {
     if (!address) return null;
+    const match = address.match(/0x[a-fA-F0-9]{40}/i);
+    const clean = match ? match[0].toLowerCase() : address.toLowerCase();
     const circles = this.getAllCircles();
     return (
-      circles.find((c) => c.address.toLowerCase() === address.toLowerCase()) ||
-      null
+      circles.find((c) => {
+        const cAddr = (c.address || "").toLowerCase();
+        return cAddr === clean || cAddr.includes(clean) || clean.includes(cAddr);
+      }) || null
     );
   }
 
   // 5. Fetch single circle from backend
   public static async fetchCircle(address: string): Promise<CircleRegistryEntry | null> {
     if (!address) return null;
+    const match = address.match(/0x[a-fA-F0-9]{40}/i);
+    const clean = match ? match[0].toLowerCase() : address.toLowerCase();
     try {
-      const res = await fetch(`${API_URL}/circles/${address.toLowerCase()}`);
+      const res = await fetch(`${API_URL}/circles/${clean}`);
       if (res.ok) {
         const circle: CircleRegistryEntry = await res.json();
         if (circle && circle.address) {
@@ -112,10 +181,13 @@ export class VerificationService {
     initializerAddress: string
   ): CircleRegistryEntry[] {
     if (!initializerAddress) return [];
+    const match = initializerAddress.match(/0x[a-fA-F0-9]{40}/i);
+    const cleanInit = match ? match[0].toLowerCase() : initializerAddress.toLowerCase();
     const circles = this.getAllCircles();
-    return circles.filter(
-      (c) => c.initializer.toLowerCase() === initializerAddress.toLowerCase()
-    );
+    return circles.filter((c) => {
+      const init = (c.initializer || "").toLowerCase();
+      return init === cleanInit || init.includes(cleanInit) || cleanInit.includes(init);
+    });
   }
 
   // 7. Fetch circles initialized by a specific wallet from backend
@@ -123,11 +195,23 @@ export class VerificationService {
     initializerAddress: string
   ): Promise<CircleRegistryEntry[]> {
     if (!initializerAddress) return [];
+    const match = initializerAddress.match(/0x[a-fA-F0-9]{40}/i);
+    const cleanInit = match ? match[0].toLowerCase() : initializerAddress.toLowerCase();
     try {
-      const res = await fetch(`${API_URL}/circles/initializer/${initializerAddress.toLowerCase()}`);
+      const res = await fetch(`${API_URL}/circles/initializer/${cleanInit}`);
       if (res.ok) {
         const list: CircleRegistryEntry[] = await res.json();
         if (Array.isArray(list)) {
+          // Sync local cache
+          const allLocal = this.getAllCircles();
+          const otherCircles = allLocal.filter((c) => {
+            const init = (c.initializer || "").toLowerCase();
+            return !init.includes(cleanInit) && !cleanInit.includes(init);
+          });
+          const merged = [...list, ...otherCircles];
+          try {
+            localStorage.setItem(STORAGE_CIRCLES_KEY, JSON.stringify(merged));
+          } catch {}
           return list;
         }
       }
@@ -135,6 +219,27 @@ export class VerificationService {
       console.warn("Backend fetchCirclesByInitializer error:", err);
     }
     return this.getCirclesByInitializer(initializerAddress);
+  }
+
+  // 7.1 Fetch all circles relevant to user (as initializer, whitelisted member, or on-chain member)
+  public static async fetchCirclesForUser(
+    userAddress: string
+  ): Promise<CircleRegistryEntry[]> {
+    if (!userAddress) return [];
+    const match = userAddress.match(/0x[a-fA-F0-9]{40}/i);
+    const cleanUser = match ? match[0].toLowerCase() : userAddress.toLowerCase();
+    try {
+      const res = await fetch(`${API_URL}/circles/member/${cleanUser}`);
+      if (res.ok) {
+        const list: CircleRegistryEntry[] = await res.json();
+        if (Array.isArray(list)) {
+          return list;
+        }
+      }
+    } catch (err) {
+      console.warn("Backend fetchCirclesForUser error:", err);
+    }
+    return this.getAllCircles();
   }
 
   // 8. Submit a join request from an applicant
@@ -476,29 +581,36 @@ export class VerificationService {
   // 20. Initializer deletes a circle completely
   public static async deleteCircle(circleAddress: string): Promise<void> {
     if (!circleAddress) return;
-    const cleanCircle = circleAddress.toLowerCase();
+    const match = circleAddress.match(/0x[a-fA-F0-9]{40}/i);
+    const clean42 = match ? match[0].toLowerCase() : circleAddress.toLowerCase();
+    const raw = circleAddress.toLowerCase();
 
     // 1. Local cache cleanup
     try {
-      const circles = this.getAllCircles().filter(
-        (c) => c.address.toLowerCase() !== cleanCircle
-      );
+      const circles = this.getAllCircles().filter((c) => {
+        const cAddr = (c.address || "").toLowerCase();
+        return !cAddr.includes(clean42) && !clean42.includes(cAddr) && cAddr !== raw && cAddr !== clean42;
+      });
       localStorage.setItem(STORAGE_CIRCLES_KEY, JSON.stringify(circles));
 
-      const requests = this.getAllRequests().filter(
-        (r) => r.circleAddress.toLowerCase() !== cleanCircle
-      );
+      const requests = this.getAllRequests().filter((r) => {
+        const rAddr = (r.circleAddress || "").toLowerCase();
+        return !rAddr.includes(clean42) && !clean42.includes(rAddr) && rAddr !== raw && rAddr !== clean42;
+      });
       localStorage.setItem(STORAGE_REQUESTS_KEY, JSON.stringify(requests));
 
-      const custom = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]").filter(
-        (g: any) => (g.address || "").toLowerCase() !== cleanCircle
-      );
+      const custom = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]").filter((g: any) => {
+        const gAddr = (g.address || "").toLowerCase();
+        return !gAddr.includes(clean42) && !clean42.includes(gAddr) && gAddr !== raw && gAddr !== clean42;
+      });
       localStorage.setItem("vouch_custom_groups", JSON.stringify(custom));
-    } catch {}
+    } catch (e) {
+      console.warn("Local storage cleanup error on circle delete:", e);
+    }
 
     // 2. Backend cleanup
     try {
-      await fetch(`${API_URL}/circles/${cleanCircle}`, {
+      await fetch(`${API_URL}/circles/${clean42}`, {
         method: "DELETE",
       });
     } catch (err) {

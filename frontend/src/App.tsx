@@ -10,6 +10,7 @@ import { useWallet } from "./hooks/useWallet";
 import { ContractService } from "./services/contractService";
 import { VerificationService } from "./services/verificationService";
 import { parseWalletError } from "./utils/formatters";
+import { API_URL } from "./config/network";
 import { CheckCircle2, AlertCircle, Plus, UserPlus, Shield } from "lucide-react";
 
 
@@ -104,6 +105,8 @@ export function App() {
     cycleDuration: number;
     discountCapBps: number;
     reserveFeeBps: number;
+    minWalletAmt?: string;
+    allowedKeys?: string[];
   }): Promise<string | undefined> => {
     if (!contractService || !account) {
       setIsAccountModalOpen(true);
@@ -116,7 +119,6 @@ export function App() {
       if (result.groupAddress && result.groupAddress.startsWith("0x")) {
         const cleanAddr = result.groupAddress.substring(0, 42);
         setLastDeployedAddress(cleanAddr);
-        setActiveCircleAddress(cleanAddr);
 
         await VerificationService.registerCircle({
           address: cleanAddr,
@@ -125,8 +127,28 @@ export function App() {
           installmentAmount: params.installmentAmount,
           cycleDuration: params.cycleDuration,
           initializer: account,
+          minWalletAmt: params.minWalletAmt || "0",
           createdAt: Date.now(),
         });
+
+        // Add initializer to allowed list
+        await VerificationService.addAllowedMember(cleanAddr, account, account);
+
+        // Add all pre-specified allowed member public keys
+        if (params.allowedKeys && Array.isArray(params.allowedKeys)) {
+          for (const key of params.allowedKeys) {
+            await VerificationService.addAllowedMember(cleanAddr, key, account);
+          }
+        }
+
+        // Index on backend
+        try {
+          await fetch(`${API_URL}/groups/index`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ address: cleanAddr }),
+          });
+        } catch {}
 
         const saved: any[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
         saved.push({

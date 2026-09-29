@@ -658,6 +658,48 @@ class DatabaseManager {
     this.save();
   }
 
+  public updateCircleRegistration(
+    address: string,
+    updates: {
+      name?: string;
+      min_wallet_amt?: string;
+      member_count?: number;
+      installment_amount?: string;
+    }
+  ): any | null {
+    if (!this.db || !address) return null;
+    const cleanAddr = this.sanitizeAddress(address);
+    const existing = this.getCircleRegistration(cleanAddr);
+    if (!existing) return null;
+
+    const newName = updates.name !== undefined ? updates.name : existing.name;
+    const newMinWallet = updates.min_wallet_amt !== undefined ? updates.min_wallet_amt : existing.min_wallet_amt;
+    const newMemberCount = updates.member_count !== undefined ? updates.member_count : existing.member_count;
+    const newInstallment = updates.installment_amount !== undefined ? updates.installment_amount : existing.installment_amount;
+
+    this.db.run(
+      `UPDATE circle_registrations SET
+        name = ?,
+        min_wallet_amt = ?,
+        member_count = ?,
+        installment_amount = ?
+      WHERE LOWER(address) = ?`,
+      [newName, newMinWallet, newMemberCount, newInstallment, cleanAddr]
+    );
+
+    this.db.run(
+      `UPDATE groups SET
+        name = ?,
+        member_count = ?,
+        installment_amount = ?
+      WHERE LOWER(address) = ?`,
+      [newName, newMemberCount, newInstallment, cleanAddr]
+    );
+
+    this.save();
+    return this.getCircleRegistration(cleanAddr);
+  }
+
   public getAllCircleRegistrations(): any[] {
     if (!this.db) return [];
     const stmt = this.db.prepare("SELECT * FROM circle_registrations ORDER BY created_at DESC");
@@ -687,6 +729,27 @@ class DatabaseManager {
     const cleanInit = this.sanitizeAddress(initializer);
     const stmt = this.db.prepare("SELECT * FROM circle_registrations WHERE LOWER(initializer) = ? ORDER BY created_at DESC");
     stmt.bind([cleanInit]);
+    const results: any[] = [];
+    while (stmt.step()) {
+      results.push(stmt.getAsObject());
+    }
+    stmt.free();
+    return results;
+  }
+
+  public getCirclesForMember(userAddress: string): any[] {
+    if (!this.db || !userAddress) return [];
+    const cleanUser = this.sanitizeAddress(userAddress);
+    const stmt = this.db.prepare(`
+      SELECT DISTINCT c.* FROM circle_registrations c
+      LEFT JOIN circle_allowed_members a ON LOWER(a.circle_address) = LOWER(c.address)
+      LEFT JOIN members m ON LOWER(m.group_address) = LOWER(c.address)
+      WHERE LOWER(c.initializer) = ?
+         OR LOWER(a.member_address) = ?
+         OR LOWER(m.member_address) = ?
+      ORDER BY c.created_at DESC
+    `);
+    stmt.bind([cleanUser, cleanUser, cleanUser]);
     const results: any[] = [];
     while (stmt.step()) {
       results.push(stmt.getAsObject());
@@ -879,11 +942,34 @@ class DatabaseManager {
 
   public deleteCircleRegistration(circleAddress: string): void {
     if (!this.db || !circleAddress) return;
-    const cleanCircle = this.sanitizeAddress(circleAddress);
-    this.db.run("DELETE FROM circle_registrations WHERE LOWER(address) = ?", [cleanCircle]);
-    this.db.run("DELETE FROM circle_allowed_members WHERE LOWER(circle_address) = ?", [cleanCircle]);
-    this.db.run("DELETE FROM circle_join_requests WHERE LOWER(circle_address) = ?", [cleanCircle]);
-    this.db.run("DELETE FROM groups WHERE LOWER(address) = ?", [cleanCircle]);
+    const raw = circleAddress.toLowerCase();
+    const cleanCircle = this.sanitizeAddress(circleAddress).toLowerCase();
+    const pattern = cleanCircle ? `${cleanCircle}%` : raw;
+
+    const tablesWithAddress = ["circle_registrations", "groups"];
+    for (const t of tablesWithAddress) {
+      this.db.run(
+        `DELETE FROM ${t} WHERE LOWER(address) = ? OR LOWER(address) = ? OR LOWER(address) LIKE ?`,
+        [cleanCircle, raw, pattern]
+      );
+    }
+
+    const tablesWithCircleAddress = ["circle_allowed_members", "circle_join_requests"];
+    for (const t of tablesWithCircleAddress) {
+      this.db.run(
+        `DELETE FROM ${t} WHERE LOWER(circle_address) = ? OR LOWER(circle_address) = ? OR LOWER(circle_address) LIKE ?`,
+        [cleanCircle, raw, pattern]
+      );
+    }
+
+    const tablesWithGroupAddress = ["members", "events", "defaults", "vouches"];
+    for (const t of tablesWithGroupAddress) {
+      this.db.run(
+        `DELETE FROM ${t} WHERE LOWER(group_address) = ? OR LOWER(group_address) = ? OR LOWER(group_address) LIKE ?`,
+        [cleanCircle, raw, pattern]
+      );
+    }
+
     this.save();
   }
 }

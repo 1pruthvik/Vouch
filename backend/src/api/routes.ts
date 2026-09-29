@@ -262,10 +262,54 @@ export function createApiRouter(indexer: IndexerService, keeper: KeeperBot): Rou
     });
   });
 
+  // Update a circle
+  router.put("/circles/:address", (req: Request, res: Response) => {
+    const { address } = req.params;
+    const { name, minWalletAmt, memberCount, installmentAmount } = req.body;
+    const updated = db.updateCircleRegistration(address, {
+      name,
+      min_wallet_amt: minWalletAmt,
+      member_count: memberCount,
+      installment_amount: installmentAmount,
+    });
+    if (!updated) {
+      return res.status(404).json({ error: "Circle not found" });
+    }
+    res.json({
+      success: true,
+      circle: {
+        address: updated.address,
+        name: updated.name,
+        memberCount: updated.member_count,
+        installmentAmount: updated.installment_amount,
+        cycleDuration: updated.cycle_duration,
+        initializer: updated.initializer,
+        minWalletAmt: updated.min_wallet_amt,
+        createdAt: updated.created_at > 10000000000 ? updated.created_at : updated.created_at * 1000,
+      },
+    });
+  });
+
   // Get circles by initializer address
   router.get("/circles/initializer/:initializer", (req: Request, res: Response) => {
     const { initializer } = req.params;
     const circles = db.getCirclesByInitializer(initializer).map((c) => ({
+      address: c.address,
+      name: c.name,
+      memberCount: c.member_count,
+      installmentAmount: c.installment_amount,
+      cycleDuration: c.cycle_duration,
+      initializer: c.initializer,
+      minWalletAmt: c.min_wallet_amt,
+      createdAt: c.created_at > 10000000000 ? c.created_at : c.created_at * 1000,
+    }));
+    res.json(circles);
+  });
+
+  // Get all circles relevant to a user (as initializer, whitelisted member, or joined member)
+  router.get("/circles/member/:userAddress", (req: Request, res: Response) => {
+    const { userAddress } = req.params;
+    const circles = db.getCirclesForMember(userAddress).map((c) => ({
       address: c.address,
       name: c.name,
       memberCount: c.member_count,
@@ -355,7 +399,8 @@ export function createApiRouter(indexer: IndexerService, keeper: KeeperBot): Rou
   router.delete("/circles/:address", (req: Request, res: Response) => {
     const { address } = req.params;
     db.deleteCircleRegistration(address);
-    res.json({ success: true, message: `Circle ${address} deleted from registry` });
+    indexer.untrackGroup(address);
+    res.json({ success: true, message: `Circle ${address} deleted from registry and indexer` });
   });
 
   return router;
