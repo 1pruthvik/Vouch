@@ -10,6 +10,11 @@ import {
   Lock,
   Unlock,
   KeyRound,
+  ShieldCheck,
+  HelpCircle,
+  ChevronDown,
+  Info,
+  Check,
 } from "lucide-react";
 import gsap from "gsap";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
@@ -53,6 +58,8 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
   // Slider value in INR
   const [requestedPayoutINR, setRequestedPayoutINR] = useState<number>(maxPotINR);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionStep, setSubmissionStep] = useState<string | null>(null);
+  const [isExplainerOpen, setIsExplainerOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -84,23 +91,32 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
     e.preventDefault();
     try {
       setIsSubmitting(true);
+      setSubmissionStep("Waiting for wallet confirmation...");
       const bidAmountMST = (requestedPayoutINR / MST_TO_INR_RATE).toFixed(4);
+
       if (phase === "Commit") {
+        setSubmissionStep("Anchoring commitment hash on MST Blockchain...");
         await onCommitBid(bidAmountMST);
       } else if (phase === "Reveal") {
+        setSubmissionStep("Submitting plaintext bid & salt for verification...");
         await onRevealBid(bidAmountMST);
       }
+      setSubmissionStep("Confirmed on-chain!");
     } catch (err) {
       console.error(err);
+      setSubmissionStep(null);
     } finally {
-      setIsSubmitting(false);
+      setTimeout(() => {
+        setIsSubmitting(false);
+        setSubmissionStep(null);
+      }, 1500);
     }
   };
 
   if (phase === "Forming") {
     return (
       <div ref={containerRef} className="v-card p-8 sm:p-10 text-center space-y-4">
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'rgba(245, 166, 35, 0.1)' }}>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: "rgba(245, 166, 35, 0.1)" }}>
           <Clock className="w-7 h-7 text-[#f5a623]" />
         </div>
         <h3 className="text-xl font-bold text-white font-display">Circle is Forming</h3>
@@ -114,7 +130,7 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
   if (phase === "Collect") {
     return (
       <div ref={containerRef} className="v-card p-8 sm:p-10 text-center space-y-4">
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'rgba(45, 212, 168, 0.1)' }}>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: "rgba(45, 212, 168, 0.1)" }}>
           <Clock className="w-7 h-7 text-[#2dd4a8]" />
         </div>
         <h3 className="text-xl font-bold text-white font-display">Round {currentRound} Collection Phase</h3>
@@ -125,9 +141,69 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
     );
   }
 
+  // Visual Stepper Stages
+  const steps = [
+    { id: "Commit", label: "1. Secret Commit", active: phase === "Commit", done: phase === "Reveal" || phase === "Settle" || phase === "Closed" },
+    { id: "Sealed", label: "2. Sealed On-Chain", active: phase === "Commit" && hasCommitted, done: phase === "Reveal" || phase === "Settle" || phase === "Closed" },
+    { id: "Reveal", label: "3. Plaintext Reveal", active: phase === "Reveal", done: phase === "Settle" || phase === "Closed" },
+    { id: "Verify", label: "4. Cryptographic Verify", active: phase === "Reveal" && hasRevealed, done: phase === "Settle" || phase === "Closed" },
+    { id: "Settle", label: "5. Settle & Distribute", active: phase === "Settle", done: phase === "Closed" },
+  ];
+
   return (
     <div ref={containerRef} className="space-y-6">
-      {/* ── DRAW HEADER ── */}
+      {/* ── 5-STEP COMMIT-REVEAL STATE PROGRESSION STEPPER ── */}
+      <div className="v-card p-4 sm:p-5 border-white/5 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Lock className="w-3.5 h-3.5 text-indigo-400" />
+            Cryptographic Commit-Reveal Protocol
+          </span>
+          <button
+            onClick={() => setIsExplainerOpen(!isExplainerOpen)}
+            className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            Why Commit-Reveal?
+          </button>
+        </div>
+
+        {/* Stepper Pills */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+          {steps.map((step) => (
+            <div
+              key={step.id}
+              className={`p-2.5 rounded-xl border text-center transition-all ${
+                step.active
+                  ? "bg-indigo-950/40 border-indigo-500/50 text-indigo-300 shadow-sm shadow-indigo-500/10"
+                  : step.done
+                  ? "bg-emerald-950/30 border-emerald-500/30 text-emerald-400"
+                  : "bg-white/[0.02] border-white/5 text-slate-500"
+              }`}
+            >
+              <div className="flex items-center justify-center gap-1 text-[11px] font-semibold">
+                {step.done ? <Check className="w-3 h-3 text-emerald-400" /> : null}
+                <span>{step.label}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Expandable Explainer */}
+        {isExplainerOpen && (
+          <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5 text-xs text-slate-300 space-y-1.5 anim-fade-in">
+            <p className="font-semibold text-white">How Commit-Reveal Protects Your Bids:</p>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              In a traditional reverse auction, late bidders can peek at existing bids and undercut you by ₹1.
+              Vouch uses a 2-stage cryptographic scheme: during Commit, you submit only an encrypted hash
+              <code> keccak256(bidAmount, salt, sender)</code>. Nobody (not even validators or peers) can see your bid
+              until the Reveal period opens.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── DRAW HERO ── */}
       <div className="v-card-hero p-6 sm:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div>
@@ -220,7 +296,7 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-[#9ca3b4] font-medium">Your Requested Payout</span>
-                  <span className="text-2xl font-bold font-display text-emerald-400">
+                  <span className="text-2xl font-bold font-display text-emerald-400 tabular-nums">
                     {formatRawINR(requestedPayoutINR)}
                   </span>
                 </div>
@@ -246,14 +322,14 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-500/20">
                   <p className="text-[11px] text-[#9ca3b4] font-medium">Discount Shared with Circle</p>
-                  <p className="text-xl font-bold font-display mt-1 text-purple-400">
+                  <p className="text-xl font-bold font-display mt-1 text-purple-400 tabular-nums">
                     {formatRawINR(discountOfferedINR)} ({maxPotINR > 0 ? ((discountOfferedINR / maxPotINR) * 100).toFixed(1) : 0}%)
                   </p>
                   <p className="text-[10px] text-[#5f6578] mt-0.5">Increases your chance of winning</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/20">
                   <p className="text-[11px] text-[#9ca3b4] font-medium">Each Member Earns</p>
-                  <p className="text-xl font-bold font-display mt-1 text-amber-400">
+                  <p className="text-xl font-bold font-display mt-1 text-amber-400 tabular-nums">
                     +{formatRawINR(memberSavingsShareINR)} / member
                   </p>
                   <p className="text-[10px] text-[#5f6578] mt-0.5">Added to everyone's savings dividends</p>
@@ -270,7 +346,7 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
                 <div className="flex items-center gap-3">
                   {phase === "Reveal" && !hasRevealed && (
                     <button type="submit" disabled={isSubmitting} className="v-btn-primary text-sm">
-                      {isSubmitting ? "Revealing..." : "Confirm & Reveal"}
+                      {isSubmitting ? (submissionStep || "Revealing...") : "Confirm & Reveal"}
                     </button>
                   )}
 
@@ -280,7 +356,11 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
                       disabled={hasCommitted || isSubmitting}
                       className="v-btn-primary text-sm"
                     >
-                      {hasCommitted ? "Request Submitted ✓" : isSubmitting ? "Submitting..." : (
+                      {hasCommitted ? (
+                        "Request Submitted ✓"
+                      ) : isSubmitting ? (
+                        submissionStep || "Submitting to Blockchain..."
+                      ) : (
                         <>
                           <KeyRound className="w-4 h-4" />
                           Securely Commit Request ({formatRawINR(requestedPayoutINR)})
@@ -303,7 +383,7 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
         </div>
       ) : (
         <div className="v-card p-8 text-center space-y-3">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'rgba(245, 166, 35, 0.1)' }}>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: "rgba(245, 166, 35, 0.1)" }}>
             <Trophy className="w-7 h-7 text-[#f5a623]" />
           </div>
           <h3 className="text-lg font-bold text-white font-display">

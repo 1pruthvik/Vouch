@@ -22,11 +22,14 @@ import {
   Plus,
   UserPlus,
   Zap,
+  HelpCircle,
+  Activity,
 } from "lucide-react";
 import gsap from "gsap";
-import { formatINR, formatRawINR, getTrafficLightStatus } from "../utils/formatters";
+import { formatINR, formatRawINR, getTrafficLightStatus, MST_TO_INR_RATE } from "../utils/formatters";
 import { GroupDetails, MemberDetails } from "../services/contractService";
 import { RiskPredictionResponse } from "../services/aiService";
+import { AnimatedNumber } from "./AnimatedNumber";
 
 export interface AvailableCircle {
   address: string;
@@ -69,11 +72,13 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
   const [isBackupLayersExpanded, setIsBackupLayersExpanded] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [currencyUnit, setCurrencyUnit] = useState<"INR" | "MST">("INR");
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
   const heroRef = useRef<HTMLDivElement>(null);
   const statsGridRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
 
-  // Animate on entrance
+  // Entrance animations
   useEffect(() => {
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReducedMotion) return;
@@ -206,15 +211,35 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
   const currentRound = groupDetails.currentRound || 1;
   const totalRounds = groupDetails.memberCount || 5;
   const rawInstallment = groupDetails.installmentAmount || "0.5";
-  const formattedInstallment = formatINR(rawInstallment);
+  const installmentFloat = parseFloat(rawInstallment) || 0;
+  const installmentINR = Math.round(installmentFloat * MST_TO_INR_RATE);
 
   const bufferBalance = memberDetails?.bufferBalance || "0.5";
+  const bufferINR = Math.round((parseFloat(bufferBalance) || 0) * MST_TO_INR_RATE);
+
   const lockedDividends = memberDetails?.lockedDividends || "0.08";
+  const dividendsINR = Math.round((parseFloat(lockedDividends) || 0) * MST_TO_INR_RATE);
+
+  const potFloat = parseFloat(groupDetails.currentPot || "2.5") || 0;
+  const potINR = Math.round(potFloat * MST_TO_INR_RATE);
+
   const hasPaidCurrentRound = memberDetails?.hasPaidCurrentRound || false;
   const isMember = memberDetails?.isMember ?? false;
 
   const trafficLight = getTrafficLightStatus(memberDetails?.solvency, memberDetails?.isDefaulted);
   const progressPercent = Math.min(100, Math.round((currentRound / totalRounds) * 100));
+
+  // Animate progress bar fill on change
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion || !progressBarRef.current) return;
+
+    gsap.fromTo(
+      progressBarRef.current,
+      { width: "0%" },
+      { width: `${progressPercent}%`, duration: 0.9, ease: "power2.out" }
+    );
+  }, [progressPercent]);
 
   const handlePay = async () => {
     try {
@@ -240,7 +265,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
                 {groupName}
               </span>
               <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${trafficLight.badgeClass}`}>
-                <span className={`w-2 h-2 rounded-full ${trafficLight.status === 'green' ? 'bg-emerald-400' : trafficLight.status === 'yellow' ? 'bg-amber-400' : 'bg-red-400'}`} />
+                <span className={`w-2 h-2 rounded-full ${trafficLight.status === "green" ? "bg-emerald-400" : trafficLight.status === "yellow" ? "bg-amber-400" : "bg-red-400"}`} />
                 {trafficLight.label}
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-slate-800/80 border border-white/5 text-[11px] font-medium text-slate-300 flex items-center gap-1">
@@ -252,7 +277,11 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
               <p className="text-xs sm:text-sm text-slate-400 font-medium">Next Monthly Contribution</p>
               <div className="flex items-baseline gap-3 mt-1">
                 <p className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white font-display tracking-tight tabular-nums">
-                  {currencyUnit === "INR" ? formattedInstallment : `${parseFloat(rawInstallment).toFixed(2)} tMSTC`}
+                  {currencyUnit === "INR" ? (
+                    <AnimatedNumber value={installmentINR} formatAsINR />
+                  ) : (
+                    `${parseFloat(rawInstallment).toFixed(2)} tMSTC`
+                  )}
                 </p>
                 <button
                   onClick={() => setCurrencyUnit(currencyUnit === "INR" ? "MST" : "INR")}
@@ -291,7 +320,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
                   ) : (
                     <>
                       <Zap className="w-4 h-4" />
-                      Pay {formattedInstallment} →
+                      Pay {formatINR(rawInstallment)} →
                     </>
                   )}
                 </button>
@@ -327,7 +356,8 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
 
           <div className="w-full h-2.5 rounded-full bg-slate-900 border border-white/5 overflow-hidden p-0.5">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-indigo-500 transition-all duration-700 ease-out"
+              ref={progressBarRef}
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-indigo-500"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -350,41 +380,67 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
             </div>
           </div>
           <p className="text-2xl font-bold text-white font-display tabular-nums tracking-tight">
-            {formatINR(groupDetails.currentPot || "2.5")}
+            <AnimatedNumber value={potINR} formatAsINR />
           </p>
           <p className="text-[11px] text-slate-400 flex items-center gap-1">
             <span className="text-emerald-400 font-medium">Available for draw</span> this round
           </p>
         </div>
 
-        <div className="fintech-card p-5 space-y-2">
+        <div className="fintech-card p-5 space-y-2 relative">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-semibold">Your Security Deposit</span>
+            <span className="text-xs font-semibold flex items-center gap-1">
+              Your Security Deposit
+              <button
+                onClick={() => setActiveTooltip(activeTooltip === "buffer" ? null : "buffer")}
+                className="text-slate-500 hover:text-slate-300"
+              >
+                <HelpCircle className="w-3 h-3" />
+              </button>
+            </span>
             <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <p className="text-2xl font-bold text-white font-display tabular-nums tracking-tight">
-            {formatINR(bufferBalance)}
+            <AnimatedNumber value={bufferINR} formatAsINR />
           </p>
           <p className="text-[11px] text-slate-400">
             <span className="text-indigo-400 font-medium">100% refundable</span> at final month
           </p>
+          {activeTooltip === "buffer" && (
+            <div className="absolute left-4 right-4 top-12 p-3 rounded-xl bg-slate-900 border border-white/10 text-[11px] text-slate-300 shadow-xl z-20 anim-fade-in">
+              Security buffer deposited into the smart contract upon joining. It guarantees circle solvency and is fully refunded at completion.
+            </div>
+          )}
         </div>
 
-        <div className="fintech-card p-5 space-y-2">
+        <div className="fintech-card p-5 space-y-2 relative">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-semibold">Earned Dividends</span>
+            <span className="text-xs font-semibold flex items-center gap-1">
+              Earned Dividends
+              <button
+                onClick={() => setActiveTooltip(activeTooltip === "dividends" ? null : "dividends")}
+                className="text-slate-500 hover:text-slate-300"
+              >
+                <HelpCircle className="w-3 h-3" />
+              </button>
+            </span>
             <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
               <Sparkles className="w-4 h-4" />
             </div>
           </div>
           <p className="text-2xl font-bold text-amber-400 font-display tabular-nums tracking-tight">
-            +{formatINR(lockedDividends)}
+            +<AnimatedNumber value={dividendsINR} formatAsINR />
           </p>
           <p className="text-[11px] text-slate-400">
             Automated discount yield rolled forward
           </p>
+          {activeTooltip === "dividends" && (
+            <div className="absolute left-4 right-4 top-12 p-3 rounded-xl bg-slate-900 border border-white/10 text-[11px] text-slate-300 shadow-xl z-20 anim-fade-in">
+              Accumulated interest savings from peers who took early pot payouts at a discount. Credited back directly to your balance.
+            </div>
+          )}
         </div>
 
         <div className="fintech-card p-5 space-y-2 cursor-pointer hover:border-emerald-500/30 transition-all" onClick={onOpenDrawTab}>
@@ -432,7 +488,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
         </button>
 
         {isBackupLayersExpanded && (
-          <div className="pt-4 border-t border-white/5 space-y-3">
+          <div className="pt-4 border-t border-white/5 space-y-3 anim-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs">
               <div className="p-3.5 rounded-xl bg-slate-900/90 border border-white/5 space-y-1">
                 <span className="font-bold text-emerald-400">Layer 1</span>

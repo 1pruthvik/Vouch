@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ArrowUpRight,
   ArrowDownLeft,
@@ -10,7 +10,14 @@ import {
   Copy,
   Check,
   History,
+  X,
+  Layers,
+  ChevronRight,
+  Clock,
+  Sparkles,
+  Info,
 } from "lucide-react";
+import gsap from "gsap";
 import { formatINR } from "../utils/formatters";
 import { MST_TESTNET } from "../config/network";
 
@@ -35,12 +42,40 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
 }) => {
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<"ALL" | "CONTRIBUTIONS" | "PAYOUTS">("ALL");
+  const [selectedTx, setSelectedTx] = useState<LedgerEvent | null>(null);
 
-  const copyToClipboard = (text: string) => {
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const copyToClipboard = (text: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     navigator.clipboard.writeText(text);
     setCopiedHash(text);
-    setTimeout(() => setCopiedHash(null), 2000);
+    setTimeout(() => setCopiedHash(null), 2200);
   };
+
+  // Close drawer with ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedTx(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // GSAP animation when drawer opens
+  useEffect(() => {
+    if (selectedTx && drawerRef.current) {
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!prefersReducedMotion) {
+        gsap.fromTo(
+          drawerRef.current,
+          { x: 30, opacity: 0 },
+          { x: 0, opacity: 1, duration: 0.35, ease: "power2.out" }
+        );
+      }
+    }
+  }, [selectedTx]);
 
   const formatTransaction = (ev: LedgerEvent) => {
     let title = "Transaction";
@@ -84,7 +119,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
       id: "1",
       eventName: "AuctionSettled",
       round: 1,
-      member: "0x71C...392B",
+      member: "0x71C8F21c83B386f786f4a3E0b90494F3c419392B",
       amount: "2.1 tMSTC",
       txHash: "0x58f91a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f",
       timestamp: "Today, 02:45 PM",
@@ -93,7 +128,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
       id: "2",
       eventName: "InstallmentCollected",
       round: 1,
-      member: "0x39A...881F",
+      member: "0x39A88F110B74f5ea0ba39494ce839613fffba742",
       amount: "0.5 tMSTC",
       txHash: "0x31a04b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a",
       timestamp: "Yesterday, 11:30 AM",
@@ -102,7 +137,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
       id: "3",
       eventName: "MemberJoined",
       round: 1,
-      member: "0x91F...221A",
+      member: "0x91F221A378D33B037A6668fOd128c4BBA28bb659",
       amount: "0.5 tMSTC",
       txHash: "0x77d88c9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e",
       timestamp: "28 Sep, 06:15 PM",
@@ -118,12 +153,14 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   });
 
   return (
-    <div className="v-card p-6 sm:p-7 space-y-5 anim-fade-up">
+    <div className="v-card p-6 sm:p-7 space-y-5 anim-fade-up relative">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
         <div>
-          <h3 className="text-base font-bold text-white font-display">Transaction History & Audit Ledger</h3>
-          <p className="text-xs text-[#9ca3b4] mt-0.5">Verified on-chain contributions, draws, and savings credits</p>
+          <h3 className="text-base font-bold text-white font-display">Blockchain Audit Statement</h3>
+          <p className="text-xs text-[#9ca3b4] mt-0.5">
+            Click any row to inspect verifiable on-chain cryptographic proofs
+          </p>
         </div>
         <div className="v-badge v-badge-green self-start sm:self-auto">
           <CheckCircle2 className="w-3.5 h-3.5" />
@@ -177,15 +214,19 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
           </p>
         </div>
       ) : (
-        <div className="space-y-1 divide-y divide-white/5">
+        <div ref={listRef} className="space-y-1 divide-y divide-white/5">
           {filteredEvents.map((ev, index) => {
             const { title, isCredit, icon, inrAmount, iconBg } = formatTransaction(ev);
             const explorerUrl = `${MST_TESTNET.explorerUrl}/tx/${ev.txHash}`;
+            const isSelected = selectedTx?.id === ev.id;
 
             return (
               <div
                 key={ev.id || index}
-                className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] px-2 rounded-xl transition-all group"
+                onClick={() => setSelectedTx(ev)}
+                className={`py-3.5 px-3 rounded-xl transition-all cursor-pointer group flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  isSelected ? "bg-white/[0.06] border border-emerald-500/30" : "hover:bg-white/[0.03]"
+                }`}
               >
                 {/* Left */}
                 <div className="flex items-center gap-3.5">
@@ -196,7 +237,12 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     {icon}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-white font-display">{title}</p>
+                    <p className="text-sm font-semibold text-white font-display flex items-center gap-1.5">
+                      {title}
+                      <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
+                        (Round {ev.round})
+                      </span>
+                    </p>
                     <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#5f6578]">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
@@ -213,18 +259,18 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 {/* Right */}
                 <div className="flex items-center justify-between sm:justify-end gap-4 text-right">
                   <div>
-                    <p className={`text-sm font-bold font-display ${isCredit ? "text-[#2dd4a8]" : "text-white"}`}>
+                    <p className={`text-sm font-bold font-display tabular-nums ${isCredit ? "text-[#2dd4a8]" : "text-white"}`}>
                       {isCredit ? `+${inrAmount}` : `-${inrAmount}`}
                     </p>
-                    <p className="text-[10px] text-[#5f6578] font-mono">
+                    <p className="text-[10px] text-[#5f6578] font-mono tabular-nums">
                       {ev.amount}
                     </p>
                   </div>
 
-                  {/* Hash & Explorer */}
-                  <div className="flex items-center gap-1.5">
+                  {/* Quick Copy / Explorer Icons */}
+                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <button
-                      onClick={() => copyToClipboard(ev.txHash)}
+                      onClick={(e) => copyToClipboard(ev.txHash, e)}
                       className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
                       title="Copy Transaction Hash"
                     >
@@ -244,6 +290,8 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
+
+                    <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-300 transition-transform group-hover:translate-x-0.5" />
                   </div>
                 </div>
 
@@ -259,6 +307,126 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Transaction Detail Drawer Modal */}
+      {selectedTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm anim-fade-in">
+          <div
+            ref={drawerRef}
+            className="w-full max-w-lg rounded-2xl bg-[#0E1117] border border-white/10 p-6 sm:p-7 shadow-2xl space-y-6 relative"
+          >
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-base font-bold text-white font-display">Transaction Audit Proof</h4>
+                  <p className="text-xs text-slate-400">MST Testnet Blockchain Record (Chain ID 91562037)</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedTx(null)}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Transaction Data Fields */}
+            <div className="space-y-3.5 text-xs">
+              <div className="flex justify-between items-center p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-slate-400">Event Type:</span>
+                <span className="font-semibold text-white font-mono">{selectedTx.eventName}</span>
+              </div>
+
+              <div className="flex justify-between items-center p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-slate-400">Transacted Amount:</span>
+                <div className="text-right">
+                  <span className="font-bold text-emerald-400 text-sm">{formatINR(selectedTx.amount.split(" ")[0])}</span>
+                  <span className="text-[11px] text-slate-400 font-mono ml-1.5">({selectedTx.amount})</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-slate-400">Chit Round:</span>
+                <span className="font-semibold text-white">Round {selectedTx.round}</span>
+              </div>
+
+              <div className="flex justify-between items-center p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-slate-400">Timestamp:</span>
+                <span className="text-slate-300 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  {selectedTx.timestamp}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+                <span className="text-slate-400">Member Address:</span>
+                <div className="flex items-center justify-between gap-2 mt-0.5">
+                  <span className="font-mono text-slate-300 break-all text-[11px]">{selectedTx.member || "Community Pool"}</span>
+                  {selectedTx.member && (
+                    <button
+                      onClick={(e) => copyToClipboard(selectedTx.member, e)}
+                      className="p-1 text-slate-400 hover:text-white"
+                      title="Copy Address"
+                    >
+                      {copiedHash === selectedTx.member ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+                <span className="text-slate-400">Cryptographic Transaction Hash:</span>
+                <div className="flex items-center justify-between gap-2 mt-0.5">
+                  <span className="font-mono text-emerald-400 break-all text-[11px]">{selectedTx.txHash}</span>
+                  <button
+                    onClick={(e) => copyToClipboard(selectedTx.txHash, e)}
+                    className="p-1 text-slate-400 hover:text-white"
+                    title="Copy Transaction Hash"
+                  >
+                    {copiedHash === selectedTx.txHash ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Independent Verification Callout */}
+            <div className="p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/20 flex items-start gap-2.5 text-xs text-indigo-300">
+              <Info className="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" />
+              <p className="leading-relaxed text-[11px]">
+                Every action on Vouch is non-custodial and cryptographically anchored. You can independently verify this receipt on the public explorer.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button onClick={() => setSelectedTx(null)} className="v-btn-secondary text-xs px-4 py-2">
+                Dismiss
+              </button>
+              <a
+                href={`${MST_TESTNET.explorerUrl}/tx/${selectedTx.txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="v-btn-primary text-xs px-4 py-2 flex items-center gap-1.5"
+              >
+                Inspect on MSTScan
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
         </div>
       )}
     </div>
