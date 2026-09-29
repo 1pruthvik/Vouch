@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { X, UserPlus, Shield } from "lucide-react";
+import { INR_PER_TMSTC } from "./CreateGroupModal";
 
 interface JoinGroupModalProps {
   isOpen: boolean;
@@ -18,12 +19,18 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
   onSubmit,
 }) => {
   const [groupAddress, setGroupAddress] = useState("");
-  const [bufferAmount, setBufferAmount] = useState("");
+  const [bufferInr, setBufferInr] = useState<number | "">("");
   const [hasVoucher, setHasVoucher] = useState(false);
   const [voucherAddress, setVoucherAddress] = useState("");
-  const [voucherStake, setVoucherStake] = useState("");
+  const [voucherStakeInr, setVoucherStakeInr] = useState<number | "">("");
 
   if (!isOpen) return null;
+
+  const numBufferInr = Number(bufferInr) || 0;
+  const bufferTokens = (numBufferInr / INR_PER_TMSTC).toFixed(4);
+
+  const numVoucherInr = Number(voucherStakeInr) || 0;
+  const voucherTokens = (numVoucherInr / INR_PER_TMSTC).toFixed(4);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
@@ -46,9 +53,9 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
             e.preventDefault();
             onSubmit({
               groupAddress,
-              bufferAmount: bufferAmount || "0",
+              bufferAmount: bufferTokens,
               voucherAddress: hasVoucher ? voucherAddress : undefined,
-              voucherStake: hasVoucher ? voucherStake : undefined,
+              voucherStake: hasVoucher ? voucherTokens : undefined,
             });
             onClose();
           }}
@@ -63,28 +70,30 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
               placeholder="0x..."
               value={groupAddress}
               onChange={(e) => setGroupAddress(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg bg-black text-white text-sm font-mono focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm font-mono focus:outline-none placeholder:text-neutral-700"
               required
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-neutral-300 mb-1">
-              Initial Collateral Buffer Deposit (tMSTC)
+              Initial Collateral Buffer Deposit (Rupees / ₹)
             </label>
             <input
               type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              value={bufferAmount}
-              onChange={(e) => setBufferAmount(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg bg-black text-white text-sm focus:outline-none"
+              min="100"
+              step="50"
+              placeholder="5000"
+              value={bufferInr}
+              onChange={(e) => setBufferInr(e.target.value === "" ? "" : parseFloat(e.target.value))}
+              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
               required
             />
-            <p className="text-xs text-neutral-400 mt-1">
-              Deposited buffer acts as Layer 1 default protection and earns protocol yield.
-            </p>
+            {numBufferInr > 0 && (
+              <p className="text-[11px] text-neutral-400 mt-1 font-mono">
+                ≈ {bufferTokens} tMSTC (1 tMSTC = ₹{INR_PER_TMSTC.toLocaleString()})
+              </p>
+            )}
           </div>
 
           <div className="pt-2 border-t border-neutral-800">
@@ -109,22 +118,27 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
                     placeholder="0x..."
                     value={voucherAddress}
                     onChange={(e) => setVoucherAddress(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg bg-[#0e0e0e] text-white text-xs font-mono focus:outline-none"
+                    className="w-full px-3 py-1.5 rounded-lg bg-[#0e0e0e] text-white text-xs font-mono focus:outline-none placeholder:text-neutral-700"
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-neutral-400 mb-1">
-                    Voucher Staked Backing (tMSTC)
+                    Voucher Staked Backing (Rupees / ₹)
                   </label>
                   <input
                     type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={voucherStake}
-                    onChange={(e) => setVoucherStake(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg bg-[#0e0e0e] text-white text-xs focus:outline-none"
+                    min="100"
+                    step="50"
+                    placeholder="2500"
+                    value={voucherStakeInr}
+                    onChange={(e) => setVoucherStakeInr(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                    className="w-full px-3 py-1.5 rounded-lg bg-[#0e0e0e] text-white text-xs focus:outline-none placeholder:text-neutral-700"
                   />
+                  {numVoucherInr > 0 && (
+                    <p className="text-[10px] text-neutral-400 mt-1 font-mono">
+                      ≈ {voucherTokens} tMSTC
+                    </p>
+                  )}
                 </div>
               </div>
             )}

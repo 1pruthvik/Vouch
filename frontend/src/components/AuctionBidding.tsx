@@ -82,10 +82,10 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
               type="number"
               step="0.01"
               min="0"
-              placeholder="0.00"
+              placeholder="Bid Amount"
               value={bidAmount}
               onChange={(e) => setBidAmount(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
               required
             />
             <p className="text-xs text-neutral-400 mt-1">
@@ -102,7 +102,7 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
               placeholder="Hex salt or secret phrase"
               value={salt}
               onChange={(e) => setSalt(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm font-mono focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm font-mono focus:outline-none placeholder:text-neutral-700"
             />
           </div>
 
@@ -129,10 +129,10 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
               type="number"
               step="0.01"
               min="0"
-              placeholder="0.00"
+              placeholder="Bid Amount"
               value={bidAmount}
               onChange={(e) => setBidAmount(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
               required
             />
           </div>

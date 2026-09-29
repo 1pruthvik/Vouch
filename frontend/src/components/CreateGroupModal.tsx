@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Plus, Shield } from "lucide-react";
+import { X, Plus, Shield, IndianRupee, ArrowRight } from "lucide-react";
 
 interface CreateGroupModalProps {
   isOpen: boolean;
@@ -11,8 +11,12 @@ interface CreateGroupModalProps {
     cycleDuration: number;
     discountCapBps: number;
     reserveFeeBps: number;
+    installmentInr: number;
   }) => void;
 }
+
+// 1 tMSTC = ₹1,000 (Internal conversion rate)
+export const INR_PER_TMSTC = 1000;
 
 export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   isOpen,
@@ -21,12 +25,27 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
 }) => {
   const [groupName, setGroupName] = useState("");
   const [memberCount, setMemberCount] = useState<number | "">("");
-  const [installmentAmount, setInstallmentAmount] = useState("");
-  const [cycleDuration, setCycleDuration] = useState<number | "">("");
-  const [discountCapPercent, setDiscountCapPercent] = useState<number | "">("");
-  const [reserveFeePercent, setReserveFeePercent] = useState<number | "">("");
+  const [installmentInr, setInstallmentInr] = useState<number | "">("");
+  const [reserveFeeInr, setReserveFeeInr] = useState<number | "">("");
+  const [cycleDurationMonths, setCycleDurationMonths] = useState<number | "">("");
 
   if (!isOpen) return null;
+
+  // Calculate internal token values and fee bps
+  const numInstallmentInr = Number(installmentInr) || 0;
+  const numMembers = Number(memberCount) || 1;
+  const installmentTokens = (numInstallmentInr / INR_PER_TMSTC).toFixed(4);
+  const totalPotInr = numMembers * numInstallmentInr;
+  const numReserveFeeInr = Number(reserveFeeInr) || 0;
+
+  // Calculate reserve fee BPS from rupees
+  const calculatedReserveFeeBps = totalPotInr > 0
+    ? Math.min(2000, Math.max(100, Math.round((numReserveFeeInr / totalPotInr) * 10000)))
+    : 500;
+
+  // Convert Months to Seconds (1 month = 30 days = 2,592,000 seconds)
+  const numMonths = Number(cycleDurationMonths) || 1;
+  const cycleDurationSeconds = numMonths * 30 * 24 * 3600;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
@@ -50,96 +69,109 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             onSubmit({
               groupName,
               memberCount: Number(memberCount) || 5,
-              installmentAmount: installmentAmount || "0",
-              cycleDuration: Number(cycleDuration) || 300,
-              discountCapBps: (Number(discountCapPercent) || 30) * 100,
-              reserveFeeBps: (Number(reserveFeePercent) || 5) * 100,
+              installmentAmount: installmentTokens,
+              cycleDuration: cycleDurationSeconds,
+              discountCapBps: 3000, // Standard 30% discount cap
+              reserveFeeBps: calculatedReserveFeeBps,
+              installmentInr: numInstallmentInr,
             });
             onClose();
           }}
           className="space-y-4"
         >
           <div>
-            <label className="block text-xs font-semibold text-neutral-300 mb-1">Group Name</label>
+            <label className="block text-xs font-semibold text-neutral-300 mb-1">
+              Group Name
+            </label>
             <input
               type="text"
-              placeholder="e.g. Community Circle"
+              placeholder="Community Savings Circle"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg bg-black text-white text-sm focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
               required
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">Member Count</label>
+              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                Member Count
+              </label>
               <input
                 type="number"
                 min="2"
                 max="50"
-                placeholder="e.g. 5"
+                placeholder="5"
                 value={memberCount}
                 onChange={(e) => setMemberCount(e.target.value === "" ? "" : parseInt(e.target.value))}
-                className="w-full px-4 py-2 rounded-lg bg-black text-white text-sm focus:outline-none"
+                className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">Installment (tMSTC)</label>
+              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                Installment (Rupees / ₹)
+              </label>
               <input
                 type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={installmentAmount}
-                onChange={(e) => setInstallmentAmount(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg bg-black text-white text-sm focus:outline-none"
+                min="100"
+                step="50"
+                placeholder="5000"
+                value={installmentInr}
+                onChange={(e) => setInstallmentInr(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
                 required
               />
+              {numInstallmentInr > 0 && (
+                <p className="text-[11px] text-neutral-400 mt-1 font-mono">
+                  ≈ {installmentTokens} tMSTC (1 tMSTC = ₹{INR_PER_TMSTC.toLocaleString()})
+                </p>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">Discount Floor Cap (%)</label>
-              <input
-                type="number"
-                min="1"
-                max="50"
-                placeholder="e.g. 30"
-                value={discountCapPercent}
-                onChange={(e) => setDiscountCapPercent(e.target.value === "" ? "" : parseInt(e.target.value))}
-                className="w-full px-4 py-2 rounded-lg bg-black text-white text-sm focus:outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">Reserve Fee (%)</label>
+              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                Reserve Fee (Rupees / ₹)
+              </label>
               <input
                 type="number"
                 min="0"
-                max="20"
-                placeholder="e.g. 5"
-                value={reserveFeePercent}
-                onChange={(e) => setReserveFeePercent(e.target.value === "" ? "" : parseInt(e.target.value))}
-                className="w-full px-4 py-2 rounded-lg bg-black text-white text-sm focus:outline-none"
+                step="10"
+                placeholder="250"
+                value={reserveFeeInr}
+                onChange={(e) => setReserveFeeInr(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
                 required
               />
+              {totalPotInr > 0 && numReserveFeeInr > 0 && (
+                <p className="text-[11px] text-neutral-400 mt-1">
+                  {(calculatedReserveFeeBps / 100).toFixed(1)}% of total pot (₹{totalPotInr.toLocaleString()})
+                </p>
+              )}
             </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-neutral-300 mb-1">Round Cycle Duration (Seconds)</label>
-            <input
-              type="number"
-              min="60"
-              placeholder="e.g. 300"
-              value={cycleDuration}
-              onChange={(e) => setCycleDuration(e.target.value === "" ? "" : parseInt(e.target.value))}
-              className="w-full px-4 py-2 rounded-lg bg-black text-white text-sm focus:outline-none"
-              required
-            />
+            <div>
+              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                Round Cycle (Months)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="24"
+                placeholder="1"
+                value={cycleDurationMonths}
+                onChange={(e) => setCycleDurationMonths(e.target.value === "" ? "" : parseInt(e.target.value))}
+                className="w-full px-4 py-2.5 rounded-lg bg-black text-white text-sm focus:outline-none placeholder:text-neutral-700"
+                required
+              />
+              {numMonths > 0 && (
+                <p className="text-[11px] text-neutral-400 mt-1">
+                  {numMonths} {numMonths === 1 ? "Month" : "Months"} per round cycle
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="pt-4 flex justify-end gap-3">

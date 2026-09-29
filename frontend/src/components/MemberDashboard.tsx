@@ -125,10 +125,10 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
               type="number"
               step="0.01"
               min="0"
-              placeholder="0.00"
+              placeholder="Amount"
               value={topUpAmount}
               onChange={(e) => setTopUpAmount(e.target.value)}
-              className="w-32 px-4 py-2 rounded-lg bg-black text-white text-sm text-right font-mono focus:outline-none"
+              className="w-32 px-4 py-2 rounded-lg bg-black text-white text-sm text-right font-mono focus:outline-none placeholder:text-neutral-700"
             />
             <span className="text-xs text-neutral-400 font-semibold">tMSTC</span>
             <button

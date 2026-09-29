@@ -61,7 +61,7 @@ export class ContractService {
     this.signer = signer;
   }
 
-  // Create a new group via ChitFactory
+  // Create a new group via ChitFactory or direct ChitGroup deployment
   public async createGroup(params: {
     factoryAddress?: string;
     groupName: string;
@@ -74,40 +74,67 @@ export class ContractService {
   }): Promise<{ txHash: string; groupAddress?: string }> {
     if (!this.signer) throw new Error("Wallet not connected");
     const factoryAddr = params.factoryAddress || CONTRACT_ADDRESSES.ChitFactory;
-    if (!factoryAddr || factoryAddr === "") {
-      throw new Error("ChitFactory contract address is not configured");
-    }
-
-    const factory = new ethers.Contract(factoryAddr, ChitFactoryABI, this.signer);
     const parsedInstallment = ethers.parseEther(params.installmentAmount);
     const safetyFactor = params.safetyFactorBps || 12000;
 
-    const tx = await factory.createGroup(
+    // 1. If factory address is configured, use ChitFactory
+    if (factoryAddr && factoryAddr.trim() !== "") {
+      const factory = new ethers.Contract(factoryAddr, ChitFactoryABI, this.signer);
+      const tx = await factory.createGroup(
+        params.groupName,
+        params.memberCount,
+        parsedInstallment,
+        params.cycleDuration,
+        params.discountCapBps,
+        params.reserveFeeBps,
+        safetyFactor
+      );
+
+      const receipt = await tx.wait();
+      let groupAddress: string | undefined;
+
+      if (receipt && receipt.logs) {
+        for (const log of receipt.logs) {
+          try {
+            const parsed = factory.interface.parseLog(log);
+            if (parsed && parsed.name === "GroupCreated") {
+              groupAddress = parsed.args.groupAddress;
+              break;
+            }
+          } catch {}
+        }
+      }
+
+      return { txHash: tx.hash, groupAddress };
+    }
+
+    // 2. Direct on-chain deployment of ChitGroup from user wallet
+    const { ChitGroupBytecode } = await import("../contracts/abis");
+    const factory = new ethers.ContractFactory(ChitGroupABI, ChitGroupBytecode, this.signer);
+
+    const registryAddr = CONTRACT_ADDRESSES.VouchRegistry || ethers.ZeroAddress;
+    const yieldAddr = CONTRACT_ADDRESSES.MockYieldVault || ethers.ZeroAddress;
+
+    const deployedContract = await factory.deploy(
       params.groupName,
       params.memberCount,
       parsedInstallment,
       params.cycleDuration,
       params.discountCapBps,
       params.reserveFeeBps,
-      safetyFactor
+      safetyFactor,
+      registryAddr,
+      yieldAddr
     );
 
-    const receipt = await tx.wait();
-    let groupAddress: string | undefined;
+    await deployedContract.waitForDeployment();
+    const groupAddress = await deployedContract.getAddress();
+    const deploymentTx = deployedContract.deploymentTransaction();
 
-    if (receipt && receipt.logs) {
-      for (const log of receipt.logs) {
-        try {
-          const parsed = factory.interface.parseLog(log);
-          if (parsed && parsed.name === "GroupCreated") {
-            groupAddress = parsed.args.groupAddress;
-            break;
-          }
-        } catch {}
-      }
-    }
-
-    return { txHash: tx.hash, groupAddress };
+    return {
+      txHash: deploymentTx ? deploymentTx.hash : "0x0",
+      groupAddress,
+    };
   }
 
   // Join group with initial collateral buffer deposit
