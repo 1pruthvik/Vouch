@@ -317,5 +317,32 @@ export function createApiRouter(indexer: IndexerService, keeper: KeeperBot): Rou
     res.json({ success: true, request: result });
   });
 
+  // --- Allowed Members (Whitelist) Endpoints ---
+
+  // Get all allowed members for a circle
+  router.get("/circles/:address/allowed", (req: Request, res: Response) => {
+    const { address } = req.params;
+    const allowed = db.getAllowedMembers(address);
+    res.json({ circleAddress: address, allowedMembers: allowed });
+  });
+
+  // Check if a specific member is allowed to view / join the circle
+  router.get("/circles/:address/allowed/:memberAddress", (req: Request, res: Response) => {
+    const { address, memberAddress } = req.params;
+    const isAllowed = db.isMemberAllowed(address, memberAddress);
+    res.json({ circleAddress: address, memberAddress, isAllowed });
+  });
+
+  // Add a member directly to allowed list
+  router.post("/circles/:address/allowed", (req: Request, res: Response) => {
+    const { address } = req.params;
+    const { memberAddress, addedBy } = req.body;
+    if (!memberAddress) {
+      return res.status(400).json({ error: "memberAddress is required" });
+    }
+    db.addAllowedMember(address, memberAddress, addedBy || "");
+    res.json({ success: true, message: `Member ${memberAddress} added to allowed list for circle ${address}` });
+  });
+
   return router;
 }

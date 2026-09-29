@@ -372,4 +372,61 @@ export class VerificationService {
       console.warn("Backend rejectApplicant error:", err);
     }
   }
+
+  // 16. Check if a member is in the Allowed IDs list for this circle
+  public static async fetchIsMemberAllowed(
+    circleAddress: string,
+    memberAddress: string
+  ): Promise<boolean> {
+    if (!circleAddress || !memberAddress) return false;
+    const cleanCircle = circleAddress.toLowerCase();
+    const cleanMember = memberAddress.toLowerCase();
+
+    // Check local circle registry if initializer
+    const circle = this.getCircle(cleanCircle);
+    if (circle && circle.initializer && circle.initializer.toLowerCase() === cleanMember) {
+      return true;
+    }
+
+    // Check local verified requests
+    const status = this.getApplicantStatus(cleanCircle, cleanMember);
+    if (status === "verified") return true;
+
+    // Fetch from backend
+    try {
+      const res = await fetch(`${API_URL}/circles/${cleanCircle}/allowed/${cleanMember}`);
+      if (res.ok) {
+        const data = await res.json();
+        return !!data.isAllowed;
+      }
+    } catch (err) {
+      console.warn("Backend fetchIsMemberAllowed error:", err);
+    }
+    return false;
+  }
+
+  // 17. Fetch all allowed member IDs for a circle
+  public static async fetchAllowedMembers(circleAddress: string): Promise<string[]> {
+    if (!circleAddress) return [];
+    const cleanCircle = circleAddress.toLowerCase();
+    try {
+      const res = await fetch(`${API_URL}/circles/${cleanCircle}/allowed`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.allowedMembers)) {
+          return data.allowedMembers;
+        }
+      }
+    } catch (err) {
+      console.warn("Backend fetchAllowedMembers error:", err);
+    }
+    const circle = this.getCircle(cleanCircle);
+    const verifiedReqs = this.getRequestsForCircle(cleanCircle)
+      .filter((r) => r.status === "verified")
+      .map((r) => r.applicantAddress.toLowerCase());
+    if (circle && circle.initializer) {
+      verifiedReqs.unshift(circle.initializer.toLowerCase());
+    }
+    return Array.from(new Set(verifiedReqs));
+  }
 }

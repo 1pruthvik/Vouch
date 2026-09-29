@@ -36,11 +36,17 @@ export function App() {
   const [activeCircleAddress, setActiveCircleAddress] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; isError?: boolean } | null>(null);
 
-  // Check URL query parameters for invitation links
+  // Check URL query parameters & pathname for invitation links (e.g. /grouplink?circle=0x...)
   const [activeTab, setActiveTab] = useState<"join" | "create" | "my-circles">(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      if (params.get("circle") || params.get("join")) {
+      if (
+        window.location.pathname.includes("grouplink") ||
+        params.get("circle") ||
+        params.get("grouplink") ||
+        params.get("join") ||
+        params.get("id")
+      ) {
         return "join";
       }
     }
@@ -50,7 +56,13 @@ export function App() {
   const [initialCircleId, setInitialCircleId] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      return params.get("circle") || params.get("join") || "";
+      return (
+        params.get("circle") ||
+        params.get("grouplink") ||
+        params.get("join") ||
+        params.get("id") ||
+        ""
+      );
     }
     return "";
   });
@@ -63,9 +75,15 @@ export function App() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      const urlCircle = params.get("circle") || params.get("join");
-      if (urlCircle) {
-        setInitialCircleId(urlCircle);
+      const urlCircle =
+        params.get("circle") ||
+        params.get("grouplink") ||
+        params.get("join") ||
+        params.get("id");
+      if (urlCircle || window.location.pathname.includes("grouplink")) {
+        if (urlCircle) {
+          setInitialCircleId(urlCircle);
+        }
         setActiveTab("join");
       }
     }

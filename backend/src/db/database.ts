@@ -158,6 +158,14 @@ class DatabaseManager {
         requested_at INTEGER,
         updated_at INTEGER
       );
+
+      CREATE TABLE IF NOT EXISTS circle_allowed_members (
+        circle_address TEXT,
+        member_address TEXT,
+        added_by TEXT,
+        added_at INTEGER,
+        PRIMARY KEY (circle_address, member_address)
+      );
     `);
   }
 
@@ -644,6 +652,9 @@ class DatabaseManager {
         entry.created_at || now,
       ]
     );
+    if (cleanInit) {
+      this.addAllowedMember(cleanAddr, cleanInit, cleanInit);
+    }
     this.save();
   }
 
@@ -769,6 +780,10 @@ class DatabaseManager {
        ON CONFLICT(id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`,
       [id, cleanCircle, cleanApplicant, `Member (${cleanApplicant.substring(0, 6)}...)`, status, now, now]
     );
+    if (status === "verified") {
+      this.addAllowedMember(cleanCircle, cleanApplicant);
+    }
+
     this.save();
     return {
       id,
@@ -777,6 +792,78 @@ class DatabaseManager {
       status,
       updatedAt: now * 1000,
     };
+  }
+
+  // --- Allowed Members (Whitelist) Methods ---
+
+  public addAllowedMember(circleAddress: string, memberAddress: string, addedBy: string = ""): void {
+    if (!this.db) return;
+    const cleanCircle = this.sanitizeAddress(circleAddress);
+    const cleanMember = this.sanitizeAddress(memberAddress);
+    const cleanAddedBy = this.sanitizeAddress(addedBy);
+    const now = Math.floor(Date.now() / 1000);
+
+    this.db.run(
+      `INSERT OR REPLACE INTO circle_allowed_members (circle_address, member_address, added_by, added_at)
+       VALUES (?, ?, ?, ?)`,
+      [cleanCircle, cleanMember, cleanAddedBy, now]
+    );
+    this.save();
+  }
+
+  public isMemberAllowed(circleAddress: string, memberAddress: string): boolean {
+    if (!this.db || !circleAddress || !memberAddress) return false;
+    const cleanCircle = this.sanitizeAddress(circleAddress);
+    const cleanMember = this.sanitizeAddress(memberAddress);
+
+    // Initializer is always allowed
+    const circle = this.getCircleRegistration(cleanCircle);
+    if (circle && circle.initializer && circle.initializer.toLowerCase() === cleanMember.toLowerCase()) {
+      return true;
+    }
+
+    const stmt = this.db.prepare(
+      "SELECT COUNT(*) as count FROM circle_allowed_members WHERE LOWER(circle_address) = ? AND LOWER(member_address) = ?"
+    );
+    stmt.bind([cleanCircle, cleanMember]);
+    let allowed = false;
+    if (stmt.step()) {
+      const obj = stmt.getAsObject() as { count: number };
+      allowed = obj.count > 0;
+    }
+    stmt.free();
+
+    // Check if verified join request exists
+    if (!allowed) {
+      const req = this.getApplicantJoinStatus(cleanCircle, cleanMember);
+      if (req && req.status === "verified") {
+        this.addAllowedMember(cleanCircle, cleanMember, circle ? circle.initializer : "");
+        return true;
+      }
+    }
+
+    return allowed;
+  }
+
+  public getAllowedMembers(circleAddress: string): string[] {
+    if (!this.db || !circleAddress) return [];
+    const cleanCircle = this.sanitizeAddress(circleAddress);
+    const stmt = this.db.prepare("SELECT member_address FROM circle_allowed_members WHERE LOWER(circle_address) = ?");
+    stmt.bind([cleanCircle]);
+    const results: string[] = [];
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as { member_address: string };
+      results.push(row.member_address);
+    }
+    stmt.free();
+
+    // Include initializer
+    const circle = this.getCircleRegistration(cleanCircle);
+    if (circle && circle.initializer && !results.includes(circle.initializer.toLowerCase())) {
+      results.unshift(circle.initializer.toLowerCase());
+    }
+
+    return results;
   }
 }
 

@@ -69,7 +69,7 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
 
   const copyGroupLink = (circleAddr: string) => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const fullLink = `${origin}/?circle=${circleAddr}`;
+    const fullLink = `${origin}/grouplink?circle=${circleAddr}`;
     navigator.clipboard.writeText(fullLink);
     setCopiedLink(circleAddr);
     setTimeout(() => setCopiedLink(null), 2500);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, Shield, Share2, Copy, Check, Users, Clock, CheckCircle2, AlertCircle, Coins, ArrowRight, XCircle, CheckCheck } from "lucide-react";
+import { ArrowLeft, Shield, Share2, Copy, Check, Users, Clock, CheckCircle2, AlertCircle, Coins, ArrowRight, XCircle, CheckCheck, Lock, Sparkles } from "lucide-react";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 import { VerificationService, CircleRegistryEntry, JoinRequest } from "../services/verificationService";
 import { ContractService, GroupDetails, MemberDetails } from "../services/contractService";
@@ -24,6 +24,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
   const [memberDetails, setMemberDetails] = useState<MemberDetails | null>(null);
   const [pendingRequests, setPendingRequests] = useState<JoinRequest[]>([]);
   const [verifiedRequests, setVerifiedRequests] = useState<JoinRequest[]>([]);
+  const [allowedMembers, setAllowedMembers] = useState<string[]>([]);
   const [isPaying, setIsPaying] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
@@ -50,7 +51,11 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
         setVerifiedRequests(remoteReqs.filter((r) => r.status === "verified"));
       }
 
-      // 3. On-chain Details
+      // 3. Allowed IDs list
+      const allowed = await VerificationService.fetchAllowedMembers(circleAddress);
+      setAllowedMembers(allowed);
+
+      // 4. On-chain Details
       if (contractService && circleAddress.startsWith("0x")) {
         try {
           const gDetails = await contractService.getGroupDetails(circleAddress);
@@ -77,12 +82,13 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
 
   const isInitializer =
     (registryCircle && registryCircle.initializer.toLowerCase() === account.toLowerCase()) ||
-    (groupDetails && groupDetails.members[0]?.toLowerCase() === account.toLowerCase());
+    (groupDetails && groupDetails.members[0]?.toLowerCase() === account.toLowerCase()) ||
+    (allowedMembers.length > 0 && allowedMembers[0]?.toLowerCase() === account.toLowerCase());
 
   const handleVerifyApplicant = async (applicantAddress: string) => {
     await VerificationService.verifyApplicant(circleAddress, applicantAddress);
     await loadCircleData(true);
-    onShowNotification(`Verified applicant ${applicantAddress.substring(0, 6)}...`);
+    onShowNotification(`Verified applicant and added to Allowed IDs list!`);
   };
 
   const handleRejectApplicant = async (applicantAddress: string) => {
@@ -109,7 +115,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
 
   const copyLink = () => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const fullLink = `${origin}/?circle=${circleAddress}`;
+    const fullLink = `${origin}/grouplink?circle=${circleAddress}`;
     navigator.clipboard.writeText(fullLink);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -237,29 +243,34 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
         </div>
       </div>
 
-      {/* ── Section for Initializer: Verification & Join Request Management ── */}
+      {/* ── Section for Initializer: Verification & Allowed IDs Whitelist ── */}
       {isInitializer && (
-        <div className="p-6 bg-neutral-950 rounded-2xl space-y-5 text-xs">
-          <div className="flex items-center justify-between">
+        <div className="p-6 bg-neutral-950 rounded-2xl space-y-6 text-xs">
+          <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
             <div className="space-y-0.5">
               <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
                 <Shield className="w-4 h-4 text-red-500" />
-                <span>Initializer Verification Management</span>
+                <span>Initializer Access & Verification Console</span>
               </h3>
               <p className="text-neutral-400 text-[11px]">
-                Approve or reject applicant requests to join your circle.
+                Only you (the Initializer) have the authority to verify applicants and add them to the Allowed IDs List.
               </p>
             </div>
-            <span className="px-2 py-0.5 rounded bg-red-950/30 text-red-400 font-semibold text-[11px]">
+            <span className="px-2.5 py-1 rounded bg-red-950/30 text-red-400 font-semibold text-[11px]">
               {pendingRequests.length} Pending
             </span>
           </div>
 
-          {/* Pending Requests */}
-          <div className="space-y-2">
+          {/* Pending Verification Requests */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-neutral-300 text-xs">Pending Join Requests ({pendingRequests.length})</h4>
+              <span className="text-[10px] text-neutral-500 font-mono">Auto-syncing live</span>
+            </div>
+
             {pendingRequests.length === 0 ? (
               <p className="text-[11px] text-neutral-600 italic py-2">
-                No pending join requests. Share your group invite link with members to let them apply.
+                No pending join requests. Share your group link with prospective members.
               </p>
             ) : (
               <div className="space-y-2">
@@ -284,7 +295,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
                         className="px-3.5 py-1.5 rounded-lg bg-green-950/40 hover:bg-green-900/50 text-green-400 hover:text-green-300 font-semibold text-xs flex items-center gap-1 transition-all border-none cursor-pointer"
                       >
                         <CheckCheck className="w-3.5 h-3.5" />
-                        <span>Verify & Approve</span>
+                        <span>Verify & Add to Allowed List</span>
                       </button>
                       <button
                         type="button"
@@ -301,25 +312,38 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
             )}
           </div>
 
-          {/* Verified Members */}
-          {verifiedRequests.length > 0 && (
-            <div className="pt-3 border-t border-neutral-900">
-              <span className="text-[11px] text-neutral-500 font-semibold block mb-2">
-                Verified Applicants ({verifiedRequests.length})
+          {/* Allowed IDs Whitelist List */}
+          <div className="pt-4 border-t border-neutral-900 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-neutral-300">
+                Allowed IDs List ({allowedMembers.length})
               </span>
-              <div className="flex flex-wrap gap-2">
-                {verifiedRequests.map((req) => (
+              <span className="text-[10px] text-green-400 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                <span>Granted Access</span>
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {allowedMembers.map((addr) => {
+                const isThisInit = registryCircle && registryCircle.initializer.toLowerCase() === addr.toLowerCase();
+                return (
                   <span
-                    key={req.id}
-                    className="px-2.5 py-1 rounded-lg bg-green-950/20 text-green-400 font-mono text-[11px] flex items-center gap-1.5"
+                    key={addr}
+                    className="px-3 py-1.5 rounded-lg bg-neutral-900 text-neutral-200 font-mono text-[11px] flex items-center gap-2"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
-                    {req.applicantAddress.substring(0, 6)}...{req.applicantAddress.substring(req.applicantAddress.length - 4)}
+                    <span>{addr.substring(0, 6)}...{addr.substring(addr.length - 4)}</span>
+                    {isThisInit && (
+                      <span className="px-1.5 py-0.2 rounded bg-red-950/60 text-red-400 text-[9px] font-sans font-semibold">
+                        Initializer
+                      </span>
+                    )}
                   </span>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          )}
+          </div>
         </div>
       )}
 
