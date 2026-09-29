@@ -311,7 +311,6 @@ export function App() {
     return (
       <LoginPage
         onLoginSuccess={handleLoginSuccess}
-        googleClientIdConfigured={Boolean(googleClientId)}
       />
     );
   }
