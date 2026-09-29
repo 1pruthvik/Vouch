@@ -14,12 +14,15 @@ import { JoinGroupModal } from "./components/JoinGroupModal";
 import { ConnectWalletModal } from "./components/ConnectWalletModal";
 import { MandateModal } from "./components/MandateModal";
 import { AccountModal } from "./components/AccountModal";
+import { GoogleAuthModal, GoogleUser } from "./components/GoogleAuthModal";
+import { DigiLockerKYCModal } from "./components/DigiLockerKYCModal";
 import { BlockchainNetwork3D } from "./components/BlockchainNetwork3D";
 import { BlockchainNetworkView } from "./components/BlockchainNetworkView";
 import { useWallet } from "./hooks/useWallet";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
 import { fetchLedgerEvents, fetchIndexedGroups } from "./services/indexerService";
+import { loadStoredKyc, KycVoucher, AadhaarDemographics } from "./services/kycService";
 import {
   UserPlus,
   Shield,
@@ -59,6 +62,22 @@ export function App() {
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isMandateModalOpen, setIsMandateModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+
+  // Google Authentication & DigiLocker KYC Modals
+  const [isGoogleAuthOpen, setIsGoogleAuthOpen] = useState(false);
+  const [googleUser, setGoogleUser] = useState<GoogleUser | null>(() => {
+    try {
+      const u = localStorage.getItem("vouch_google_user");
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isDigiLockerModalOpen, setIsDigiLockerModalOpen] = useState(false);
+  const [isKycVerified, setIsKycVerified] = useState<boolean>(() => {
+    const s = loadStoredKyc();
+    return !!s?.isVerified;
+  });
 
   // Progressive Disclosure: Technical Pro Mode Toggle
   const [isTechnicalMode, setIsTechnicalMode] = useState<boolean>(false);
@@ -218,6 +237,27 @@ export function App() {
     }
   }, [activeGroupAddress, refreshData]);
 
+  // Google Authentication Completion Handler
+  // Requirement: "after googel authitication this window should pop up"
+  const handleGoogleAuthSuccess = (user: GoogleUser) => {
+    setGoogleUser(user);
+    localStorage.setItem("vouch_google_user", JSON.stringify(user));
+    setIsGoogleAuthOpen(false);
+    showNotification(`Google Authentication successful for ${user.email}!`);
+
+    // Immediately pop up the DigiLocker Aadhaar KYC Window
+    setTimeout(() => {
+      setIsDigiLockerModalOpen(true);
+    }, 350);
+  };
+
+  // DigiLocker KYC Verified Handler
+  const handleKycVerified = (voucher: KycVoucher, demographics: AadhaarDemographics) => {
+    setIsKycVerified(true);
+    showNotification(`DigiLocker Verified: ${demographics.fullName} (${demographics.maskedAadhaar}). Proof tied to wallet!`);
+    refreshData();
+  };
+
   // Handler: Create Group
   const handleCreateGroup = async (params: {
     groupName: string;
@@ -365,7 +405,11 @@ export function App() {
         isConnecting={isConnecting}
         groupName={groupDetails?.name || "Community 07"}
         isTechnicalMode={isTechnicalMode}
+        googleUser={googleUser}
+        isKycVerified={isKycVerified}
         onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
+        onOpenGoogleAuth={() => setIsGoogleAuthOpen(true)}
+        onOpenDigiLockerModal={() => setIsDigiLockerModalOpen(true)}
         onOpenAccountModal={() => {
           if (!account) {
             clearError();
@@ -575,6 +619,8 @@ export function App() {
             groupDetails={groupDetails}
             riskAdvisory={riskAdvisory}
             isTechnicalMode={isTechnicalMode}
+            isKycVerified={isKycVerified}
+            onOpenDigiLockerModal={() => setIsDigiLockerModalOpen(true)}
           />
         )}
       </main>
@@ -585,6 +631,7 @@ export function App() {
         onClose={() => setIsConnectModalOpen(false)}
         onConnectExtension={connectWallet}
         onConnectPrivateKey={connectWithPrivateKey}
+        onOpenGoogleAuth={() => setIsGoogleAuthOpen(true)}
         onClearError={clearError}
         detectedProviders={detectedProviders}
         error={walletError}
@@ -636,6 +683,22 @@ export function App() {
         detectedProviders={detectedProviders}
         onConnectExtension={connectWallet}
         onConnectPrivateKey={connectWithPrivateKey}
+      />
+
+      {/* Google Authentication Modal */}
+      <GoogleAuthModal
+        isOpen={isGoogleAuthOpen}
+        onClose={() => setIsGoogleAuthOpen(false)}
+        onSuccess={handleGoogleAuthSuccess}
+      />
+
+      {/* DigiLocker Aadhaar KYC Modal */}
+      <DigiLockerKYCModal
+        isOpen={isDigiLockerModalOpen}
+        onClose={() => setIsDigiLockerModalOpen(false)}
+        walletAddress={account}
+        googleUser={googleUser}
+        onKycVerified={handleKycVerified}
       />
     </div>
   );

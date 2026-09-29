@@ -24,6 +24,8 @@ interface StandingViewProps {
   groupDetails: GroupDetails | null;
   riskAdvisory: RiskPredictionResponse | null;
   isTechnicalMode: boolean;
+  isKycVerified?: boolean;
+  onOpenDigiLockerModal?: () => void;
 }
 
 export const StandingView: React.FC<StandingViewProps> = ({
@@ -32,6 +34,8 @@ export const StandingView: React.FC<StandingViewProps> = ({
   groupDetails,
   riskAdvisory,
   isTechnicalMode,
+  isKycVerified,
+  onOpenDigiLockerModal,
 }) => {
   const [isBackupExpanded, setIsBackupExpanded] = useState(false);
 
@@ -60,11 +64,32 @@ export const StandingView: React.FC<StandingViewProps> = ({
       <div className="v-card-hero p-6 sm:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="v-badge v-badge-green text-xs">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 Tier 1 Prime Member
               </span>
+              {isKycVerified ? (
+                <button
+                  type="button"
+                  onClick={onOpenDigiLockerModal}
+                  className="v-badge v-badge-green text-xs cursor-pointer hover:bg-emerald-500/20 transition-colors"
+                  title="Click to view verified DigiLocker Aadhaar credential"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  DigiLocker Aadhaar Verified
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onOpenDigiLockerModal}
+                  className="v-badge text-xs cursor-pointer bg-blue-500/15 text-blue-300 border border-blue-500/30 hover:bg-blue-500/25 transition-colors"
+                  title="Click to complete DigiLocker Aadhaar e-KYC"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+                  Aadhaar e-KYC Pending
+                </button>
+              )}
               <span className="v-badge v-badge-amber text-xs">
                 {onTimePayments}/{totalRoundsSoFar} On-Time Contributions
               </span>
