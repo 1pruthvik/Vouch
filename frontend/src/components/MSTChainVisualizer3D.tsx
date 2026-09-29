@@ -21,9 +21,7 @@ import {
   Check,
   Send,
   HelpCircle,
-  Award,
-  CircleDollarSign,
-  Flame,
+  RotateCw,
 } from "lucide-react";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 import { ethers } from "ethers";
@@ -80,6 +78,7 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
   // Active Stage
   const [activeStage, setActiveStage] = useState<LifecycleStage>("day1_pooling");
   const [isPlayingAuto, setIsPlayingAuto] = useState<boolean>(false);
+  const [isAutoSpinning, setIsAutoSpinning] = useState<boolean>(true);
   const [autoProgress, setAutoProgress] = useState<number>(0);
   const [selectedNode, setSelectedNode] = useState<NodeData | null>(null);
 
@@ -93,7 +92,7 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
   const aaveAPY = 5.82; // 5.82% APY
   const bitFeePercentage = 5; // 5% BIT cut
 
-  // Build Member Nodes corresponding accurately to memberCount
+  // Build Member Nodes
   const nodes: NodeData[] = useMemo(() => {
     const list: NodeData[] = [];
     const count = Math.max(memberCount, 3);
@@ -155,7 +154,7 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
     return [...nodes].sort((a, b) => a.secretBidAmount - b.secretBidAmount)[0];
   }, [nodes]);
 
-  // Three.js Scene References
+  // Persistent Three.js Scene References
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -168,6 +167,8 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
   const chainLoopRef = useRef<THREE.Group | null>(null);
   const winnerLightningRef = useRef<THREE.Group | null>(null);
   const pointLightRef = useRef<THREE.PointLight | null>(null);
+  const nodesStateRef = useRef<NodeData[]>(nodes);
+  nodesStateRef.current = nodes;
 
   // Set initial selected node
   useEffect(() => {
@@ -190,7 +191,6 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
     }
   }, [userBidAmount, userSalt, currentAccount, nodes]);
 
-  // Generate new random salt
   const regenerateSalt = () => {
     const s = "0x" + Array.from(crypto.getRandomValues(new Uint8Array(32)))
       .map((b) => b.toString(16).padStart(2, "0"))
@@ -198,7 +198,24 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
     setUserSalt(s);
   };
 
-  // Three.js Scene Initialization
+  // Reset Camera View
+  const handleResetCamera = () => {
+    if (cameraRef.current && controlsRef.current) {
+      cameraRef.current.position.set(0, 16, 25);
+      controlsRef.current.target.set(0, 0, 0);
+      controlsRef.current.update();
+    }
+  };
+
+  // Sync Auto-Spin State with OrbitControls
+  useEffect(() => {
+    if (controlsRef.current) {
+      controlsRef.current.autoRotate = isAutoSpinning;
+      controlsRef.current.autoRotateSpeed = 0.85;
+    }
+  }, [isAutoSpinning]);
+
+  // 1. Initial Scene Setup (RUNS ONLY ONCE ON MOUNT)
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
@@ -206,18 +223,18 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // 1. Scene
+    // A. Scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x020204);
-    scene.fog = new THREE.FogExp2(0x020204, 0.028);
+    scene.fog = new THREE.FogExp2(0x020204, 0.024);
     sceneRef.current = scene;
 
-    // 2. Camera
+    // B. Camera
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
     camera.position.set(0, 16, 25);
     cameraRef.current = camera;
 
-    // 3. Renderer
+    // C. Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -227,34 +244,39 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // 4. Orbit Controls
+    // D. Free Orbit Controls (ALLOWS UNRESTRICTED 360 TWIRL, SWIRL & CURL WITHOUT HARD STOPS)
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.maxPolarAngle = Math.PI / 2 + 0.08;
-    controls.minDistance = 6;
-    controls.maxDistance = 50;
+    controls.dampingFactor = 0.035; // Silky frictionless inertia glide that lets users spin & twirl freely
+    controls.rotateSpeed = 1.35; // Fast, responsive swirling and curling
+    controls.zoomSpeed = 1.2;
+    controls.panSpeed = 1.0;
+    controls.minDistance = 2;
+    controls.maxDistance = 85;
+    controls.minPolarAngle = 0.0001; // Can view completely from zenith above
+    controls.maxPolarAngle = Math.PI - 0.0001; // Can view completely from nadir underneath without snapping back
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.85;
     controlsRef.current = controls;
 
-    // 5. Lights
+    // E. Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
-    const dynamicPointLight = new THREE.PointLight(0xff1744, 5, 35);
+    const dynamicPointLight = new THREE.PointLight(0xff1744, 5.5, 40);
     dynamicPointLight.position.set(0, 6, 0);
     pointLightRef.current = dynamicPointLight;
     scene.add(dynamicPointLight);
 
-    const cyanRimLight = new THREE.PointLight(0x00f0ff, 3, 30);
+    const cyanRimLight = new THREE.PointLight(0x00f0ff, 3.5, 35);
     cyanRimLight.position.set(0, -5, 0);
     scene.add(cyanRimLight);
 
-    // 6. Holographic Grid Floor & Concentric Energy Rings
+    // F. Holographic Floor Grid
     const gridHelper = new THREE.GridHelper(60, 60, 0xb91c1c, 0x181822);
     gridHelper.position.y = -3.8;
     scene.add(gridHelper);
 
-    // Neon Floor Rings
     [8, 12, 18].forEach((r, idx) => {
       const ringGeo = new THREE.RingGeometry(r - 0.05, r + 0.05, 64);
       const ringMat = new THREE.MeshBasicMaterial({
@@ -269,15 +291,15 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
       scene.add(floorRing);
     });
 
-    // 7. Outer Starfield / Cyber Nebula Particles (1,200 particles)
+    // G. Starfield (1,200 particles)
     const starCount = 1200;
     const starGeo = new THREE.BufferGeometry();
     const starPos = new Float32Array(starCount * 3);
     const starColors = new Float32Array(starCount * 3);
     for (let i = 0; i < starCount; i++) {
-      starPos[i * 3] = (Math.random() - 0.5) * 100;
-      starPos[i * 3 + 1] = (Math.random() - 0.5) * 50 + 5;
-      starPos[i * 3 + 2] = (Math.random() - 0.5) * 100;
+      starPos[i * 3] = (Math.random() - 0.5) * 110;
+      starPos[i * 3 + 1] = (Math.random() - 0.5) * 60 + 5;
+      starPos[i * 3 + 2] = (Math.random() - 0.5) * 110;
 
       const rand = Math.random();
       if (rand < 0.5) {
@@ -306,7 +328,7 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
     const starField = new THREE.Points(starGeo, starMat);
     scene.add(starField);
 
-    // 8. Central MST Core Pot Vault (High-Tech Holographic Reactor)
+    // H. Central MST Core Pot Vault
     const centralGroup = new THREE.Group();
     centralVaultRef.current = centralGroup;
     scene.add(centralGroup);
@@ -364,14 +386,13 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
     ring3.rotation.z = Math.PI / 4;
     centralGroup.add(ring3);
 
-    // 9. Floating Aave De-Fi Staking Matrix (Days 2 - 30)
+    // I. Aave De-Fi Staking Matrix (Days 2 - 30)
     const aaveGroup = new THREE.Group();
     aaveGroup.position.set(0, 5.5, 0);
     aaveGroup.visible = false;
     aaveMatrixRef.current = aaveGroup;
     scene.add(aaveGroup);
 
-    // Floating Aave Octahedron Crystal
     const aaveCoreGeo = new THREE.OctahedronGeometry(1.5, 0);
     const aaveCoreMat = new THREE.MeshStandardMaterial({
       color: 0x00ff88,
@@ -383,7 +404,6 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
     const aaveCore = new THREE.Mesh(aaveCoreGeo, aaveCoreMat);
     aaveGroup.add(aaveCore);
 
-    // Aave Holographic Energy Disks
     const aaveHaloGeo = new THREE.RingGeometry(2.0, 2.5, 48);
     const aaveHaloMat = new THREE.MeshBasicMaterial({
       color: 0x00ffa3,
@@ -396,7 +416,7 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
     aaveHalo.rotation.x = Math.PI / 2;
     aaveGroup.add(aaveHalo);
 
-    // 10. Member Nodes Ring & Authentic 3D Inter-Node Chain Links
+    // J. Node Group and Chain Loop Container
     const nodesGroup = new THREE.Group();
     nodesGroupRef.current = nodesGroup;
     scene.add(nodesGroup);
@@ -404,6 +424,143 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
     const chainLoopGroup = new THREE.Group();
     chainLoopRef.current = chainLoopGroup;
     scene.add(chainLoopGroup);
+
+    const winnerGroup = new THREE.Group();
+    winnerLightningRef.current = winnerGroup;
+    winnerGroup.visible = false;
+    scene.add(winnerGroup);
+
+    // K. Particle Inflow Streams
+    const particleCount = 350;
+    const particlesGeo = new THREE.BufferGeometry();
+    const particlePositions = new Float32Array(particleCount * 3);
+    const particleProgress = new Float32Array(particleCount);
+    const particleNodeIndex = new Float32Array(particleCount);
+
+    for (let i = 0; i < particleCount; i++) {
+      particleProgress[i] = Math.random();
+    }
+    particlesGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
+    particlesGeoRef.current = particlesGeo;
+
+    const particleMat = new THREE.PointsMaterial({
+      color: 0xff3344,
+      size: 0.38,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+    });
+    const particleSystem = new THREE.Points(particlesGeo, particleMat);
+    particleStreamsRef.current = particleSystem;
+    scene.add(particleSystem);
+
+    // L. Animation Loop (Runs continuously without interrupting user's camera rotation)
+    let animationFrameId: number;
+    let clock = new THREE.Clock();
+
+    const animate = () => {
+      animationFrameId = requestAnimationFrame(animate);
+      const elapsedTime = clock.getElapsedTime();
+
+      // Starfield Rotation
+      starField.rotation.y = elapsedTime * 0.02;
+
+      // Central Vault Dynamic Rotations
+      if (centralVaultRef.current) {
+        centralVaultRef.current.children[1].rotation.x = elapsedTime * 0.45;
+        centralVaultRef.current.children[1].rotation.y = elapsedTime * 0.55;
+        centralVaultRef.current.children[2].rotation.x = -elapsedTime * 0.35;
+        centralVaultRef.current.children[2].rotation.z = elapsedTime * 0.65;
+        centralVaultRef.current.children[3].rotation.z = elapsedTime * 0.9;
+        centralVaultRef.current.children[4].rotation.z = -elapsedTime * 0.7;
+        centralVaultRef.current.children[5].rotation.x = elapsedTime * 0.8;
+      }
+
+      // Aave Matrix Animations
+      if (aaveMatrixRef.current && aaveMatrixRef.current.visible) {
+        aaveMatrixRef.current.children[0].rotation.y = elapsedTime * 1.3;
+        aaveMatrixRef.current.children[0].rotation.x = elapsedTime * 0.9;
+        aaveMatrixRef.current.children[1].rotation.z = -elapsedTime * 1.6;
+        aaveMatrixRef.current.position.y = 5.5 + Math.sin(elapsedTime * 2.2) * 0.45;
+      }
+
+      // Member Nodes Breathing Animation
+      if (nodesGroupRef.current) {
+        nodesGroupRef.current.children.forEach((group, idx) => {
+          group.children[0].rotation.y = elapsedTime * 0.9 + idx;
+          group.children[0].position.y = Math.sin(elapsedTime * 1.8 + idx) * 0.2;
+        });
+      }
+
+      // Update Particle Inflow Stream
+      if (particlesGeoRef.current && particleStreamsRef.current) {
+        const currentNodes = nodesStateRef.current;
+        const curCount = currentNodes.length || 1;
+        const radius = 9.5;
+        const positions = particlesGeoRef.current.attributes.position.array as Float32Array;
+
+        for (let i = 0; i < particleCount; i++) {
+          let t = particleProgress[i] + 0.009;
+          if (t > 1) t = 0;
+          particleProgress[i] = t;
+
+          const nIdx = i % curCount;
+          const nodeAngle = currentNodes[nIdx]?.angle || 0;
+          const startX = Math.cos(nodeAngle) * radius;
+          const startZ = Math.sin(nodeAngle) * radius;
+
+          positions[i * 3] = THREE.MathUtils.lerp(startX, 0, t);
+          positions[i * 3 + 1] = Math.sin(t * Math.PI) * 2.2;
+          positions[i * 3 + 2] = THREE.MathUtils.lerp(startZ, 0, t);
+        }
+        particlesGeoRef.current.attributes.position.needsUpdate = true;
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    };
+
+    animate();
+
+    const handleResize = () => {
+      if (!container || !renderer || !camera) return;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("resize", handleResize);
+      if (renderer.domElement && container.contains(renderer.domElement)) {
+        container.removeChild(renderer.domElement);
+      }
+      renderer.dispose();
+    };
+  }, []);
+
+  // 2. Dynamic Member Node Mesh & Chain Link Construction (WITHOUT RESETTING CAMERA)
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const nodesGroup = nodesGroupRef.current;
+    const chainLoopGroup = chainLoopRef.current;
+    const winnerGroup = winnerLightningRef.current;
+    if (!scene || !nodesGroup || !chainLoopGroup || !winnerGroup) return;
+
+    // Clear previous children
+    while (nodesGroup.children.length > 0) {
+      nodesGroup.remove(nodesGroup.children[0]);
+    }
+    while (chainLoopGroup.children.length > 0) {
+      chainLoopGroup.remove(chainLoopGroup.children[0]);
+    }
+    while (winnerGroup.children.length > 0) {
+      winnerGroup.remove(winnerGroup.children[0]);
+    }
 
     const radius = 9.5;
     const nodeCount = nodes.length;
@@ -467,7 +624,6 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
         emissiveIntensity: 0.6,
         roughness: 0.3,
         metalness: 0.8,
-        wireframe: false,
       });
       const chainTube = new THREE.Mesh(chainTubeGeo, chainTubeMat);
       chainLoopGroup.add(chainTube);
@@ -475,17 +631,11 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
       nodesGroup.add(nodeSubGroup);
     });
 
-    // 11. Winner Golden Lightning Aura
-    const winnerGroup = new THREE.Group();
-    winnerLightningRef.current = winnerGroup;
-    winnerGroup.visible = false;
-    scene.add(winnerGroup);
-
+    // Winner Lightning Beam & Golden Column
     if (lowestBidNode) {
       const winX = Math.cos(lowestBidNode.angle) * radius;
       const winZ = Math.sin(lowestBidNode.angle) * radius;
 
-      // Golden Vertical Light Column
       const winCylinderGeo = new THREE.CylinderGeometry(1.2, 1.2, 12, 32, 1, true);
       const winCylinderMat = new THREE.MeshBasicMaterial({
         color: 0xffd700,
@@ -498,7 +648,6 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
       winCylinder.position.set(winX, 4, winZ);
       winnerGroup.add(winCylinder);
 
-      // Golden Lightning Beam from Core to Winner
       const beamGeo = new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(0, 0, 0),
         new THREE.Vector3(winX, 0, winZ),
@@ -510,129 +659,9 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
       const lightningBeam = new THREE.Line(beamGeo, beamMat);
       winnerGroup.add(lightningBeam);
     }
+  }, [nodes, lowestBidNode]);
 
-    // 12. Animated Particle Stream
-    const particleCount = 350;
-    const particlesGeo = new THREE.BufferGeometry();
-    const particlePositions = new Float32Array(particleCount * 3);
-    const particleProgress = new Float32Array(particleCount);
-    const particleNodeIndex = new Float32Array(particleCount);
-
-    for (let i = 0; i < particleCount; i++) {
-      const nodeIdx = i % nodeCount;
-      particleNodeIndex[i] = nodeIdx;
-      particleProgress[i] = Math.random();
-
-      const nodeAngle = nodes[nodeIdx].angle;
-      const startX = Math.cos(nodeAngle) * radius;
-      const startZ = Math.sin(nodeAngle) * radius;
-      const t = particleProgress[i];
-
-      particlePositions[i * 3] = THREE.MathUtils.lerp(startX, 0, t);
-      particlePositions[i * 3 + 1] = Math.sin(t * Math.PI) * 1.8;
-      particlePositions[i * 3 + 2] = THREE.MathUtils.lerp(startZ, 0, t);
-    }
-
-    particlesGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
-    particlesGeoRef.current = particlesGeo;
-
-    const particleMat = new THREE.PointsMaterial({
-      color: 0xff3344,
-      size: 0.38,
-      transparent: true,
-      opacity: 0.95,
-      blending: THREE.AdditiveBlending,
-    });
-    const particleSystem = new THREE.Points(particlesGeo, particleMat);
-    particleStreamsRef.current = particleSystem;
-    scene.add(particleSystem);
-
-    // 13. Animation Loop
-    let animationFrameId: number;
-    let clock = new THREE.Clock();
-
-    const animate = () => {
-      animationFrameId = requestAnimationFrame(animate);
-      const elapsedTime = clock.getElapsedTime();
-
-      // Rotate starfield
-      starField.rotation.y = elapsedTime * 0.02;
-
-      // Central Vault Dynamic Rotations
-      if (centralVaultRef.current) {
-        centralVaultRef.current.children[1].rotation.x = elapsedTime * 0.45;
-        centralVaultRef.current.children[1].rotation.y = elapsedTime * 0.55;
-        centralVaultRef.current.children[2].rotation.x = -elapsedTime * 0.35;
-        centralVaultRef.current.children[2].rotation.z = elapsedTime * 0.65;
-        centralVaultRef.current.children[3].rotation.z = elapsedTime * 0.9;
-        centralVaultRef.current.children[4].rotation.z = -elapsedTime * 0.7;
-        centralVaultRef.current.children[5].rotation.x = elapsedTime * 0.8;
-      }
-
-      // Aave Matrix Animations
-      if (aaveMatrixRef.current && aaveMatrixRef.current.visible) {
-        aaveMatrixRef.current.children[0].rotation.y = elapsedTime * 1.3;
-        aaveMatrixRef.current.children[0].rotation.x = elapsedTime * 0.9;
-        aaveMatrixRef.current.children[1].rotation.z = -elapsedTime * 1.6;
-        aaveMatrixRef.current.position.y = 5.5 + Math.sin(elapsedTime * 2.2) * 0.45;
-      }
-
-      // Member Nodes Breathing Animation
-      if (nodesGroupRef.current) {
-        nodesGroupRef.current.children.forEach((group, idx) => {
-          group.children[0].rotation.y = elapsedTime * 0.9 + idx;
-          group.children[0].position.y = Math.sin(elapsedTime * 1.8 + idx) * 0.2;
-        });
-      }
-
-      // Update Particle Inflow Stream
-      if (particlesGeoRef.current && particleStreamsRef.current) {
-        const positions = particlesGeoRef.current.attributes.position.array as Float32Array;
-        for (let i = 0; i < particleCount; i++) {
-          let t = particleProgress[i] + 0.009;
-          if (t > 1) t = 0;
-          particleProgress[i] = t;
-
-          const nIdx = particleNodeIndex[i];
-          const nodeAngle = nodes[nIdx]?.angle || 0;
-          const startX = Math.cos(nodeAngle) * radius;
-          const startZ = Math.sin(nodeAngle) * radius;
-
-          positions[i * 3] = THREE.MathUtils.lerp(startX, 0, t);
-          positions[i * 3 + 1] = Math.sin(t * Math.PI) * 2.2;
-          positions[i * 3 + 2] = THREE.MathUtils.lerp(startZ, 0, t);
-        }
-        particlesGeoRef.current.attributes.position.needsUpdate = true;
-      }
-
-      controls.update();
-      renderer.render(scene, camera);
-    };
-
-    animate();
-
-    const handleResize = () => {
-      if (!container || !renderer || !camera) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener("resize", handleResize);
-      if (renderer.domElement && container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
-      }
-      renderer.dispose();
-    };
-  }, [nodes]);
-
-  // Stage Change Visual Effects
+  // 3. Stage Change Visual Effects (WITHOUT RESETTING CAMERA)
   useEffect(() => {
     if (!aaveMatrixRef.current || !particleStreamsRef.current || !centralVaultRef.current || !pointLightRef.current) return;
 
@@ -740,7 +769,31 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
           </div>
 
           {/* Quick Simulation & Auto-Play Control */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsAutoSpinning(!isAutoSpinning)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                isAutoSpinning
+                  ? "bg-red-950/60 text-red-400 border-red-500/80 shadow-[0_0_12px_rgba(255,23,68,0.3)]"
+                  : "bg-black text-neutral-400 hover:text-white border-neutral-800 hover:border-neutral-700"
+              }`}
+              title="Toggle Auto Orbit Twirling"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-red-500 ${isAutoSpinning ? "animate-spin" : ""}`} />
+              <span>{isAutoSpinning ? "Auto-Orbit ON" : "Auto-Orbit OFF"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleResetCamera}
+              className="p-2.5 rounded-xl bg-black text-neutral-400 hover:text-white border border-neutral-800 hover:border-neutral-700 transition-colors cursor-pointer flex items-center gap-1 text-xs"
+              title="Reset 3D View Angle"
+            >
+              <RotateCw className="w-3.5 h-3.5 text-red-500" />
+              <span>Reset View</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setIsPlayingAuto(!isPlayingAuto)}
@@ -917,7 +970,7 @@ export const MSTChainVisualizer3D: React.FC<MSTChainVisualizer3DProps> = ({
             </div>
 
             <div className="px-3 py-1.5 rounded-lg bg-black/80 backdrop-blur-md border border-neutral-800 text-[11px] font-mono text-neutral-400 pointer-events-auto">
-              Drag to Orbit • Scroll to Zoom
+              Drag to Twirl & Swirl • Scroll to Zoom
             </div>
           </div>
         </div>
