@@ -82,6 +82,11 @@ export function parseWalletError(err: any): string {
     return "BridgeKey extension was updated. Please refresh the page, then click Connect Wallet again.";
   }
 
+  // 3. Not a group member revert
+  if (rawMsg.includes("Not a group member")) {
+    return "You have not joined this circle yet. Please click 'Join Circle with Deposit' first to deposit your security buffer.";
+  }
+
   // 3. Extract nested message from ethers v6 "could not coalesce error"
   const messageMatch = rawMsg.match(/"message":\s*"([^"]+)"/);
   if (messageMatch && messageMatch[1]) {

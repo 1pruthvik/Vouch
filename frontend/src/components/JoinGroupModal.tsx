@@ -5,6 +5,8 @@ import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 interface JoinGroupModalProps {
   isOpen: boolean;
   onClose: () => void;
+  defaultGroupAddress?: string;
+  defaultDepositINR?: number;
   onJoin: (groupAddress: string, bufferDeposit: string) => void;
   isTechnicalMode: boolean;
 }
@@ -12,12 +14,23 @@ interface JoinGroupModalProps {
 export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
   isOpen,
   onClose,
+  defaultGroupAddress = "",
+  defaultDepositINR = 5000,
   onJoin,
   isTechnicalMode,
 }) => {
-  const [groupAddress, setGroupAddress] = useState("");
-  const [bufferDepositINR, setBufferDepositINR] = useState<number | "">("");
+  const [groupAddress, setGroupAddress] = useState(defaultGroupAddress);
+  const [bufferDepositINR, setBufferDepositINR] = useState<number | "">(defaultDepositINR);
   const [isJoining, setIsJoining] = useState(false);
+
+  React.useEffect(() => {
+    if (defaultGroupAddress) {
+      setGroupAddress(defaultGroupAddress);
+    }
+    if (defaultDepositINR) {
+      setBufferDepositINR(defaultDepositINR);
+    }
+  }, [defaultGroupAddress, defaultDepositINR, isOpen]);
 
   if (!isOpen) return null;
 

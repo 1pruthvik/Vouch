@@ -81,7 +81,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
   const bufferBalance = memberDetails?.bufferBalance || "0";
   const lockedDividends = memberDetails?.lockedDividends || "0";
   const hasPaidCurrentRound = memberDetails?.hasPaidCurrentRound || false;
-  const isMember = !!memberDetails;
+  const isMember = memberDetails?.isMember ?? false;
 
   // Traffic light status
   const trafficLight = getTrafficLightStatus(memberDetails?.solvency, memberDetails?.isDefaulted);
@@ -122,15 +122,15 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
               <span className="text-xs font-medium px-3 py-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', color: '#9ca3b4' }}>
                 {groupName}
               </span>
-              <span className={`v-badge ${statusBadgeClass}`}>
-                <span className="w-2 h-2 rounded-full" style={{ background: statusDotColor }} />
-                {trafficLight.label}
+              <span className={`v-badge ${isMember ? statusBadgeClass : 'v-badge-amber'}`}>
+                <span className="w-2 h-2 rounded-full" style={{ background: isMember ? statusDotColor : '#f5a623' }} />
+                {isMember ? trafficLight.label : "Pending Deposit"}
               </span>
             </div>
 
             {/* Amount */}
             <div>
-              <p className="text-sm text-[#9ca3b4] font-medium">Next Monthly Contribution</p>
+              <p className="text-sm text-[#9ca3b4] font-medium">Monthly Contribution</p>
               <div className="flex items-baseline gap-3 mt-1">
                 <h2 className="text-4xl sm:text-5xl font-bold text-white font-display tracking-tight">
                   {formattedInstallment}
@@ -144,7 +144,9 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
 
             {/* Description */}
             <p className="text-sm text-[#9ca3b4] max-w-lg leading-relaxed">
-              {hasPaidCurrentRound
+              {!isMember
+                ? `You have not joined this circle yet. Complete your refundable security deposit to activate your membership.`
+                : hasPaidCurrentRound
                 ? `This month's contribution is complete! The draw is in progress.`
                 : `Due for Month ${currentRound}. Approved mandates execute automatically.`}
             </p>

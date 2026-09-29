@@ -415,6 +415,8 @@ export function App() {
       <JoinGroupModal
         isOpen={isJoinModalOpen}
         onClose={() => setIsJoinModalOpen(false)}
+        defaultGroupAddress={activeGroupAddress}
+        defaultDepositINR={groupDetails ? Math.round(parseFloat(groupDetails.installmentAmount) * 1000) : 5000}
         onJoin={handleJoinGroup}
         isTechnicalMode={isTechnicalMode}
       />

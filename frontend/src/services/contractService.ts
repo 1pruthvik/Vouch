@@ -32,6 +32,7 @@ export interface GroupDetails {
 
 export interface MemberDetails {
   address: string;
+  isMember: boolean;
   bufferBalance: string;
   lockedDividends: string;
   paidInstallments: number;
@@ -280,24 +281,29 @@ export class ContractService {
   public async getMemberDetails(groupAddress: string, memberAddress: string): Promise<MemberDetails> {
     const group = new ethers.Contract(groupAddress, ChitGroupABI, this.provider);
 
-    const [m, solvency] = await Promise.all([
-      group.members(memberAddress),
-      group.checkSolvency(memberAddress),
+    const [m, solvency, membersList] = await Promise.all([
+      group.members(memberAddress).catch(() => null),
+      group.checkSolvency(memberAddress).catch(() => ({ isSolvent: false, totalBacking: 0n, requiredBacking: 0n })),
+      group.getMembers().catch(() => []),
     ]);
+
+    const isMember = (membersList && membersList.some((addr: string) => addr.toLowerCase() === memberAddress.toLowerCase())) ||
+      (m && m.addr && m.addr !== ethers.ZeroAddress && m.addr.toLowerCase() === memberAddress.toLowerCase());
 
     return {
       address: memberAddress,
-      bufferBalance: ethers.formatEther(m.bufferBalance),
-      lockedDividends: ethers.formatEther(m.lockedDividends),
-      paidInstallments: Number(m.paidInstallments),
-      hasPaidCurrentRound: m.hasPaidCurrentRound ?? false,
-      hasWon: m.hasWon,
-      winRound: Number(m.winRound),
-      isDefaulted: m.isDefaulted,
+      isMember: Boolean(isMember),
+      bufferBalance: m?.bufferBalance ? ethers.formatEther(m.bufferBalance) : "0",
+      lockedDividends: m?.lockedDividends ? ethers.formatEther(m.lockedDividends) : "0",
+      paidInstallments: m?.paidInstallments ? Number(m.paidInstallments) : 0,
+      hasPaidCurrentRound: m?.hasPaidCurrentRound ?? false,
+      hasWon: m?.hasWon ?? false,
+      winRound: m?.winRound ? Number(m.winRound) : 0,
+      isDefaulted: m?.isDefaulted ?? false,
       solvency: {
-        isSolvent: solvency.isSolvent,
-        totalBacking: ethers.formatEther(solvency.totalBacking),
-        requiredBacking: ethers.formatEther(solvency.requiredBacking),
+        isSolvent: solvency?.isSolvent ?? false,
+        totalBacking: solvency?.totalBacking ? ethers.formatEther(solvency.totalBacking) : "0",
+        requiredBacking: solvency?.requiredBacking ? ethers.formatEther(solvency.requiredBacking) : "0",
       },
     };
   }
