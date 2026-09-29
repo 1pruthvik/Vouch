@@ -14,7 +14,7 @@ import { useWallet } from "./hooks/useWallet";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
 import { fetchLedgerEvents, fetchIndexedGroups } from "./services/indexerService";
-import { UserPlus, Shield, CheckCircle2, AlertCircle, Sparkles, Home, Box, History } from "lucide-react";
+import { UserPlus, CheckCircle2, AlertCircle, Sparkles, Home, Box, History } from "lucide-react";
 
 export function App() {
   const {
@@ -33,22 +33,18 @@ export function App() {
 
   const [contractService, setContractService] = useState<ContractService | null>(null);
 
-  // Modals
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isMandateModalOpen, setIsMandateModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
-  // Progressive Disclosure: Technical Pro Mode Toggle
   const [isTechnicalMode, setIsTechnicalMode] = useState<boolean>(false);
 
-  // Tabs
-  const [activeTab, setActiveTab] = useState<"home" | "draw" | "standing" | "network" | "history">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "draw" | "network" | "history">("home");
 
-  // State
   const [activeGroupAddress, setActiveGroupAddress] = useState<string>(() => {
-    return localStorage.getItem("vouch_active_group") || "0xAf378D33B037A6668fOd128c4BBA28bb65974D9b";
+    return localStorage.getItem("vouch_active_group") || "";
   });
   const [availableGroups, setAvailableGroups] = useState<AvailableCircle[]>([]);
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
@@ -61,37 +57,12 @@ export function App() {
     return localStorage.getItem("vouch_autopay_active") === "true";
   });
 
-  // Load available groups dynamically from backend and localStorage
   const loadAvailableGroups = useCallback(async () => {
     try {
       const indexed = await fetchIndexedGroups();
       const customSaved: AvailableCircle[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
-
       const combinedMap = new Map<string, AvailableCircle>();
 
-      // Base active circles
-      const baseCircles: AvailableCircle[] = [
-        {
-          address: "0xAf378D33B037A6668fOd128c4BBA28bb65974D9b",
-          name: "Alpha Savings Circle",
-          memberCount: 5,
-          installmentAmount: "5.0",
-        },
-        {
-          address: "0xb794f5ea0ba39494ce839613fffba74279579268",
-          name: "Bangalore Techies Chit",
-          memberCount: 4,
-          installmentAmount: "10.0",
-        },
-        {
-          address: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
-          name: "Family Emergency Pool",
-          memberCount: 5,
-          installmentAmount: "2.0",
-        },
-      ];
-
-      baseCircles.forEach((c) => combinedMap.set(c.address.toLowerCase(), c));
       customSaved.forEach((c) => combinedMap.set(c.address.toLowerCase(), c));
 
       if (Array.isArray(indexed)) {
@@ -99,32 +70,63 @@ export function App() {
           if (g.address) {
             combinedMap.set(g.address.toLowerCase(), {
               address: g.address,
-              name: g.group_name || g.name || "Community Pool",
-              memberCount: g.member_count || g.memberCount || 5,
-              installmentAmount: g.installment_amount || g.installmentAmount || "5.0",
+              name: g.groupName || g.name || `Circle (${g.address.substring(0, 6)}...)`,
+              memberCount: Number(g.memberCount || 5),
+              installmentAmount: String(g.installmentAmount || "1.0"),
             });
           }
         });
       }
 
-      setAvailableGroups(Array.from(combinedMap.values()));
+      if (contractService) {
+        try {
+          const factoryGroups = await contractService.getDeployedGroupsFromFactory();
+          for (const addr of factoryGroups) {
+            if (!combinedMap.has(addr.toLowerCase())) {
+              try {
+                const gd = await contractService.getGroupDetails(addr);
+                combinedMap.set(addr.toLowerCase(), {
+                  address: addr,
+                  name: gd.name,
+                  memberCount: gd.memberCount,
+                  installmentAmount: gd.installmentAmount,
+                });
+              } catch {
+                combinedMap.set(addr.toLowerCase(), {
+                  address: addr,
+                  name: `Circle (${addr.substring(0, 6)}...)`,
+                  memberCount: 5,
+                  installmentAmount: "1.0",
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("Factory fetch error:", err);
+        }
+      }
+
+      const list = Array.from(combinedMap.values());
+      setAvailableGroups(list);
+
+      if (!activeGroupAddress && list.length > 0) {
+        setActiveGroupAddress(list[0].address);
+      }
     } catch (err) {
-      console.warn("Could not load available groups:", err);
+      console.warn("Failed to load circles:", err);
     }
-  }, []);
+  }, [contractService, activeGroupAddress]);
 
   useEffect(() => {
     loadAvailableGroups();
   }, [loadAvailableGroups]);
 
-  // Persist activeGroupAddress
   useEffect(() => {
     if (activeGroupAddress) {
       localStorage.setItem("vouch_active_group", activeGroupAddress);
     }
   }, [activeGroupAddress]);
 
-  // Persist AutoPay state
   useEffect(() => {
     localStorage.setItem("vouch_autopay_active", isMandateActive ? "true" : "false");
   }, [isMandateActive]);
@@ -134,7 +136,6 @@ export function App() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  // Initialize ContractService
   useEffect(() => {
     const srv = new ContractService((provider as any) || undefined);
     if (signer) {
@@ -143,7 +144,6 @@ export function App() {
     setContractService(srv);
   }, [provider, signer]);
 
-  // Refresh Group and Member state
   const refreshData = useCallback(async () => {
     if (!activeGroupAddress || !contractService) return;
     try {
@@ -154,7 +154,6 @@ export function App() {
         const mDetails = await contractService.getMemberDetails(activeGroupAddress, account);
         setMemberDetails(mDetails);
 
-        // Fetch AI risk prediction
         const aiResult = await fetchRiskAdvisory({
           member: account,
           term_length: gDetails.memberCount,
@@ -166,7 +165,6 @@ export function App() {
         setRiskAdvisory(aiResult);
       }
 
-      // Fetch indexer events
       const events = await fetchLedgerEvents(activeGroupAddress);
       setLedgerEvents(events);
     } catch (err: any) {
@@ -174,28 +172,12 @@ export function App() {
     }
   }, [activeGroupAddress, contractService, account]);
 
-  const handleSelectGroup = async (addr: string) => {
-    setActiveGroupAddress(addr);
-    const srv = contractService || new ContractService((provider as any) || undefined);
-    try {
-      const g = await srv.getGroupDetails(addr);
-      setGroupDetails(g);
-      if (account) {
-        const m = await srv.getMemberDetails(addr, account);
-        setMemberDetails(m);
-      }
-    } catch (e) {
-      console.warn("Could not load group details on selection:", e);
-    }
-  };
-
   useEffect(() => {
     if (activeGroupAddress) {
       refreshData();
     }
   }, [activeGroupAddress, refreshData]);
 
-  // Handler: Create Group
   const handleCreateGroup = async (params: {
     groupName: string;
     memberCount: number;
@@ -212,37 +194,27 @@ export function App() {
       showNotification("Deploying Chit Group to MST Testnet...");
       const result = await contractService.createGroup(params);
       if (result.groupAddress) {
-        const newCircle: AvailableCircle = {
+        setActiveGroupAddress(result.groupAddress);
+        const saved: AvailableCircle[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
+        saved.push({
           address: result.groupAddress,
           name: params.groupName,
           memberCount: params.memberCount,
           installmentAmount: params.installmentAmount,
-        };
-        const customSaved: AvailableCircle[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
-        customSaved.unshift(newCircle);
-        localStorage.setItem("vouch_custom_groups", JSON.stringify(customSaved));
-
-        // Register with indexer
-        fetch("http://localhost:4000/api/groups/index", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: result.groupAddress }),
-        }).catch(() => {});
-
-        loadAvailableGroups();
-        setActiveGroupAddress(result.groupAddress);
-        showNotification(`Circle "${params.groupName}" deployed at ${result.groupAddress.substring(0, 10)}...`);
+        });
+        localStorage.setItem("vouch_custom_groups", JSON.stringify(saved));
+        showNotification(`Group deployed at ${result.groupAddress.substring(0, 10)}...`);
       } else {
         showNotification("Group creation transaction confirmed.");
       }
       await refreshData();
+      await loadAvailableGroups();
     } catch (err: any) {
       console.error(err);
       showNotification(err.message || "Failed to create group", true);
     }
   };
 
-  // Handler: Join Group
   const handleJoinGroup = async (groupAddr: string, bufferDeposit: string) => {
     if (!contractService || !account) {
       setIsConnectModalOpen(true);
@@ -254,17 +226,17 @@ export function App() {
       setActiveGroupAddress(groupAddr);
       showNotification("Successfully joined the group!");
       await refreshData();
+      await loadAvailableGroups();
     } catch (err: any) {
       console.error(err);
       showNotification(err.message || "Failed to join group", true);
     }
   };
 
-  // Handler: Pay Monthly Contribution
   const handlePayInstallment = async () => {
     if (!contractService || !activeGroupAddress || !groupDetails) return;
     try {
-      showNotification(`Processing monthly installment of ${groupDetails.installmentAmount} tMSTC...`);
+      showNotification(`Processing installment of ${groupDetails.installmentAmount} tMSTC...`);
       await contractService.payInstallment(activeGroupAddress, groupDetails.installmentAmount);
       showNotification("Monthly contribution confirmed on blockchain!");
       await refreshData();
@@ -274,7 +246,6 @@ export function App() {
     }
   };
 
-  // Handler: Commit Early Payout Request
   const handleCommitBid = async (bidAmountMST: string) => {
     if (!contractService || !activeGroupAddress) return;
     try {
@@ -288,7 +259,6 @@ export function App() {
     }
   };
 
-  // Handler: Reveal Bid
   const handleRevealBid = async (bidAmountMST: string) => {
     if (!contractService || !activeGroupAddress) return;
     try {
@@ -302,7 +272,6 @@ export function App() {
     }
   };
 
-  // Handler: Settle Draw
   const handleSettleRound = async () => {
     if (!contractService || !activeGroupAddress) return;
     try {
@@ -317,16 +286,14 @@ export function App() {
   };
 
   const tabs = [
-    { id: "home" as const, label: "Circle Home", icon: <Home className="w-4 h-4" /> },
-    { id: "draw" as const, label: "This Month's Draw", icon: <Sparkles className="w-4 h-4" /> },
-    { id: "standing" as const, label: "Your Standing", icon: <Shield className="w-4 h-4" /> },
+    { id: "home" as const, label: "Group Home", icon: <Home className="w-4 h-4" /> },
+    { id: "draw" as const, label: "Reverse Auction", icon: <Sparkles className="w-4 h-4" /> },
     { id: "network" as const, label: "3D Network", icon: <Box className="w-4 h-4" /> },
-    { id: "history" as const, label: "Transactions", icon: <History className="w-4 h-4" /> },
+    { id: "history" as const, label: "Ledger History", icon: <History className="w-4 h-4" /> },
   ];
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
-      {/* Header */}
+    <div className="min-h-screen flex flex-col bg-black text-neutral-100">
       <Header
         account={account}
         balance={balance}
@@ -334,64 +301,71 @@ export function App() {
         groupName={groupDetails?.name}
         isTechnicalMode={isTechnicalMode}
         onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
-        onOpenAccountModal={() => {
-          if (!account) {
-            clearError();
-            setIsConnectModalOpen(true);
-          } else {
-            setIsAccountModalOpen(true);
-          }
-        }}
+        onOpenAccountModal={() => setIsAccountModalOpen(true)}
         onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
         onSwitchGroup={() => {
           setActiveGroupAddress("");
           setGroupDetails(null);
+          setActiveTab("home");
         }}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
-        {/* Toast */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {notification && (
-          <div className={`v-toast ${notification.isError ? 'v-toast-error' : 'v-toast-success'}`}>
-            <div className="flex items-center gap-2.5">
+          <div
+            className={`p-4 rounded-lg flex items-center justify-between text-xs sm:text-sm font-semibold transition-all ${
+              notification.isError
+                ? "text-red-400 bg-red-950/20"
+                : "text-neutral-100 bg-transparent"
+            }`}
+          >
+            <div className="flex items-center gap-2">
               {notification.isError ? (
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
               ) : (
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-red-500 flex-shrink-0" />
               )}
               <span>{notification.message}</span>
             </div>
             <button
               onClick={() => setNotification(null)}
-              className="text-inherit opacity-60 hover:opacity-100 ml-4 transition-opacity"
+              className="text-neutral-400 hover:text-white ml-4"
             >
               ✕
             </button>
           </div>
         )}
 
-        {/* Navigation Tabs */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`v-nav-pill ${activeTab === tab.id ? 'v-nav-pill--active' : 'v-nav-pill--inactive'}`}
-              >
-                {tab.icon}
-                <span className="hidden sm:inline">{tab.label}</span>
-              </button>
-            ))}
+        {/* ── Tabs Navigation: Transparent background, scales up, raises a little, and turns red ── */}
+        <div className="flex items-center justify-between gap-3 pb-2">
+          <div className="flex items-center gap-5 sm:gap-7 flex-wrap py-2">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-1 py-1 text-xs sm:text-sm flex items-center gap-2 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
+                    isActive
+                      ? "text-red-500 font-bold scale-110 -translate-y-1 drop-shadow-[0_0_10px_rgba(255,23,68,0.5)]"
+                      : "text-neutral-500 font-medium scale-100 translate-y-0 hover:text-neutral-300 hover:-translate-y-0.5"
+                  }`}
+                >
+                  <span className={isActive ? "text-red-500" : "text-neutral-500"}>
+                    {tab.icon}
+                  </span>
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="hidden sm:flex items-center gap-2">
             <button
               onClick={() => setIsJoinModalOpen(true)}
-              className="v-btn-ghost text-xs"
+              className="btn-secondary text-xs"
             >
-              <UserPlus className="w-3.5 h-3.5 text-[#2dd4a8]" />
+              <UserPlus className="w-3.5 h-3.5 text-red-500" />
               Join Circle
             </button>
           </div>
@@ -399,7 +373,7 @@ export function App() {
 
         {/* Tab 1: Group Home */}
         {activeTab === "home" && (
-          <div className="space-y-5 anim-fade-up">
+          <div className="space-y-6">
             <MemberDashboard
               account={account}
               groupDetails={groupDetails}
@@ -408,7 +382,9 @@ export function App() {
               isTechnicalMode={isTechnicalMode}
               isMandateActive={isMandateActive}
               availableGroups={availableGroups}
-              onSelectGroup={handleSelectGroup}
+              onSelectGroup={(addr) => {
+                setActiveGroupAddress(addr);
+              }}
               onPayInstallment={handlePayInstallment}
               onOpenMandateModal={() => setIsMandateModalOpen(true)}
               onOpenDrawTab={() => setActiveTab("draw")}
@@ -417,7 +393,7 @@ export function App() {
             />
 
             {groupDetails && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
                 <div className="lg:col-span-2">
                   <LedgerView
                     events={ledgerEvents.slice(0, 4)}
@@ -438,7 +414,7 @@ export function App() {
 
         {/* Tab 2: Reverse Auction */}
         {activeTab === "draw" && (
-          <div className="space-y-5 anim-fade-up">
+          <div className="space-y-6">
             <AuctionBidding
               currentRound={groupDetails?.currentRound || 1}
               totalPot={groupDetails?.currentPot || "0"}
@@ -456,39 +432,9 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 3: Solvency & Standing */}
-        {activeTab === "standing" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 anim-fade-up">
-            <div className="lg:col-span-2">
-              <MemberDashboard
-                account={account}
-                groupDetails={groupDetails}
-                memberDetails={memberDetails}
-                riskAdvisory={riskAdvisory}
-                isTechnicalMode={isTechnicalMode}
-                isMandateActive={isMandateActive}
-                availableGroups={availableGroups}
-                onSelectGroup={handleSelectGroup}
-                onPayInstallment={handlePayInstallment}
-                onOpenMandateModal={() => setIsMandateModalOpen(true)}
-                onOpenDrawTab={() => setActiveTab("draw")}
-                onJoinGroup={() => setIsJoinModalOpen(true)}
-                onCreateGroup={() => setIsCreateModalOpen(true)}
-              />
-            </div>
-            <div>
-              <RiskAdvisorCard
-                memberAddress={account || ""}
-                riskAdvisory={riskAdvisory}
-                isTechnicalMode={isTechnicalMode}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Tab 4: 3D Blockchain Network */}
+        {/* Tab 3: 3D Blockchain Network */}
         {activeTab === "network" && (
-          <div className="space-y-5 anim-fade-up">
+          <div className="space-y-6">
             <BlockchainNetwork3D
               currentAccount={account}
               groupDetails={groupDetails}
@@ -499,9 +445,9 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 5: Ledger History */}
+        {/* Tab 4: Ledger History */}
         {activeTab === "history" && (
-          <div className="space-y-5 anim-fade-up">
+          <div className="space-y-6">
             <LedgerView
               events={ledgerEvents}
               isTechnicalMode={isTechnicalMode}

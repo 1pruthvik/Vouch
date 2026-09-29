@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Sparkles, Clock, CheckCircle2, ArrowRight, Gift, Trophy, Code2 } from "lucide-react";
+import { Sparkles, ArrowRight, Trophy, Code2 } from "lucide-react";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 import { GroupDetails } from "../services/contractService";
 
@@ -38,7 +38,6 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
   const maxPotINR = Math.round(potFloat * MST_TO_INR_RATE);
   const minPotINR = Math.round(minBidFloat * MST_TO_INR_RATE);
 
-  // Slider value in INR
   const [requestedPayoutINR, setRequestedPayoutINR] = useState<number>(maxPotINR);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -69,12 +68,12 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
 
   if (!groupDetails || potFloat === 0) {
     return (
-      <div className="v-card text-center py-12 px-6 space-y-3">
-        <div className="w-12 h-12 rounded-2xl bg-white/5 text-[#f5a623] flex items-center justify-center mx-auto">
+      <div className="text-center py-12 px-6 space-y-3">
+        <div className="w-12 h-12 text-red-500 flex items-center justify-center mx-auto">
           <Sparkles className="w-6 h-6" />
         </div>
         <h3 className="text-base font-bold text-white font-display">No Active Round Draw</h3>
-        <p className="text-xs text-[#9ca3b4] max-w-md mx-auto">
+        <p className="text-xs text-neutral-400 max-w-md mx-auto">
           Reverse auction bidding will open automatically when all member contributions for the round are collected.
         </p>
       </div>
@@ -82,72 +81,54 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
   }
 
   return (
-    <div className="space-y-5 anim-fade-up">
-      {/* ── DRAW HEADER ── */}
-      <div className="v-card-hero p-6 sm:p-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+    <div className="space-y-6">
+      {/* ── Draw Header ── */}
+      <div className="space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="v-badge v-badge-green mb-3">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-red-500 mb-2">
               <Sparkles className="w-3.5 h-3.5" />
               ROUND {currentRound} DRAW
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-white font-display">
-              This Month's Savings Pot
+              Round Savings Pot
             </h2>
-            <p className="text-sm text-[#9ca3b4] mt-2 max-w-lg leading-relaxed">
-              One member receives the full pot early each month. Request your payout below if you need funds now.
+            <p className="text-sm text-neutral-400 mt-1 max-w-lg leading-relaxed">
+              Request your payout below via reverse auction discount bidding.
             </p>
           </div>
 
-          <div className="p-5 rounded-2xl text-center sm:text-right min-w-[200px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <p className="text-xs text-[#9ca3b4] font-medium">Total Pool Value</p>
-            <p className="text-3xl font-bold font-display tracking-tight mt-1" style={{ color: '#2dd4a8' }}>
-              {formatRawINR(maxPotINR)}
-            </p>
-            <p className="text-[11px] text-[#5f6578] mt-1">
-              {potFloat} tMSTC ({groupDetails.memberCount} members)
-            </p>
+          <div className="flex flex-col sm:items-end">
+            <span className="text-xs text-neutral-400 uppercase tracking-wider font-medium">Total Round Pot</span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-3xl sm:text-4xl font-bold text-white font-display">
+                {formatRawINR(maxPotINR)}
+              </span>
+              <span className="text-xs text-neutral-400 font-mono">({totalPot} tMSTC)</span>
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-red-400 font-semibold">Phase: {phase}</span>
+            </div>
           </div>
-        </div>
-
-        {/* Phase / Countdown */}
-        <div className="mt-6 pt-5 flex flex-wrap items-center justify-between gap-3 text-xs" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-[#f5a623]" />
-            <span className="font-semibold text-white font-display">
-              Phase: {phase}
-            </span>
-          </div>
-          <span className="text-[#9ca3b4]">
-            {phase === "Commit" && "Secret payout request phase open"}
-            {phase === "Reveal" && "Revealing verified requests..."}
-            {phase === "Collect" && "Collecting member installments"}
-            {phase === "Settle" && "Round ready for settlement"}
-            {phase === "Forming" && "Waiting for members to join"}
-            {phase === "Closed" && "Circle closed"}
-          </span>
         </div>
       </div>
 
-      {/* ── EARLY PAYOUT REQUEST ── */}
-      {!hasWonPreviously ? (
-        <div className="v-card p-6 sm:p-7 space-y-6">
-          <div>
-            <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
-              <Gift className="w-4 h-4 text-[#f5a623]" />
-              Request Early Payout
-            </h3>
-            <p className="text-sm text-[#9ca3b4] mt-1 leading-relaxed">
-              How much less would you accept? The member offering the best discount wins the pot — the rest is shared as savings dividends.
-            </p>
-          </div>
-
+      {/* ── Bidding / Settlement Section ── */}
+      {hasWonPreviously ? (
+        <div className="text-center py-8 space-y-2">
+          <Trophy className="w-8 h-8 text-red-500 mx-auto" />
+          <h3 className="text-sm font-bold text-white">Draw Payout Already Received</h3>
+          <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+            You received the round pot in a prior cycle. Continue contributing monthly to earn draw discounts.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
           <form onSubmit={handleRequestPayout} className="space-y-6">
-            {/* Slider */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#9ca3b4] font-medium">Your Requested Payout</span>
-                <span className="text-2xl font-bold font-display" style={{ color: '#2dd4a8' }}>
+                <span className="text-sm font-medium text-neutral-300">Requested Payout</span>
+                <span className="text-xl font-bold text-white font-display">
                   {formatRawINR(requestedPayoutINR)}
                 </span>
               </div>
@@ -158,106 +139,64 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
                 max={maxPotINR}
                 step={100}
                 value={requestedPayoutINR}
-                onChange={(e) => setRequestedPayoutINR(parseInt(e.target.value))}
-                className="w-full"
-                disabled={hasCommitted || (phase !== "Commit" && phase !== "Reveal")}
+                onChange={(e) => setRequestedPayoutINR(Number(e.target.value))}
+                className="w-full h-2 bg-neutral-900 rounded-lg appearance-none cursor-pointer accent-red-600"
               />
 
-              <div className="flex justify-between text-[11px] text-[#5f6578] font-medium">
+              <div className="flex items-center justify-between text-[11px] text-neutral-500">
                 <span>Min: {formatRawINR(minPotINR)}</span>
-                <span>Full: {formatRawINR(maxPotINR)}</span>
+                <span>Max: {formatRawINR(maxPotINR)}</span>
               </div>
             </div>
 
-            {/* Impact Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-4 rounded-2xl" style={{ background: 'rgba(139, 92, 246, 0.06)', border: '1px solid rgba(139, 92, 246, 0.12)' }}>
-                <p className="text-[11px] text-[#9ca3b4] font-medium">Discount Shared with Circle</p>
-                <p className="text-xl font-bold font-display mt-1" style={{ color: '#8b5cf6' }}>
-                  {formatRawINR(discountOfferedINR)}
-                </p>
-                <p className="text-[10px] text-[#5f6578] mt-0.5">Increases your chance of winning</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-3 bg-neutral-950 rounded-lg">
+                <p className="text-neutral-500">Discount Offered</p>
+                <p className="text-base font-bold text-white font-display mt-0.5">{formatRawINR(discountOfferedINR)}</p>
               </div>
-              <div className="p-4 rounded-2xl" style={{ background: 'rgba(245, 166, 35, 0.06)', border: '1px solid rgba(245, 166, 35, 0.12)' }}>
-                <p className="text-[11px] text-[#9ca3b4] font-medium">Each Member Earns</p>
-                <p className="text-xl font-bold font-display mt-1" style={{ color: '#f5a623' }}>
-                  ~{formatRawINR(memberSavingsShareINR)}
-                </p>
-                <p className="text-[10px] text-[#5f6578] mt-0.5">Added to everyone's savings</p>
+              <div className="p-3 bg-neutral-950 rounded-lg">
+                <p className="text-neutral-500">Member Dividend Share</p>
+                <p className="text-base font-bold text-red-400 font-display mt-0.5">{formatRawINR(memberSavingsShareINR)}</p>
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-              <div className="flex items-center gap-2 text-xs text-[#9ca3b4]">
-                <CheckCircle2 className="w-4 h-4 text-[#2dd4a8] flex-shrink-0" />
-                <span>Encrypted on blockchain — nobody sees your request until the draw.</span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {phase === "Reveal" && !hasRevealed && (
-                  <button type="submit" disabled={isSubmitting} className="v-btn-primary text-sm">
-                    {isSubmitting ? "Revealing..." : "Confirm & Reveal"}
-                  </button>
-                )}
-
-                {phase === "Commit" && (
-                  <button
-                    type="submit"
-                    disabled={hasCommitted || isSubmitting}
-                    className="v-btn-primary text-sm"
-                  >
-                    {hasCommitted ? "Request Submitted ✓" : isSubmitting ? "Submitting..." : "Submit Request"}
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                )}
-
-                {(phase === "Reveal" || phase === "Settle") && (
-                  <button type="button" onClick={onSettleRound} className="v-btn-secondary text-sm">
-                    <Trophy className="w-3.5 h-3.5 text-[#f5a623]" />
-                    Finalize Draw
-                  </button>
-                )}
-              </div>
-            </div>
+            <button
+              type="submit"
+              disabled={isSubmitting || (phase !== "Commit" && phase !== "Reveal")}
+              className="btn-primary w-full py-3"
+            >
+              {isSubmitting
+                ? "Submitting..."
+                : phase === "Commit"
+                ? `Commit Secret Bid (${formatRawINR(requestedPayoutINR)})`
+                : phase === "Reveal"
+                ? `Reveal Bid (${formatRawINR(requestedPayoutINR)})`
+                : `Bidding Opens in Commit Phase`}
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </form>
-        </div>
-      ) : (
-        <div className="v-card p-8 text-center space-y-3 anim-scale-in">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'rgba(245, 166, 35, 0.1)' }}>
-            <Trophy className="w-7 h-7 text-[#f5a623]" />
-          </div>
-          <h3 className="text-lg font-bold text-white font-display">
-            You received your payout in Round {groupDetails.currentRound}!
-          </h3>
-          <p className="text-sm text-[#9ca3b4] max-w-md mx-auto">
-            You'll continue earning monthly savings dividends while contributing your standard payment until the circle finishes.
-          </p>
+
+          {phase === "Settle" && (
+            <button
+              onClick={onSettleRound}
+              className="btn-secondary w-full py-3 text-xs text-red-400"
+            >
+              Settle Round & Distribute Dividends
+            </button>
+          )}
         </div>
       )}
 
-      {/* ── TECHNICAL DETAILS ── */}
+      {/* ── Technical Details ── */}
       {isTechnicalMode && (
-        <div className="v-tech-box text-xs space-y-2.5 anim-fade-up">
-          <div className="flex items-center justify-between pb-1.5" style={{ borderBottom: '1px solid rgba(139, 92, 246, 0.15)' }}>
-            <span className="font-bold text-[#8b5cf6] flex items-center gap-1.5">
-              <Code2 className="w-4 h-4" />
-              Reverse Auction Cryptographic Mechanics
-            </span>
-            <span className="text-[10px] font-mono text-[#8b5cf6]/80">Commit-Reveal Protocol</span>
+        <div className="text-xs space-y-2 pt-4">
+          <div className="flex items-center gap-1.5 font-semibold text-neutral-400">
+            <Code2 className="w-3.5 h-3.5 text-red-500" />
+            Reverse Auction Mechanics
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
-            <div>
-              <p className="text-[#5f6578]">Current Phase State</p>
-              <p className="font-mono text-[#2dd4a8] uppercase">{phase}</p>
-            </div>
-            <div>
-              <p className="text-[#5f6578]">Discount Floor</p>
-              <p className="font-mono text-[#9ca3b4]">
-                {minBidAllowed} tMSTC ({groupDetails?.discountCapBps || 3000} BPS max cap)
-              </p>
-            </div>
-          </div>
+          <p className="text-neutral-500 font-mono text-[11px]">
+            Lowest payout requested wins the round. The difference between full pot and winning bid is distributed equally as locked dividends to all other solvent members.
+          </p>
         </div>
       )}
     </div>

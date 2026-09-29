@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Wallet, Key, Shield, ArrowRight, AlertCircle, RefreshCw } from "lucide-react";
+import { X, Wallet, Key, AlertCircle, RefreshCw } from "lucide-react";
 import { EIP6963ProviderDetail } from "../types/global";
 
 interface ConnectWalletModalProps {
@@ -69,145 +69,124 @@ export const ConnectWalletModal: React.FC<ConnectWalletModalProps> = ({
   const isExtensionUpdateError = activeError?.toLowerCase().includes("refresh");
 
   return (
-    <div className="v-overlay">
-      <div className="v-modal p-7 space-y-5">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(45, 212, 168, 0.1)' }}>
-              <Wallet className="w-5 h-5 text-[#2dd4a8]" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white font-display">Connect Account</h2>
-              <p className="text-xs text-[#5f6578]">Link your MST Testnet wallet</p>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90">
+      <div className="bg-black max-w-md w-full p-8 rounded-xl relative space-y-6">
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 text-neutral-400 hover:text-white"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs font-semibold text-red-500">
+            <Wallet className="w-4 h-4" />
+            Wallet Connection
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-[#5f6578] hover:text-white hover:bg-white/5 transition-all duration-200">
-            <X className="w-5 h-5" />
-          </button>
+          <h2 className="text-xl font-bold text-white font-display">
+            Connect Account
+          </h2>
+          <p className="text-xs text-neutral-400">
+            Link your MST Testnet wallet to access your savings circles.
+          </p>
         </div>
 
         {/* Tab Toggle */}
-        <div className="flex rounded-2xl p-1" style={{ background: 'rgba(255,255,255,0.04)' }}>
+        <div className="flex gap-2 p-1 bg-neutral-950 rounded-lg text-xs">
           <button
             onClick={() => handleTabChange("extension")}
-            className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200"
-            style={{ background: tab === "extension" ? 'rgba(255,255,255,0.08)' : 'transparent', color: tab === "extension" ? 'white' : '#5f6578' }}
+            className={`flex-1 py-2 rounded-md font-semibold transition-all ${
+              tab === "extension" ? "bg-red-600 text-white" : "text-neutral-400 hover:text-white"
+            }`}
           >
             Browser Extension
           </button>
           <button
             onClick={() => handleTabChange("privateKey")}
-            className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200"
-            style={{ background: tab === "privateKey" ? 'rgba(255,255,255,0.08)' : 'transparent', color: tab === "privateKey" ? 'white' : '#5f6578' }}
+            className={`flex-1 py-2 rounded-md font-semibold transition-all ${
+              tab === "privateKey" ? "bg-red-600 text-white" : "text-neutral-400 hover:text-white"
+            }`}
           >
             Private Key
           </button>
         </div>
 
-        {/* Error Notification */}
         {activeError && (
-          <div className="v-toast v-toast-error text-xs flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span className="leading-relaxed">{activeError}</span>
+          <div className="p-3 bg-red-950/20 text-red-400 rounded-lg flex items-start gap-2.5 text-xs">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p>{activeError}</p>
+              {isExtensionUpdateError && (
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-1 flex items-center gap-1.5 text-[11px] underline font-semibold text-red-300 hover:text-white"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  Reload Page Now
+                </button>
+              )}
             </div>
-            {isExtensionUpdateError && (
-              <button
-                type="button"
-                onClick={() => window.location.reload()}
-                className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-semibold text-[11px] inline-flex items-center gap-1.5 flex-shrink-0 transition-colors"
-              >
-                <RefreshCw className="w-3 h-3" />
-                Reload Page
-              </button>
-            )}
           </div>
         )}
 
-        {/* Extension Tab */}
-        {tab === "extension" && (
+        {tab === "extension" ? (
           <div className="space-y-3">
             {detectedProviders.length > 0 ? (
-              detectedProviders.map((prov) => (
+              detectedProviders.map((prov, i) => (
                 <button
-                  key={prov.info.uuid}
+                  key={i}
                   onClick={() => handleExtensionClick(prov)}
                   disabled={isSubmitting}
-                  className="w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all duration-200 hover:bg-white/5"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                  className="w-full p-4 rounded-lg bg-neutral-950 hover:bg-neutral-900 transition-all flex items-center justify-between text-xs text-left"
                 >
                   <div className="flex items-center gap-3">
                     {prov.info.icon ? (
-                      <img src={prov.info.icon} alt={prov.info.name} className="w-7 h-7 rounded-lg" />
+                      <img src={prov.info.icon} alt="" className="w-6 h-6 rounded" />
                     ) : (
-                      <Shield className="w-7 h-7 text-[#2dd4a8]" />
+                      <Wallet className="w-5 h-5 text-red-500" />
                     )}
                     <div>
-                      <p className="text-sm font-semibold text-white">{prov.info.name}</p>
-                      <p className="text-[11px] text-[#5f6578]">Detected Wallet</p>
+                      <p className="font-bold text-white">{prov.info.name}</p>
+                      <p className="text-[11px] text-neutral-400">EIP-6963 Wallet</p>
                     </div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-[#5f6578]" />
+                  <span className="text-red-400 font-semibold">Connect</span>
                 </button>
               ))
             ) : (
               <button
                 onClick={() => handleExtensionClick()}
                 disabled={isSubmitting}
-                className="w-full p-4 rounded-2xl flex items-center justify-between text-left transition-all duration-200 hover:bg-white/5"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                className="btn-primary w-full py-3"
               >
-                <div className="flex items-center gap-3">
-                  <Shield className="w-7 h-7 text-[#2dd4a8]" />
-                  <div>
-                    <p className="text-sm font-semibold text-white">BridgeKey / Web3 Wallet</p>
-                    <p className="text-[11px] text-[#5f6578]">Connect via browser extension</p>
-                  </div>
-                </div>
-                <ArrowRight className="w-4 h-4 text-[#5f6578]" />
+                {isSubmitting ? "Connecting Extension..." : "Connect Default Wallet"}
               </button>
             )}
-
-            <p className="text-xs text-[#5f6578] text-center py-2">
-              Extension updated or not responding? Use the <strong className="text-[#9ca3b4] cursor-pointer hover:underline" onClick={() => handleTabChange("privateKey")}>Private Key</strong> tab.
-            </p>
           </div>
-        )}
-
-        {/* Private Key Tab */}
-        {tab === "privateKey" && (
-          <form onSubmit={handlePrivateKeySubmit} className="space-y-4">
+        ) : (
+          <form onSubmit={handlePrivateKeySubmit} className="space-y-4 text-xs">
             <div>
-              <label className="block text-xs font-semibold text-[#9ca3b4] mb-2">MST Testnet Private Key</label>
+              <label className="block font-semibold text-neutral-300 mb-1.5 flex items-center gap-1.5">
+                <Key className="w-3.5 h-3.5 text-red-500" />
+                Private Key (Hex)
+              </label>
               <input
                 type="password"
-                placeholder="0x... (64-character private key)"
-                value={privateKey}
-                onChange={(e) => {
-                  setPrivateKey(e.target.value);
-                  if (localError || error) {
-                    setLocalError(null);
-                    if (onClearError) onClearError();
-                  }
-                }}
-                className="v-input font-mono text-xs"
                 required
+                placeholder="64-character hex key (0x...)"
+                value={privateKey}
+                onChange={(e) => setPrivateKey(e.target.value)}
+                className="w-full bg-neutral-950 rounded-lg px-4 py-3 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none"
               />
-              <p className="text-[11px] text-[#5f6578] mt-1.5">
-                Key stays in your browser memory only. Never sent to any server.
-              </p>
             </div>
 
-            <div className="flex justify-end gap-3 pt-1">
-              <button type="button" onClick={onClose} className="v-btn-secondary text-xs">
-                Cancel
-              </button>
-              <button type="submit" disabled={isSubmitting || !privateKey.trim()} className="v-btn-primary text-xs">
-                <Key className="w-4 h-4" />
-                {isSubmitting ? "Connecting..." : "Connect"}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="btn-primary w-full py-3"
+            >
+              {isSubmitting ? "Importing..." : "Connect with Key"}
+            </button>
           </form>
         )}
       </div>
