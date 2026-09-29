@@ -2,10 +2,11 @@ import React, { useState, useEffect } from "react";
 import { Header } from "./components/Header";
 import { ConnectWalletPage } from "./components/ConnectWalletPage";
 import { CreateGroupView } from "./components/CreateGroupView";
+import { JoinCircleView } from "./components/JoinCircleView";
 import { AccountModal } from "./components/AccountModal";
 import { useWallet } from "./hooks/useWallet";
 import { ContractService } from "./services/contractService";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Plus, UserPlus } from "lucide-react";
 
 export function App() {
   const {
@@ -29,6 +30,25 @@ export function App() {
   const [lastDeployedAddress, setLastDeployedAddress] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; isError?: boolean } | null>(null);
 
+  // Check URL query parameters for invitation links
+  const [activeTab, setActiveTab] = useState<"join" | "create">(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("circle") || params.get("join")) {
+        return "join";
+      }
+    }
+    return "join";
+  });
+
+  const [initialCircleId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("circle") || params.get("join") || "";
+    }
+    return "";
+  });
+
   const showNotification = (message: string, isError: boolean = false) => {
     setNotification({ message, isError });
     setTimeout(() => setNotification(null), 6000);
@@ -49,10 +69,10 @@ export function App() {
     cycleDuration: number;
     discountCapBps: number;
     reserveFeeBps: number;
-  }) => {
+  }): Promise<string | undefined> => {
     if (!contractService || !account) {
       setIsAccountModalOpen(true);
-      return;
+      return undefined;
     }
     setIsDeploying(true);
     try {
@@ -69,15 +89,22 @@ export function App() {
         });
         localStorage.setItem("vouch_custom_groups", JSON.stringify(saved));
         showNotification(`Savings Circle deployed successfully at ${result.groupAddress}!`);
+        return result.groupAddress;
       } else {
         showNotification("Group creation transaction confirmed on blockchain.");
+        return undefined;
       }
     } catch (err: any) {
       console.error(err);
       showNotification(err.message || "Failed to deploy group contract", true);
+      return undefined;
     } finally {
       setIsDeploying(false);
     }
+  };
+
+  const handleJoinSuccess = (circleAddr: string) => {
+    showNotification(`Joined circle ${circleAddr.substring(0, 10)}...`);
   };
 
   // If not connected to wallet, render ConnectWalletPage
@@ -129,13 +156,53 @@ export function App() {
           </div>
         )}
 
-        {/* Dashboard Content: Only Create Group view */}
-        <CreateGroupView
-          account={account}
-          onCreateGroup={handleCreateGroup}
-          isDeploying={isDeploying}
-          deployedCircleAddress={lastDeployedAddress}
-        />
+        {/* ── 2 Main Options Selector: Join a Circle vs Create a Circle ── */}
+        <div className="flex items-center justify-center gap-10 sm:gap-14 pt-2 pb-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("join")}
+            className={`px-1 py-1 text-sm sm:text-base flex items-center gap-2.5 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
+              activeTab === "join"
+                ? "text-red-500 font-bold scale-110 -translate-y-1 drop-shadow-[0_0_10px_rgba(255,23,68,0.5)]"
+                : "text-neutral-500 font-medium scale-100 translate-y-0 hover:text-neutral-300 hover:-translate-y-0.5"
+            }`}
+          >
+            <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>Join a Circle</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("create")}
+            className={`px-1 py-1 text-sm sm:text-base flex items-center gap-2.5 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
+              activeTab === "create"
+                ? "text-red-500 font-bold scale-110 -translate-y-1 drop-shadow-[0_0_10px_rgba(255,23,68,0.5)]"
+                : "text-neutral-500 font-medium scale-100 translate-y-0 hover:text-neutral-300 hover:-translate-y-0.5"
+            }`}
+          >
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>Create a Circle</span>
+          </button>
+        </div>
+
+        {/* ── Content View ── */}
+        {activeTab === "join" ? (
+          <JoinCircleView
+            account={account}
+            contractService={contractService}
+            onJoinSuccess={handleJoinSuccess}
+            initialCircleId={initialCircleId}
+            onShowNotification={showNotification}
+          />
+        ) : (
+          <CreateGroupView
+            account={account}
+            onCreateGroup={handleCreateGroup}
+            isDeploying={isDeploying}
+            deployedCircleAddress={lastDeployedAddress}
+            onShowNotification={showNotification}
+          />
+        )}
       </main>
 
       {/* Account Modal for wallet info and disconnect */}
