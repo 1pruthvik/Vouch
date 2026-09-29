@@ -3,12 +3,13 @@ import { Header } from "./components/Header";
 import { ConnectWalletPage } from "./components/ConnectWalletPage";
 import { CreateGroupView } from "./components/CreateGroupView";
 import { JoinCircleView } from "./components/JoinCircleView";
+import { MyCirclesView } from "./components/MyCirclesView";
 import { DedicatedCirclePage } from "./components/DedicatedCirclePage";
 import { AccountModal } from "./components/AccountModal";
 import { useWallet } from "./hooks/useWallet";
 import { ContractService } from "./services/contractService";
 import { parseWalletError } from "./utils/formatters";
-import { CheckCircle2, AlertCircle, Plus, UserPlus } from "lucide-react";
+import { CheckCircle2, AlertCircle, Plus, UserPlus, Shield } from "lucide-react";
 
 export function App() {
   const {
@@ -34,7 +35,7 @@ export function App() {
   const [notification, setNotification] = useState<{ message: string; isError?: boolean } | null>(null);
 
   // Check URL query parameters for invitation links
-  const [activeTab, setActiveTab] = useState<"join" | "create">(() => {
+  const [activeTab, setActiveTab] = useState<"join" | "create" | "my-circles">(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("circle") || params.get("join")) {
@@ -172,7 +173,7 @@ export function App() {
           </div>
         )}
 
-        {/* ── Conditional Render: Dedicated Circle Page vs Selection Hub ── */}
+        {/* ── Conditional Render: Dedicated Circle Page vs Hub Tabs ── */}
         {activeCircleAddress ? (
           <DedicatedCirclePage
             circleAddress={activeCircleAddress}
@@ -183,12 +184,12 @@ export function App() {
           />
         ) : (
           <>
-            {/* ── 2 Main Options Selector: Join a Circle vs Create a Circle ── */}
-            <div className="flex items-center justify-center gap-10 sm:gap-14 pt-2 pb-2">
+            {/* ── 3 Main Navigation Tabs: Join, Create, and My Circles ── */}
+            <div className="flex items-center justify-center gap-6 sm:gap-12 pt-2 pb-2 flex-wrap">
               <button
                 type="button"
                 onClick={() => setActiveTab("join")}
-                className={`px-1 py-1 text-sm sm:text-base flex items-center gap-2.5 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
+                className={`px-1 py-1 text-xs sm:text-sm md:text-base flex items-center gap-2 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
                   activeTab === "join"
                     ? "text-red-500 font-bold scale-110 -translate-y-1 drop-shadow-[0_0_10px_rgba(255,23,68,0.5)]"
                     : "text-neutral-500 font-medium scale-100 translate-y-0 hover:text-neutral-300 hover:-translate-y-0.5"
@@ -201,7 +202,7 @@ export function App() {
               <button
                 type="button"
                 onClick={() => setActiveTab("create")}
-                className={`px-1 py-1 text-sm sm:text-base flex items-center gap-2.5 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
+                className={`px-1 py-1 text-xs sm:text-sm md:text-base flex items-center gap-2 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
                   activeTab === "create"
                     ? "text-red-500 font-bold scale-110 -translate-y-1 drop-shadow-[0_0_10px_rgba(255,23,68,0.5)]"
                     : "text-neutral-500 font-medium scale-100 translate-y-0 hover:text-neutral-300 hover:-translate-y-0.5"
@@ -209,6 +210,19 @@ export function App() {
               >
                 <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span>Create a Circle</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("my-circles")}
+                className={`px-1 py-1 text-xs sm:text-sm md:text-base flex items-center gap-2 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
+                  activeTab === "my-circles"
+                    ? "text-red-500 font-bold scale-110 -translate-y-1 drop-shadow-[0_0_10px_rgba(255,23,68,0.5)]"
+                    : "text-neutral-500 font-medium scale-100 translate-y-0 hover:text-neutral-300 hover:-translate-y-0.5"
+                }`}
+              >
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>My Circles</span>
               </button>
             </div>
 
@@ -221,12 +235,20 @@ export function App() {
                 initialCircleId={initialCircleId}
                 onShowNotification={showNotification}
               />
-            ) : (
+            ) : activeTab === "create" ? (
               <CreateGroupView
                 account={account}
                 onCreateGroup={handleCreateGroup}
                 isDeploying={isDeploying}
                 deployedCircleAddress={lastDeployedAddress}
+                onShowNotification={showNotification}
+              />
+            ) : (
+              <MyCirclesView
+                account={account}
+                contractService={contractService}
+                onSelectCircle={(addr) => setActiveCircleAddress(addr)}
+                onCreateNewCircle={() => setActiveTab("create")}
                 onShowNotification={showNotification}
               />
             )}
