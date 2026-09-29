@@ -1,9 +1,9 @@
 /**
- * Utility formatters for Indian Rupee (INR) representation & friendly names
- * Assumes 1 tMSTC ~ ₹10,000 for intuitive mental models while preserving exact on-chain math
+ * Utility formatters for Indian Rupee (INR) representation & on-chain tokens
+ * 1 tMSTC = ₹1,000 (standard conversion rate)
  */
 
-export const MST_TO_INR_RATE = 10000;
+export const MST_TO_INR_RATE = 1000;
 
 export function formatINR(mstAmount: string | number): string {
   const num = typeof mstAmount === "string" ? parseFloat(mstAmount) || 0 : mstAmount;
@@ -27,38 +27,36 @@ export function inrToMST(inrAmount: number): string {
   return (inrAmount / MST_TO_INR_RATE).toFixed(4);
 }
 
-export function getFriendlyMemberName(address: string, index?: number): string {
-  if (!address) return "Member";
-  const names = ["Aarav S.", "Priya R.", "Rahul M.", "Ananya D.", "Vikram K.", "Sneha P.", "Rohan B."];
-  if (index !== undefined && index < names.length) {
-    return names[index];
-  }
-  // Deterministic name hash based on last 2 chars of address
-  const charCode = address.charCodeAt(address.length - 1) + address.charCodeAt(address.length - 2);
-  return names[charCode % names.length];
+export function getFriendlyMemberName(address: string): string {
+  if (!address || address === "0x0000000000000000000000000000000000000000") return "Not Assigned";
+  if (address.length < 10) return address;
+  return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 }
 
-export function getTrafficLightStatus(solvency: { isSolvent: boolean; totalBacking: string; requiredBacking: string } | undefined, isDefaulted: boolean = false) {
+export function getTrafficLightStatus(
+  solvency: { isSolvent: boolean; totalBacking: string; requiredBacking: string } | undefined,
+  isDefaulted: boolean = false
+) {
   if (isDefaulted) {
     return {
       status: "red" as const,
       label: "Action Needed",
       badgeClass: "badge-status-red",
-      description: "Deposit or installment overdue. Please complete to avoid late deductions.",
+      description: "Installment overdue. Please complete deposit to remain in good standing.",
     };
   }
   if (!solvency || !solvency.isSolvent) {
     return {
       status: "yellow" as const,
-      label: "Consider Adding Backup",
+      label: "Pending Deposit",
       badgeClass: "badge-status-yellow",
-      description: "Deposit is partially complete. Adding a trusted backer ensures full coverage.",
+      description: "Collateral backing is pending or partial.",
     };
   }
   return {
     status: "green" as const,
     label: "Good Standing",
     badgeClass: "badge-status-green",
-    description: "All payments and security deposit are fully up to date.",
+    description: "All payments and security deposit are fully confirmed on-chain.",
   };
 }

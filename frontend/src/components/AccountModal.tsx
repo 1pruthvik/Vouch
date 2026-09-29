@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { X, Wallet, Copy, Check, ExternalLink, ShieldCheck, Key, RefreshCw, Code2, Globe } from "lucide-react";
+import { X, Copy, Check, Key, Shield, ArrowRight, AlertCircle } from "lucide-react";
 import { formatINR } from "../utils/formatters";
-import { MST_TESTNET, CONTRACT_ADDRESSES } from "../config/network";
+import { EIP6963ProviderDetail } from "../types/global";
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -9,10 +9,9 @@ interface AccountModalProps {
   account: string | null;
   balance: string;
   isCorrectNetwork: boolean;
-  onSwitchNetwork: () => void;
-  onOpenConnectModal: () => void;
-  isTechnicalMode: boolean;
-  onToggleTechnicalMode: () => void;
+  detectedProviders?: EIP6963ProviderDetail[];
+  onConnectExtension: (detail?: EIP6963ProviderDetail) => Promise<boolean>;
+  onConnectPrivateKey: (key: string) => Promise<boolean>;
 }
 
 export const AccountModal: React.FC<AccountModalProps> = ({
@@ -20,13 +19,15 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   onClose,
   account,
   balance,
-  isCorrectNetwork,
-  onSwitchNetwork,
-  onOpenConnectModal,
-  isTechnicalMode,
-  onToggleTechnicalMode,
+  detectedProviders = [],
+  onConnectExtension,
+  onConnectPrivateKey,
 }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [connectTab, setConnectTab] = useState<"extension" | "privateKey">("extension");
+  const [privateKey, setPrivateKey] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -36,126 +37,208 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
+  const handleExtensionConnect = async (prov?: EIP6963ProviderDetail) => {
+    setErrorMsg(null);
+    setIsSubmitting(true);
+    try {
+      const success = await onConnectExtension(prov);
+      if (!success) {
+        setErrorMsg("No browser extension detected. Connect via Private Key or install BridgeKey.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to connect extension.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePrivateKeyConnect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!privateKey.trim()) return;
+    setErrorMsg(null);
+    setIsSubmitting(true);
+    try {
+      const success = await onConnectPrivateKey(privateKey.trim());
+      if (success) {
+        setPrivateKey("");
+      } else {
+        setErrorMsg("Invalid private key format. Please check and retry.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to connect with private key.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="cred-card max-w-lg w-full p-6 sm:p-7 border-white/10 relative max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+      <div className="bg-[#0e0e0e] max-w-lg w-full p-8 rounded-xl relative shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+        <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-              {account ? account.substring(2, 4).toUpperCase() : "U"}
+            <div className="w-10 h-10 rounded-lg bg-royal-600 flex items-center justify-center text-white font-bold text-sm">
+              {account ? account.substring(2, 4).toUpperCase() : "W"}
             </div>
             <div>
-              <h2 className="text-base font-bold text-white font-display">Account & Blockchain Specs</h2>
-              <p className="text-xs text-slate-400">Manage connections & inspect on-chain contracts</p>
+              <h2 className="text-base font-bold text-white font-display">Account Details</h2>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+            className="text-neutral-400 hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="space-y-5 my-5 text-xs">
-          {/* Account Balance Card */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#12151d] to-[#0d0f14] border border-white/10 flex items-center justify-between">
-            <div>
-              <p className="text-slate-400 font-medium">Connected Balance</p>
-              <p className="text-2xl font-extrabold text-white font-display mt-0.5">
-                {formatINR(balance)}
-              </p>
-              <p className="text-[11px] font-mono text-emerald-400">
-                {parseFloat(balance).toFixed(4)} tMSTC
-              </p>
-            </div>
+        <div className="space-y-4 my-4 text-xs">
+          {/* Account Balance & Address (when connected) */}
+          {account ? (
+            <div className="p-5 rounded-xl bg-black space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-neutral-400 font-medium">Connected Balance</p>
+                  <p className="text-2xl font-extrabold text-white font-display mt-0.5">
+                    {formatINR(balance)}
+                  </p>
+                  <p className="text-[11px] font-mono text-royal-400">
+                    {parseFloat(balance).toFixed(4)} tMSTC
+                  </p>
+                </div>
+                <span className="badge">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                  Connected
+                </span>
+              </div>
 
-            <button
-              onClick={onOpenConnectModal}
-              className="btn-cred-secondary text-xs"
-            >
-              <Key className="w-3.5 h-3.5" />
-              Switch Wallet
-            </button>
-          </div>
-
-          {/* Connected Address */}
-          {account && (
-            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
-              <p className="text-slate-400 font-medium">Your Blockchain Address</p>
-              <div className="flex items-center justify-between gap-2">
-                <code className="text-slate-200 font-mono text-[11px] truncate">{account}</code>
+              <div className="pt-2 border-t border-neutral-900 flex items-center justify-between gap-2">
+                <code className="text-white font-mono text-[11px] truncate">{account}</code>
                 <button
                   onClick={() => copyToClipboard(account, "account")}
-                  className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                  className="p-1 rounded text-neutral-400 hover:text-white transition-colors flex-shrink-0"
                 >
-                  {copiedKey === "account" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedKey === "account" ? <Check className="w-3.5 h-3.5 text-royal-400" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
               </div>
             </div>
+          ) : (
+            <div className="p-4 rounded-xl bg-black text-center">
+              <p className="text-sm font-semibold text-white font-display">No Wallet Connected</p>
+            </div>
           )}
 
-          {/* Network Parameters */}
-          <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+          {/* Connection Mode Selection */}
+          <div className="p-4 rounded-xl bg-black space-y-3">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-white flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-emerald-400" /> Network Status
-              </span>
-              <span className="badge badge-status-green">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                MST Testnet Active
+              <span className="font-semibold text-white">
+                {account ? "Switch Connection" : "Connect Wallet"}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300 pt-1">
-              <div>
-                <p className="text-slate-500">Chain ID</p>
-                <p className="font-mono font-bold text-slate-200">91562037 (0x5752eb5)</p>
+            {/* Tab Pill Switcher */}
+            <div className="flex rounded-lg bg-[#141414] p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setConnectTab("extension");
+                  setErrorMsg(null);
+                }}
+                className={`flex-1 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  connectTab === "extension" ? "bg-black text-white" : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                BridgeKey / Extension
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConnectTab("privateKey");
+                  setErrorMsg(null);
+                }}
+                className={`flex-1 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  connectTab === "privateKey" ? "bg-black text-white" : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Private Key
+              </button>
+            </div>
+
+            {errorMsg && (
+              <div className="p-2.5 rounded-lg bg-red-950/50 border border-red-900 text-red-200 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <span>{errorMsg}</span>
               </div>
-              <div>
-                <p className="text-slate-500">EVM Target</p>
-                <p className="font-mono font-bold text-slate-200">Paris (0.8.24)</p>
+            )}
+
+            {/* Extension Option */}
+            {connectTab === "extension" && (
+              <div className="space-y-2 pt-1">
+                {detectedProviders.length > 0 ? (
+                  detectedProviders.map((prov) => (
+                    <button
+                      key={prov.info.uuid}
+                      type="button"
+                      onClick={() => handleExtensionConnect(prov)}
+                      disabled={isSubmitting}
+                      className="w-full p-3 rounded-lg bg-[#141414] hover:bg-[#1a1a1a] transition-colors flex items-center justify-between text-left"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {prov.info.icon ? (
+                          <img src={prov.info.icon} alt={prov.info.name} className="w-5 h-5 rounded" />
+                        ) : (
+                          <Shield className="w-5 h-5 text-royal-400" />
+                        )}
+                        <div>
+                          <p className="text-xs font-bold text-white">{prov.info.name}</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-neutral-400" />
+                    </button>
+                  ))
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleExtensionConnect()}
+                    disabled={isSubmitting}
+                    className="w-full p-3 rounded-lg bg-[#141414] hover:bg-[#1a1a1a] transition-colors flex items-center justify-between text-left"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Shield className="w-5 h-5 text-royal-400" />
+                      <div>
+                        <p className="text-xs font-bold text-white">BridgeKey Extension</p>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-neutral-400" />
+                  </button>
+                )}
               </div>
-              <div>
-                <p className="text-slate-500">RPC Endpoint</p>
-                <p className="font-mono text-slate-200 truncate">{MST_TESTNET.rpcUrl}</p>
-              </div>
-              <div>
-                <p className="text-slate-500">Explorer</p>
-                <a
-                  href={MST_TESTNET.explorerUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1"
+            )}
+
+            {/* Private Key Option */}
+            {connectTab === "privateKey" && (
+              <form onSubmit={handlePrivateKeyConnect} className="space-y-3 pt-1">
+                <div>
+                  <input
+                    type="password"
+                    placeholder="Enter Private Key (0x...)"
+                    value={privateKey}
+                    onChange={(e) => setPrivateKey(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#141414] text-white text-xs font-mono focus:outline-none placeholder:text-neutral-700"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !privateKey.trim()}
+                  className="btn-primary w-full text-xs"
                 >
-                  mstscan.com <ExternalLink className="w-2.5 h-2.5" />
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* Mode Switcher Toggle */}
-          <div className="p-4 rounded-xl bg-indigo-950/20 border border-indigo-500/20 flex items-center justify-between">
-            <div className="space-y-0.5">
-              <p className="font-bold text-white text-xs flex items-center gap-1.5">
-                <Code2 className="w-4 h-4 text-indigo-400" /> Technical Details View (Judges / Developers)
-              </p>
-              <p className="text-[11px] text-slate-400">
-                Reveal raw smart contract addresses, hash states, and protocol formulas on all screens.
-              </p>
-            </div>
-            <button
-              onClick={onToggleTechnicalMode}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                isTechnicalMode
-                  ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/30"
-                  : "bg-white/10 text-slate-400 hover:text-white"
-              }`}
-            >
-              {isTechnicalMode ? "ON" : "OFF"}
-            </button>
+                  <Key className="w-3.5 h-3.5" />
+                  {isSubmitting ? "Connecting..." : "Connect with Private Key"}
+                </button>
+              </form>
+            )}
           </div>
         </div>
 
@@ -163,7 +246,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         <div className="pt-2 flex justify-end">
           <button
             onClick={onClose}
-            className="btn-cred-secondary text-xs"
+            className="btn-secondary"
           >
             Close
           </button>

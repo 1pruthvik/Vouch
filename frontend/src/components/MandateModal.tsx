@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { X, CheckCircle2, ShieldCheck, Clock, ArrowRight, Lock, Zap, HelpCircle } from "lucide-react";
-import { formatINR, formatRawINR } from "../utils/formatters";
+import { X, CheckCircle2, ShieldCheck, Clock, ArrowRight, Lock, Zap } from "lucide-react";
+import { formatINR } from "../utils/formatters";
 
 interface MandateModalProps {
   isOpen: boolean;
@@ -19,7 +19,6 @@ export const MandateModal: React.FC<MandateModalProps> = ({
   onClose,
   groupName,
   installmentAmount,
-  cycleDurationSeconds,
   totalMembers,
   isMandateActive,
   onActivateMandate,
@@ -43,22 +42,22 @@ export const MandateModal: React.FC<MandateModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="cred-card max-w-md w-full p-6 sm:p-7 border-emerald-500/20 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+      <div className="bg-[#0e0e0e] max-w-md w-full p-8 rounded-xl relative shadow-2xl space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+        <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-              <Zap className="w-5 h-5 stroke-[2.5]" />
+            <div className="p-2 rounded-lg bg-royal-600 text-white flex items-center justify-center">
+              <Zap className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white font-display">Setup Auto-Debit Mandate</h2>
-              <p className="text-xs text-slate-400">UPI Autopay & Seamless Monthly Contributions</p>
+              <h2 className="text-lg font-bold text-white font-display">Auto-Debit Mandate</h2>
+              <p className="text-xs text-neutral-400">Automated recurring contributions</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+            className="text-neutral-400 hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -67,45 +66,45 @@ export const MandateModal: React.FC<MandateModalProps> = ({
         {/* Body */}
         <div className="space-y-4 my-5">
           {/* Amount Card */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#12151d] to-[#0d0f14] border border-white/10 text-center">
-            <p className="text-xs text-slate-400 font-medium mb-1">Monthly Contribution Amount</p>
+          <div className="p-5 rounded-xl bg-black text-center">
+            <p className="text-xs text-neutral-400 font-medium mb-1">Monthly Contribution</p>
             <p className="text-3xl font-extrabold text-white font-display tracking-tight">
               {inrInstallment}
             </p>
-            <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-semibold text-emerald-400">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Auto-debits on cycle start
+            <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-0.5 rounded-full bg-[#141414] text-[11px] font-semibold text-neutral-300">
+              <CheckCircle2 className="w-3.5 h-3.5 text-royal-400" />
+              On-chain allowance authorization
             </div>
           </div>
 
           {/* Mandate Summary Points */}
-          <div className="space-y-2.5 text-xs text-slate-300">
-            <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5">
-              <Clock className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+          <div className="space-y-2.5 text-xs text-neutral-300">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-black">
+              <Clock className="w-4 h-4 text-royal-400 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-white">Never miss a cycle</p>
-                <p className="text-slate-400 text-[11px]">
-                  Ensures your monthly deposit arrives on time so your credit reputation stays in Good Standing.
+                <p className="font-semibold text-white">Automated Execution</p>
+                <p className="text-neutral-400 text-[11px]">
+                  Executes contribution automatically at each cycle start so your profile stays solvent.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-black">
+              <ShieldCheck className="w-4 h-4 text-royal-400 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-white">Full Security & Transparency</p>
-                <p className="text-slate-400 text-[11px]">
-                  Funds go directly to the {groupName} autonomous pool. You earn monthly savings dividends on every round.
+                <p className="font-semibold text-white">Smart Contract Escrow</p>
+                <p className="text-neutral-400 text-[11px]">
+                  Funds go directly to {groupName || "the ChitGroup"} autonomous pool on MST Testnet.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5">
-              <Lock className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-black">
+              <Lock className="w-4 h-4 text-royal-400 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-white">Cancel anytime</p>
-                <p className="text-slate-400 text-[11px]">
-                  You maintain full ownership of your security deposit and accumulated savings.
+                <p className="font-semibold text-white">Full Capital Ownership</p>
+                <p className="text-neutral-400 text-[11px]">
+                  Security deposit and accumulated dividends remain locked to your address.
                 </p>
               </div>
             </div>
@@ -113,13 +112,13 @@ export const MandateModal: React.FC<MandateModalProps> = ({
 
           {/* Technical Details Box (Opt-in) */}
           {isTechnicalMode && (
-            <div className="tech-details-box text-[11px] text-indigo-300 space-y-1">
-              <p className="font-bold flex items-center gap-1 text-indigo-400">
+            <div className="tech-details-box text-[11px] text-neutral-300 space-y-1">
+              <p className="font-bold flex items-center gap-1 text-royal-400">
                 <ShieldCheck className="w-3 h-3" /> Protocol Mandate Execution
               </p>
-              <p>• Smart Contract: <code className="text-slate-200">ChitGroup.payInstallment()</code></p>
-              <p>• Raw Amount: <code className="text-slate-200">{installmentAmount} tMSTC</code></p>
-              <p>• Auto-triggers Commit transition once all {totalMembers} members execute.</p>
+              <p>• Smart Contract: <code className="text-white">ChitGroup.payInstallment()</code></p>
+              <p>• Token Amount: <code className="text-white">{installmentAmount} tMSTC</code></p>
+              <p>• Total Group Members: <code className="text-white">{totalMembers}</code></p>
             </div>
           )}
         </div>
@@ -129,7 +128,7 @@ export const MandateModal: React.FC<MandateModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="btn-cred-secondary text-xs"
+            className="btn-secondary"
           >
             Cancel
           </button>
@@ -137,10 +136,10 @@ export const MandateModal: React.FC<MandateModalProps> = ({
             type="button"
             onClick={handleConfirm}
             disabled={isProcessing}
-            className="btn-cred-primary text-xs w-full sm:w-auto"
+            className="btn-primary"
           >
-            {isProcessing ? "Authorizing..." : isMandateActive ? "Mandate Already Active" : "Confirm Auto-Debit Mandate"}
-            <ArrowRight className="w-3.5 h-3.5" />
+            {isProcessing ? "Authorizing..." : isMandateActive ? "Mandate Active" : "Confirm Mandate"}
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>
