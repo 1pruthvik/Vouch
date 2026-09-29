@@ -3,6 +3,7 @@ import { Header } from "./components/Header";
 import { ConnectWalletPage } from "./components/ConnectWalletPage";
 import { CreateGroupView } from "./components/CreateGroupView";
 import { JoinCircleView } from "./components/JoinCircleView";
+import { DedicatedCirclePage } from "./components/DedicatedCirclePage";
 import { AccountModal } from "./components/AccountModal";
 import { useWallet } from "./hooks/useWallet";
 import { ContractService } from "./services/contractService";
@@ -29,6 +30,9 @@ export function App() {
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [lastDeployedAddress, setLastDeployedAddress] = useState<string | null>(null);
+  const [activeCircleAddress, setActiveCircleAddress] = useState<string | null>(() => {
+    return localStorage.getItem("vouch_active_circle_view") || null;
+  });
   const [notification, setNotification] = useState<{ message: string; isError?: boolean } | null>(null);
 
   // Check URL query parameters for invitation links
@@ -56,6 +60,14 @@ export function App() {
   };
 
   useEffect(() => {
+    if (activeCircleAddress) {
+      localStorage.setItem("vouch_active_circle_view", activeCircleAddress);
+    } else {
+      localStorage.removeItem("vouch_active_circle_view");
+    }
+  }, [activeCircleAddress]);
+
+  useEffect(() => {
     const srv = new ContractService((provider as any) || undefined);
     if (signer) {
       srv.setSigner(signer);
@@ -81,6 +93,7 @@ export function App() {
       const result = await contractService.createGroup(params);
       if (result.groupAddress) {
         setLastDeployedAddress(result.groupAddress);
+        setActiveCircleAddress(result.groupAddress);
         const saved: any[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
         saved.push({
           address: result.groupAddress,
@@ -106,6 +119,7 @@ export function App() {
 
   const handleJoinSuccess = (circleAddr: string) => {
     showNotification(`Joined circle ${circleAddr.substring(0, 10)}...`);
+    setActiveCircleAddress(circleAddr);
   };
 
   // If not connected to wallet, render ConnectWalletPage
@@ -157,52 +171,65 @@ export function App() {
           </div>
         )}
 
-        {/* ── 2 Main Options Selector: Join a Circle vs Create a Circle ── */}
-        <div className="flex items-center justify-center gap-10 sm:gap-14 pt-2 pb-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab("join")}
-            className={`px-1 py-1 text-sm sm:text-base flex items-center gap-2.5 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
-              activeTab === "join"
-                ? "text-red-500 font-bold scale-110 -translate-y-1 drop-shadow-[0_0_10px_rgba(255,23,68,0.5)]"
-                : "text-neutral-500 font-medium scale-100 translate-y-0 hover:text-neutral-300 hover:-translate-y-0.5"
-            }`}
-          >
-            <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span>Join a Circle</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("create")}
-            className={`px-1 py-1 text-sm sm:text-base flex items-center gap-2.5 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
-              activeTab === "create"
-                ? "text-red-500 font-bold scale-110 -translate-y-1 drop-shadow-[0_0_10px_rgba(255,23,68,0.5)]"
-                : "text-neutral-500 font-medium scale-100 translate-y-0 hover:text-neutral-300 hover:-translate-y-0.5"
-            }`}
-          >
-            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span>Create a Circle</span>
-          </button>
-        </div>
-
-        {/* ── Content View ── */}
-        {activeTab === "join" ? (
-          <JoinCircleView
+        {/* ── Conditional Render: Dedicated Circle Page vs Selection Hub ── */}
+        {activeCircleAddress ? (
+          <DedicatedCirclePage
+            circleAddress={activeCircleAddress}
             account={account}
             contractService={contractService}
-            onJoinSuccess={handleJoinSuccess}
-            initialCircleId={initialCircleId}
+            onBack={() => setActiveCircleAddress(null)}
             onShowNotification={showNotification}
           />
         ) : (
-          <CreateGroupView
-            account={account}
-            onCreateGroup={handleCreateGroup}
-            isDeploying={isDeploying}
-            deployedCircleAddress={lastDeployedAddress}
-            onShowNotification={showNotification}
-          />
+          <>
+            {/* ── 2 Main Options Selector: Join a Circle vs Create a Circle ── */}
+            <div className="flex items-center justify-center gap-10 sm:gap-14 pt-2 pb-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab("join")}
+                className={`px-1 py-1 text-sm sm:text-base flex items-center gap-2.5 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
+                  activeTab === "join"
+                    ? "text-red-500 font-bold scale-110 -translate-y-1 drop-shadow-[0_0_10px_rgba(255,23,68,0.5)]"
+                    : "text-neutral-500 font-medium scale-100 translate-y-0 hover:text-neutral-300 hover:-translate-y-0.5"
+                }`}
+              >
+                <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>Join a Circle</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("create")}
+                className={`px-1 py-1 text-sm sm:text-base flex items-center gap-2.5 transition-all duration-300 ease-out transform cursor-pointer bg-transparent border-none ${
+                  activeTab === "create"
+                    ? "text-red-500 font-bold scale-110 -translate-y-1 drop-shadow-[0_0_10px_rgba(255,23,68,0.5)]"
+                    : "text-neutral-500 font-medium scale-100 translate-y-0 hover:text-neutral-300 hover:-translate-y-0.5"
+                }`}
+              >
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>Create a Circle</span>
+              </button>
+            </div>
+
+            {/* ── Content View ── */}
+            {activeTab === "join" ? (
+              <JoinCircleView
+                account={account}
+                contractService={contractService}
+                onJoinSuccess={handleJoinSuccess}
+                initialCircleId={initialCircleId}
+                onShowNotification={showNotification}
+              />
+            ) : (
+              <CreateGroupView
+                account={account}
+                onCreateGroup={handleCreateGroup}
+                isDeploying={isDeploying}
+                deployedCircleAddress={lastDeployedAddress}
+                onShowNotification={showNotification}
+              />
+            )}
+          </>
         )}
       </main>
 
