@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ShieldCheck,
   TrendingUp,
@@ -16,8 +16,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   CreditCard,
-  Code2
+  Code2,
+  Clock,
+  Layers,
+  ArrowUpRight,
+  ExternalLink,
 } from "lucide-react";
+import gsap from "gsap";
 import { formatINR, getTrafficLightStatus, getFriendlyMemberName } from "../utils/formatters";
 import { GroupDetails, MemberDetails } from "../services/contractService";
 import { RiskPredictionResponse } from "../services/aiService";
@@ -47,6 +52,34 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
 }) => {
   const [isBackupLayersExpanded, setIsBackupLayersExpanded] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [currencyUnit, setCurrencyUnit] = useState<"INR" | "MST">("INR");
+
+  const heroRef = useRef<HTMLDivElement>(null);
+  const statsGridRef = useRef<HTMLDivElement>(null);
+  const waterfallRef = useRef<HTMLDivElement>(null);
+
+  // Animate on entrance
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        heroRef.current,
+        { opacity: 0, y: 15 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }
+      );
+      if (statsGridRef.current) {
+        gsap.fromTo(
+          statsGridRef.current.children,
+          { opacity: 0, y: 12 },
+          { opacity: 1, y: 0, duration: 0.45, stagger: 0.08, ease: "power2.out", delay: 0.1 }
+        );
+      }
+    });
+
+    return () => ctx.revert();
+  }, []);
 
   // Defaults if no group is loaded
   const groupName = groupDetails?.name || "Alpha Savings Circle";
@@ -79,281 +112,277 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* 1. HERO CARD — Next Payment, Mandate & Month Progress */}
-      <div className="cred-hero-card p-6 sm:p-8 relative overflow-hidden">
-        {/* Glow effect */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* 1. PRIMARY HERO CARD — Next Payment, Mandate & Month Progress */}
+      <div ref={heroRef} className="fintech-hero-card p-6 sm:p-8 relative overflow-hidden">
+        {/* Subtle Ambient Radial Glow */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/[0.07] rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2.5">
-              <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-slate-200">
+              <span className="px-3 py-1 rounded-full bg-white/[0.06] border border-white/10 text-xs font-semibold text-slate-200">
                 {groupName}
               </span>
-              <span className={`badge ${trafficLight.badgeClass}`}>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${trafficLight.badgeClass}`}>
                 <span className={`w-2 h-2 rounded-full ${trafficLight.status === 'green' ? 'bg-emerald-400' : trafficLight.status === 'yellow' ? 'bg-amber-400' : 'bg-red-400'}`} />
                 {trafficLight.label}
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-slate-800/80 border border-white/5 text-[11px] font-medium text-slate-300 flex items-center gap-1">
+                <Clock className="w-3 h-3 text-slate-400" /> Month {currentRound} of {totalRounds}
               </span>
             </div>
 
             <div>
               <p className="text-xs sm:text-sm text-slate-400 font-medium">Next Monthly Contribution</p>
-              <div className="flex items-baseline gap-3 mt-0.5">
-                <h2 className="text-3xl sm:text-4xl font-extrabold text-white font-display tracking-tight">
-                  {formattedInstallment}
-                </h2>
-                <span className="text-xs sm:text-sm text-emerald-400 font-semibold flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Auto-Mandate Ready
-                </span>
+              <div className="flex items-baseline gap-3 mt-1">
+                <p className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white font-display tracking-tight tabular-nums">
+                  {currencyUnit === "INR" ? formattedInstallment : `${parseFloat(rawInstallment).toFixed(2)} tMSTC`}
+                </p>
+                <button
+                  onClick={() => setCurrencyUnit(currencyUnit === "INR" ? "MST" : "INR")}
+                  className="text-[11px] text-slate-400 hover:text-emerald-400 font-medium px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 transition-all"
+                  title="Toggle display currency"
+                >
+                  {currencyUnit === "INR" ? "⇄ Show in tMSTC" : "⇄ Show in ₹ INR"}
+                </button>
               </div>
+              <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                Due in {groupDetails?.cycleDuration ? `${Math.round(groupDetails.cycleDuration / 60)} mins (Demo Timer)` : "4 days"}
+              </p>
             </div>
-
-            <p className="text-xs text-slate-400 max-w-xl leading-relaxed">
-              {hasPaidCurrentRound
-                ? `You have completed this month's contribution. The draw is currently in progress!`
-                : `Your monthly contribution is due for Month ${currentRound}. Approved mandates execute automatically.`}
-            </p>
           </div>
 
-          {/* Action CTAs */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
-            {!isMember ? (
-              <button
-                onClick={onJoinGroup}
-                className="btn-cred-primary text-sm w-full sm:w-auto"
-              >
-                Join Circle with Deposit
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            ) : (
+          {/* Action Center on Hero */}
+          <div className="flex flex-col sm:flex-row lg:flex-col gap-3 min-w-[240px]">
+            {isMember ? (
               <>
-                {!hasPaidCurrentRound ? (
-                  <button
-                    onClick={handlePay}
-                    disabled={isProcessingPayment}
-                    className="btn-cred-primary text-sm w-full sm:w-auto"
-                  >
-                    {isProcessingPayment ? "Processing..." : `Pay ${formattedInstallment}`}
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={onOpenDrawTab}
-                    className="btn-cred-primary text-sm w-full sm:w-auto"
-                  >
-                    View This Month's Draw
-                    <Sparkles className="w-4 h-4" />
-                  </button>
-                )}
+                <button
+                  onClick={handlePay}
+                  disabled={hasPaidCurrentRound || isProcessingPayment}
+                  className="btn-fintech-primary w-full py-3.5 text-sm"
+                >
+                  {isProcessingPayment ? (
+                    <>
+                      <Zap className="w-4 h-4 animate-spin" />
+                      Submitting on Blockchain...
+                    </>
+                  ) : hasPaidCurrentRound ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                      Month {currentRound} Paid
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4" />
+                      Pay {formattedInstallment} →
+                    </>
+                  )}
+                </button>
+
                 <button
                   onClick={onOpenMandateModal}
-                  className="btn-cred-secondary text-sm w-full sm:w-auto"
+                  className="btn-fintech-secondary w-full py-2.5 text-xs text-slate-300"
                 >
-                  <Zap className="w-4 h-4 text-emerald-400" />
-                  Setup Mandate
+                  <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+                  Auto-Pay Mandate Active ✓
                 </button>
               </>
+            ) : (
+              <button
+                onClick={onJoinGroup}
+                className="btn-fintech-primary w-full py-3.5 text-sm"
+              >
+                Join Savings Circle →
+              </button>
             )}
           </div>
         </div>
 
-        {/* Month Progress Bar */}
-        <div className="mt-8 pt-6 border-t border-white/5 relative z-10">
-          <div className="flex items-center justify-between text-xs font-semibold mb-2">
-            <span className="text-white font-display">Month {currentRound} of {totalRounds}</span>
-            <span className="text-emerald-400">{progressPercent}% Completed</span>
+        {/* Cycle Progress Bar */}
+        <div className="mt-7 pt-6 border-t border-white/[0.07]">
+          <div className="flex justify-between items-center text-xs font-semibold mb-2">
+            <span className="text-slate-300 flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              Circle Savings Progress
+            </span>
+            <span className="text-emerald-400 tabular-nums font-mono">{progressPercent}% Completed</span>
           </div>
-          <div className="w-full h-2.5 rounded-full bg-slate-900 border border-white/5 overflow-hidden">
+
+          <div className="w-full h-2.5 rounded-full bg-slate-900 border border-white/5 overflow-hidden p-0.5">
             <div
-              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-700 ease-out shadow-sm shadow-emerald-500/50"
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-indigo-500 transition-all duration-700 ease-out"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
+
+          <div className="flex justify-between items-center text-[11px] text-slate-400 mt-2">
+            <span>Month 1 (Formed)</span>
+            <span className="font-medium text-slate-300">Active: Month {currentRound}</span>
+            <span>Month {totalRounds} (Settlement)</span>
+          </div>
         </div>
       </div>
 
-      {/* 2. CORE STANDING METRICS (SCREEN 4) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric 1: Security Deposit */}
-        <div className="cred-card p-5 border-white/5 relative group">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Your Security Deposit</span>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-              <Lock className="w-4 h-4" />
+      {/* 2. SECONDARY METRICS GRID — High-Contrast Financial Balances */}
+      <div ref={statsGridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Total Community Pot */}
+        <div className="fintech-card p-5 space-y-2">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-xs font-semibold">Total Community Pot</span>
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <Coins className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-white font-display">{formatINR(bufferBalance)}</p>
-          <p className="text-xs text-emerald-400/90 font-medium mt-1">100% Refundable at Cycle End</p>
-          
-          {parseFloat(bufferBalance) <= 0 && (
-            <button
-              onClick={onJoinGroup}
-              className="mt-3 w-full py-1.5 px-3 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-semibold border border-emerald-500/30 hover:bg-emerald-500/25 transition-all flex items-center justify-center gap-1.5"
-            >
-              Complete your deposit to activate
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <p className="text-2xl font-bold text-white font-display tabular-nums tracking-tight">
+            {formatINR(groupDetails?.currentPot || "2.5")}
+          </p>
+          <p className="text-[11px] text-slate-400 flex items-center gap-1">
+            <span className="text-emerald-400 font-medium">Available for draw</span> this round
+          </p>
         </div>
 
-        {/* Metric 2: Your Savings So Far */}
-        <div className="cred-card p-5 border-white/5 relative group">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Your Savings So Far</span>
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-white font-display">{formatINR(lockedDividends)}</p>
-          <p className="text-xs text-purple-400/90 font-medium mt-1">Earned from Draw Discounts</p>
-        </div>
-
-        {/* Metric 3: Backer Details */}
-        <div className="cred-card p-5 border-white/5 relative group">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Your Backer</span>
-            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
-              <HeartHandshake className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5 mt-1">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
-              P
-            </div>
-            <div>
-              <p className="text-sm font-bold text-white font-display">Backed by Priya R.</p>
-              <p className="text-[11px] text-slate-400">Active Social Trust Bond</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Metric 4: Traffic Light Standing */}
-        <div className="cred-card p-5 border-white/5 relative group">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Standing Status</span>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+        {/* Card 2: Your Safety Buffer */}
+        <div className="fintech-card p-5 space-y-2">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-xs font-semibold">Your Security Deposit</span>
+            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-lg font-bold text-white font-display flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${trafficLight.status === 'green' ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50' : 'bg-amber-400'}`} />
-            {trafficLight.label}
+          <p className="text-2xl font-bold text-white font-display tabular-nums tracking-tight">
+            {formatINR(bufferBalance)}
           </p>
-          <p className="text-xs text-slate-400 mt-1 line-clamp-1">{trafficLight.description}</p>
+          <p className="text-[11px] text-slate-400">
+            <span className="text-indigo-400 font-medium">100% refundable</span> at final month
+          </p>
+        </div>
+
+        {/* Card 3: Earned Dividend Savings */}
+        <div className="fintech-card p-5 space-y-2">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-xs font-semibold">Earned Dividends</span>
+            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
+              <Sparkles className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-amber-400 font-display tabular-nums tracking-tight">
+            +{formatINR(lockedDividends)}
+          </p>
+          <p className="text-[11px] text-slate-400">
+            Automated discount yield rolled forward
+          </p>
+        </div>
+
+        {/* Card 4: Monthly Draw Eligibility */}
+        <div className="fintech-card p-5 space-y-2 cursor-pointer hover:border-emerald-500/30 transition-all" onClick={onOpenDrawTab}>
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-xs font-semibold">Need Early Funds?</span>
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <ArrowUpRight className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-base font-bold text-emerald-400 font-display flex items-center gap-1.5 mt-1">
+            Request Draw Payout <ArrowRight className="w-4 h-4" />
+          </p>
+          <p className="text-[11px] text-slate-400">
+            Participate in this month's reverse auction
+          </p>
         </div>
       </div>
 
-      {/* 3. THE 5-LAYER BACKUP GUARANTEE (PLAIN LANGUAGE EXPLAINER) */}
-      <div className="cred-card p-6 border-white/5">
-        <div
+      {/* 3. TERTIARY SECTION: 5-LAYER WATERFALL DISCLOSURE */}
+      <div className="fintech-card p-6 border-white/5 space-y-4">
+        <button
           onClick={() => setIsBackupLayersExpanded(!isBackupLayersExpanded)}
-          className="flex items-center justify-between cursor-pointer group select-none"
+          className="w-full flex items-center justify-between text-left group"
         >
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-              <ShieldCheck className="w-5 h-5 stroke-[2.5]" />
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-105 transition-transform">
+              <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm sm:text-base font-bold text-white font-display">
-                Protected by 5 layers of backup — your money never depends on one person.
+              <h3 className="text-sm font-bold text-white font-display flex items-center gap-2">
+                Why Your Community Savings Are Safe
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  5-Layer Solvency Protection
+                </span>
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Every rupee is shielded by autonomous on-chain guarantees. Tap to see how your money is safe.
+              <p className="text-xs text-slate-400">
+                Multi-tier automated smart contract protections guarantee you receive your full savings.
               </p>
             </div>
           </div>
-          <button className="p-2 rounded-lg text-slate-400 group-hover:text-white transition-colors">
-            {isBackupLayersExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-          </button>
-        </div>
 
-        {/* Expanded 5 Layers */}
+          <div className="p-2 rounded-lg bg-white/5 text-slate-400 group-hover:text-white transition-colors">
+            {isBackupLayersExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </div>
+        </button>
+
         {isBackupLayersExpanded && (
-          <div className="mt-6 pt-5 border-t border-white/5 grid grid-cols-1 md:grid-cols-5 gap-3 animate-fadeIn">
-            {/* Layer 1 */}
-            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Layer 1
-              </span>
-              <h4 className="text-xs font-bold text-white font-display">Their Own Deposit</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                If a member misses a month, their personal security deposit covers it instantly.
-              </p>
-            </div>
+          <div className="pt-4 border-t border-white/5 space-y-3 animate-fadeIn">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-slate-900/90 border border-white/5 space-y-1">
+                <span className="font-bold text-emerald-400">Layer 1</span>
+                <p className="font-semibold text-white">Security Deposit</p>
+                <p className="text-[11px] text-slate-400 leading-snug">Member's own buffer absorbed first if an installment is missed.</p>
+              </div>
 
-            {/* Layer 2 */}
-            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                Layer 2
-              </span>
-              <h4 className="text-xs font-bold text-white font-display">Accumulated Savings</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Past savings and dividends accrued by the member backstop their obligation.
-              </p>
-            </div>
+              <div className="p-3.5 rounded-xl bg-slate-900/90 border border-white/5 space-y-1">
+                <span className="font-bold text-indigo-400">Layer 2</span>
+                <p className="font-semibold text-white">Locked Dividends</p>
+                <p className="text-[11px] text-slate-400 leading-snug">Accumulated discount yield seized to cover any payment delay.</p>
+              </div>
 
-            {/* Layer 3 */}
-            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                Layer 3
-              </span>
-              <h4 className="text-xs font-bold text-white font-display">Trusted Backer</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                The member's nominated backer absorbs the deficit from their staked collateral.
-              </p>
-            </div>
+              <div className="p-3.5 rounded-xl bg-slate-900/90 border border-white/5 space-y-1">
+                <span className="font-bold text-purple-400">Layer 3</span>
+                <p className="font-semibold text-white">Social Vouch Stake</p>
+                <p className="text-[11px] text-slate-400 leading-snug">External peer stakes in VouchRegistry slashed if buffer runs dry.</p>
+              </div>
 
-            {/* Layer 4 */}
-            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                Layer 4
-              </span>
-              <h4 className="text-xs font-bold text-white font-display">Circle Safety Fund</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                The community's reserve pool built from discount slices cushions any remaining shortfall.
-              </p>
-            </div>
+              <div className="p-3.5 rounded-xl bg-slate-900/90 border border-white/5 space-y-1">
+                <span className="font-bold text-amber-400">Layer 4</span>
+                <p className="font-semibold text-white">Protocol Reserve</p>
+                <p className="text-[11px] text-slate-400 leading-snug">Accumulated discount-floor fees fund circle-wide contingency reserves.</p>
+              </div>
 
-            {/* Layer 5 */}
-            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                Layer 5
-              </span>
-              <h4 className="text-xs font-bold text-white font-display">Rare Shared Adjustment</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                An ultra-rare mutual adjustment ensuring the circle pot is 100% paid out every single round.
-              </p>
+              <div className="p-3.5 rounded-xl bg-slate-900/90 border border-white/5 space-y-1">
+                <span className="font-bold text-rose-400">Layer 5</span>
+                <p className="font-semibold text-white">Pro-Rata Backstop</p>
+                <p className="text-[11px] text-slate-400 leading-snug">Mathematical socialized deduction guarantees pool stays solvent.</p>
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* 4. OPT-IN TECHNICAL DETAILS (FOR JUDGES & EVALUATORS) */}
+      {/* 4. TECHNICAL / BLOCKCHAIN DETAILS (Opt-in for evaluators/judges) */}
       {isTechnicalMode && (
-        <div className="tech-details-box text-xs space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-indigo-500/20">
-            <span className="font-bold text-indigo-300 flex items-center gap-1.5">
+        <div className="tech-details-box text-xs space-y-2">
+          <div className="flex items-center justify-between text-indigo-300 font-bold">
+            <span className="flex items-center gap-1.5">
               <Code2 className="w-4 h-4 text-indigo-400" />
-              On-Chain Protocol State & Invariants
+              On-Chain State Machine & Solvency Telemetry
             </span>
-            <span className="text-[10px] font-mono text-indigo-300">MST Testnet (Chain ID 91562037)</span>
+            <span className="font-mono text-[11px] text-slate-400">MST Testnet</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px]">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-slate-300 pt-2">
             <div>
-              <p className="text-slate-400">Contract Address</p>
-              <p className="font-mono text-slate-200 truncate">{groupDetails?.address || "0x..."}</p>
+              <p className="text-slate-400 text-[11px]">Contract State:</p>
+              <p className="font-mono text-emerald-400 font-bold">{groupDetails?.currentState || "Collect"}</p>
             </div>
             <div>
-              <p className="text-slate-400">Raw Buffer / Dividends</p>
-              <p className="font-mono text-slate-200">{bufferBalance} / {lockedDividends} tMSTC</p>
+              <p className="text-slate-400 text-[11px]">Solvency Invariant:</p>
+              <p className="font-mono text-slate-200">Collateral ≥ Rem × 120%</p>
             </div>
             <div>
-              <p className="text-slate-400">Solvency Invariant</p>
-              <p className="font-mono text-emerald-400">
-                (Buffer + Divs + Vouch) ≥ (Rem. × {groupDetails?.safetyFactorBps || 10000} bps)
-              </p>
+              <p className="text-slate-400 text-[11px]">Safety Factor:</p>
+              <p className="font-mono text-slate-200">{groupDetails?.safetyFactorBps ? `${groupDetails.safetyFactorBps / 100}%` : "120%"}</p>
+            </div>
+            <div>
+              <p className="text-slate-400 text-[11px]">Discount Floor Cap:</p>
+              <p className="font-mono text-slate-200">{groupDetails?.discountCapBps ? `${groupDetails.discountCapBps / 100}%` : "30%"}</p>
             </div>
           </div>
         </div>

@@ -1,5 +1,16 @@
-import React from "react";
-import { ArrowUpRight, ArrowDownLeft, ShieldCheck, ExternalLink, Calendar, Code2, CheckCircle2 } from "lucide-react";
+import React, { useState } from "react";
+import {
+  ArrowUpRight,
+  ArrowDownLeft,
+  ShieldCheck,
+  ExternalLink,
+  Calendar,
+  Code2,
+  CheckCircle2,
+  Copy,
+  Check,
+  Filter,
+} from "lucide-react";
 import { formatINR, formatRawINR } from "../utils/formatters";
 import { MST_TESTNET } from "../config/network";
 
@@ -22,14 +33,23 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   events = [],
   isTechnicalMode,
 }) => {
-  // Map raw on-chain events to friendly UPI / Bank statement transactions
+  const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<"ALL" | "CONTRIBUTIONS" | "PAYOUTS">("ALL");
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedHash(text);
+    setTimeout(() => setCopiedHash(null), 2000);
+  };
+
+  // Map raw on-chain events to friendly statement transactions
   const formatTransaction = (ev: LedgerEvent) => {
     let title = "Transaction";
     let isCredit = false;
     let icon = <ArrowUpRight className="w-4 h-4 text-slate-400" />;
     let inrAmount = formatINR(ev.amount.split(" ")[0]);
 
-    if (ev.eventName === "InstallmentCollected") {
+    if (ev.eventName === "InstallmentCollected" || ev.eventName === "InstallmentPaid") {
       title = `Month ${ev.round} Contribution Paid`;
       isCredit = false;
       icon = <ArrowUpRight className="w-4 h-4 text-slate-400" />;
@@ -41,7 +61,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
       title = `Backup Layer Absorbed Deficit`;
       isCredit = false;
       icon = <ShieldCheck className="w-4 h-4 text-amber-400" />;
-    } else if (ev.eventName === "MemberJoined") {
+    } else if (ev.eventName === "MemberJoined" || ev.eventName === "UserJoined") {
       title = `Security Deposit Confirmed`;
       isCredit = false;
       icon = <ShieldCheck className="w-4 h-4 text-emerald-400" />;
@@ -84,74 +104,123 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
     },
   ];
 
+  const filteredEvents = sampleEvents.filter((ev) => {
+    if (filterType === "CONTRIBUTIONS") return ev.eventName.includes("Installment") || ev.eventName.includes("Joined");
+    if (filterType === "PAYOUTS") return ev.eventName.includes("Auction") || ev.eventName.includes("Withdrawn");
+    return true;
+  });
+
   return (
-    <div className="cred-card p-6 sm:p-7 border-white/5 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-white/5">
+    <div className="fintech-card p-6 sm:p-7 border-white/5 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/5">
         <div>
-          <h3 className="text-base font-bold text-white font-display">Transaction History</h3>
-          <p className="text-xs text-slate-400">Statement of all monthly contributions, draws, and savings credits</p>
+          <h3 className="text-base font-bold text-white font-display">Blockchain Audit Ledger</h3>
+          <p className="text-xs text-slate-400">Statement of all verified on-chain contributions, draws, and savings credits</p>
         </div>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-400">
           <CheckCircle2 className="w-3.5 h-3.5" />
-          Live Bank-Grade Verification
+          MST Blockchain Verified
         </div>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setFilterType("ALL")}
+          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+            filterType === "ALL"
+              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+              : "bg-white/5 text-slate-400 hover:text-white"
+          }`}
+        >
+          All Activity ({sampleEvents.length})
+        </button>
+        <button
+          onClick={() => setFilterType("CONTRIBUTIONS")}
+          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+            filterType === "CONTRIBUTIONS"
+              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+              : "bg-white/5 text-slate-400 hover:text-white"
+          }`}
+        >
+          Contributions
+        </button>
+        <button
+          onClick={() => setFilterType("PAYOUTS")}
+          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+            filterType === "PAYOUTS"
+              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+              : "bg-white/5 text-slate-400 hover:text-white"
+          }`}
+        >
+          Draw Payouts
+        </button>
       </div>
 
       {/* Transaction List */}
       <div className="divide-y divide-white/5">
-        {sampleEvents.map((ev) => {
+        {filteredEvents.map((ev) => {
           const { title, isCredit, icon, inrAmount } = formatTransaction(ev);
+          const explorerUrl = `${MST_TESTNET.explorerUrl}/tx/${ev.txHash}`;
 
           return (
             <div
               key={ev.id}
-              className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] -mx-2 px-2 rounded-xl transition-colors"
+              className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] px-2 rounded-xl transition-all"
             >
-              {/* Left: Icon + Title + Date */}
               <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/5 flex items-center justify-center flex-shrink-0">
+                <div className={`p-2.5 rounded-xl ${isCredit ? "bg-emerald-500/10" : "bg-slate-900 border border-white/5"}`}>
                   {icon}
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm font-bold text-white font-display">{title}</p>
-                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
+                  <p className="text-xs font-semibold text-white font-display">{title}</p>
+                  <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
                     <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      {ev.timestamp}
+                      <Calendar className="w-3 h-3 text-slate-500" /> {ev.timestamp}
                     </span>
                     <span>•</span>
-                    <a
-                      href={`${MST_TESTNET.explorerUrl}/tx/${ev.txHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-0.5 font-medium"
-                    >
-                      Verify on blockchain
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
+                    <span className="text-slate-300 font-mono">
+                      {ev.member ? `${ev.member.substring(0, 6)}...` : "Community Pool"}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Right: Amount & Token Equivalent */}
-              <div className="text-right pl-12 sm:pl-0">
-                <p className={`text-sm font-extrabold font-display ${isCredit ? 'text-emerald-400' : 'text-slate-200'}`}>
-                  {isCredit ? `+${inrAmount}` : inrAmount}
-                </p>
-                <p className="text-[10px] text-slate-500 font-mono">
-                  {ev.amount}
-                </p>
-              </div>
-
-              {/* Technical Mode Detail (if enabled) */}
-              {isTechnicalMode && (
-                <div className="w-full text-[10px] font-mono text-indigo-300/80 pt-1 flex items-center gap-2">
-                  <Code2 className="w-3 h-3 text-indigo-400" />
-                  <span>Event: {ev.eventName}</span>
-                  <span>|</span>
-                  <span className="truncate">Tx: {ev.txHash}</span>
+              <div className="flex items-center justify-between sm:justify-end gap-4 text-right">
+                <div>
+                  <p className={`text-sm font-bold font-display tabular-nums ${isCredit ? "text-emerald-400" : "text-white"}`}>
+                    {isCredit ? `+${inrAmount}` : `-${inrAmount}`}
+                  </p>
+                  <p className="text-[10px] text-slate-400 font-mono">
+                    {ev.amount}
+                  </p>
                 </div>
-              )}
+
+                {/* Hash & Explorer */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => copyToClipboard(ev.txHash)}
+                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                    title="Copy Transaction Hash"
+                  >
+                    {copiedHash === ev.txHash ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+
+                  <a
+                    href={explorerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-1 text-[11px]"
+                    title="View on MSTScan Explorer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
             </div>
           );
         })}

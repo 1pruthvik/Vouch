@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Header } from "./components/Header";
 import { MemberDashboard } from "./components/MemberDashboard";
 import { AuctionBidding } from "./components/AuctionBidding";
@@ -10,12 +10,17 @@ import { ConnectWalletModal } from "./components/ConnectWalletModal";
 import { MandateModal } from "./components/MandateModal";
 import { AccountModal } from "./components/AccountModal";
 import { useWallet } from "./hooks/useWallet";
+import { useLenis } from "./hooks/useLenis";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
 import { fetchLedgerEvents } from "./services/indexerService";
-import { Plus, UserPlus, Shield, CheckCircle2, RefreshCw, AlertCircle, Sparkles, Zap, Layers, History } from "lucide-react";
+import { Plus, UserPlus, Shield, CheckCircle2, RefreshCw, AlertCircle, Sparkles, Zap, Layers, History, LayoutDashboard } from "lucide-react";
+import gsap from "gsap";
 
 export function App() {
+  // Initialize Lenis smooth scroll
+  useLenis();
+
   const {
     account,
     balance,
@@ -56,6 +61,8 @@ export function App() {
   const [notification, setNotification] = useState<{ message: string; isError?: boolean } | null>(null);
   const [isMandateActive, setIsMandateActive] = useState(true);
 
+  const tabContentRef = useRef<HTMLDivElement>(null);
+
   const showNotification = (message: string, isError: boolean = false) => {
     setNotification({ message, isError });
     setTimeout(() => setNotification(null), 5000);
@@ -69,6 +76,19 @@ export function App() {
     }
     setContractService(srv);
   }, [provider, signer]);
+
+  // Tab switch GSAP animation
+  const handleTabChange = (tab: "home" | "draw" | "standing" | "history") => {
+    setActiveTab(tab);
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!prefersReducedMotion && tabContentRef.current) {
+      gsap.fromTo(
+        tabContentRef.current,
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }
+      );
+    }
+  };
 
   // Refresh Group and Member state
   const refreshData = useCallback(async () => {
@@ -214,7 +234,7 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#08090c] text-slate-100 selection:bg-emerald-500 selection:text-black">
+    <div className="min-h-screen flex flex-col bg-[#08090C] text-slate-100 selection:bg-emerald-500 selection:text-black">
       {/* Header */}
       <Header
         account={account}
@@ -232,15 +252,15 @@ export function App() {
         {/* Toast / Notification Banner */}
         {notification && (
           <div
-            className={`p-4 rounded-2xl flex items-center justify-between text-xs sm:text-sm font-semibold transition-all shadow-lg animate-fadeIn ${
+            className={`p-4 rounded-2xl flex items-center justify-between text-xs sm:text-sm font-semibold transition-all shadow-lg ${
               notification.isError
-                ? "bg-red-500/15 border border-red-500/30 text-red-300"
+                ? "bg-rose-500/15 border border-rose-500/30 text-rose-300"
                 : "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
             }`}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               {notification.isError ? (
-                <AlertCircle className="w-4 h-4 text-red-400" />
+                <AlertCircle className="w-4 h-4 text-rose-400" />
               ) : (
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               )}
@@ -248,30 +268,30 @@ export function App() {
             </div>
             <button
               onClick={() => setNotification(null)}
-              className="text-slate-400 hover:text-white"
+              className="text-slate-400 hover:text-white px-1.5 py-0.5"
             >
               ✕
             </button>
           </div>
         )}
 
-        {/* Navigation Tabs (CRED-style pill switcher) */}
+        {/* Navigation Tabs (FinTech Segmented Switcher) */}
         <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-3">
-          <div className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar">
+          <div className="flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar">
             <button
-              onClick={() => setActiveTab("home")}
+              onClick={() => handleTabChange("home")}
               className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
                 activeTab === "home"
                   ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
                   : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
               }`}
             >
-              <Zap className="w-3.5 h-3.5" />
+              <LayoutDashboard className="w-3.5 h-3.5" />
               Circle Home
             </button>
 
             <button
-              onClick={() => setActiveTab("draw")}
+              onClick={() => handleTabChange("draw")}
               className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
                 activeTab === "draw"
                   ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
@@ -279,11 +299,11 @@ export function App() {
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              This Month's Draw
+              Monthly Draw
             </button>
 
             <button
-              onClick={() => setActiveTab("standing")}
+              onClick={() => handleTabChange("standing")}
               className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
                 activeTab === "standing"
                   ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
@@ -295,7 +315,7 @@ export function App() {
             </button>
 
             <button
-              onClick={() => setActiveTab("history")}
+              onClick={() => handleTabChange("history")}
               className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
                 activeTab === "history"
                   ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
@@ -303,7 +323,7 @@ export function App() {
               }`}
             >
               <History className="w-3.5 h-3.5" />
-              Transaction History
+              Audit Ledger
             </button>
           </div>
 
@@ -318,26 +338,75 @@ export function App() {
           </div>
         </div>
 
-        {/* Tab 1: Circle Home */}
-        {activeTab === "home" && (
-          <div className="space-y-6 animate-fadeIn">
-            <MemberDashboard
-              account={account}
-              groupDetails={groupDetails}
-              memberDetails={memberDetails}
-              riskAdvisory={riskAdvisory}
-              isTechnicalMode={isTechnicalMode}
-              onPayInstallment={handlePayInstallment}
-              onOpenMandateModal={() => setIsMandateModalOpen(true)}
-              onOpenDrawTab={() => setActiveTab("draw")}
-              onJoinGroup={() => setIsJoinModalOpen(true)}
-            />
+        {/* Tab Content Container with Smooth Animation */}
+        <div ref={tabContentRef}>
+          {/* Tab 1: Circle Home */}
+          {activeTab === "home" && (
+            <div className="space-y-6">
+              <MemberDashboard
+                account={account}
+                groupDetails={groupDetails}
+                memberDetails={memberDetails}
+                riskAdvisory={riskAdvisory}
+                isTechnicalMode={isTechnicalMode}
+                onPayInstallment={handlePayInstallment}
+                onOpenMandateModal={() => setIsMandateModalOpen(true)}
+                onOpenDrawTab={() => handleTabChange("draw")}
+                onJoinGroup={() => setIsJoinModalOpen(true)}
+              />
 
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <LedgerView
+                    events={ledgerEvents.slice(0, 4)}
+                    isTechnicalMode={isTechnicalMode}
+                  />
+                </div>
+                <div>
+                  <RiskAdvisorCard
+                    memberAddress={account || "0x000"}
+                    riskAdvisory={riskAdvisory}
+                    isTechnicalMode={isTechnicalMode}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Tab 2: Monthly Draw */}
+          {activeTab === "draw" && (
+            <div className="space-y-6">
+              <AuctionBidding
+                currentRound={groupDetails?.currentRound || 1}
+                totalPot={groupDetails?.currentPot || "2.5"}
+                minBidAllowed={groupDetails?.minBid || "1.75"}
+                phase={groupDetails?.currentState || "Commit"}
+                hasCommitted={false}
+                hasRevealed={false}
+                hasWonPreviously={memberDetails?.hasWon || false}
+                isTechnicalMode={isTechnicalMode}
+                groupDetails={groupDetails}
+                onCommitBid={handleCommitBid}
+                onRevealBid={handleRevealBid}
+                onSettleRound={handleSettleRound}
+              />
+            </div>
+          )}
+
+          {/* Tab 3: Your Standing */}
+          {activeTab === "standing" && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                <LedgerView
-                  events={ledgerEvents.slice(0, 4)}
+                <MemberDashboard
+                  account={account}
+                  groupDetails={groupDetails}
+                  memberDetails={memberDetails}
+                  riskAdvisory={riskAdvisory}
                   isTechnicalMode={isTechnicalMode}
+                  onPayInstallment={handlePayInstallment}
+                  onOpenMandateModal={() => setIsMandateModalOpen(true)}
+                  onOpenDrawTab={() => handleTabChange("draw")}
+                  onJoinGroup={() => setIsJoinModalOpen(true)}
                 />
               </div>
               <div>
@@ -348,64 +417,18 @@ export function App() {
                 />
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Tab 2: This Month's Draw */}
-        {activeTab === "draw" && (
-          <div className="space-y-6 animate-fadeIn">
-            <AuctionBidding
-              currentRound={groupDetails?.currentRound || 1}
-              totalPot={groupDetails?.currentPot || "2.5"}
-              minBidAllowed={groupDetails?.minBid || "1.75"}
-              phase={groupDetails?.currentState || "Commit"}
-              hasCommitted={false}
-              hasRevealed={false}
-              hasWonPreviously={memberDetails?.hasWon || false}
-              isTechnicalMode={isTechnicalMode}
-              groupDetails={groupDetails}
-              onCommitBid={handleCommitBid}
-              onRevealBid={handleRevealBid}
-              onSettleRound={handleSettleRound}
-            />
-          </div>
-        )}
-
-        {/* Tab 3: Your Standing */}
-        {activeTab === "standing" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
-            <div className="lg:col-span-2">
-              <MemberDashboard
-                account={account}
-                groupDetails={groupDetails}
-                memberDetails={memberDetails}
-                riskAdvisory={riskAdvisory}
-                isTechnicalMode={isTechnicalMode}
-                onPayInstallment={handlePayInstallment}
-                onOpenMandateModal={() => setIsMandateModalOpen(true)}
-                onOpenDrawTab={() => setActiveTab("draw")}
-                onJoinGroup={() => setIsJoinModalOpen(true)}
-              />
-            </div>
-            <div>
-              <RiskAdvisorCard
-                memberAddress={account || "0x000"}
-                riskAdvisory={riskAdvisory}
+          {/* Tab 4: Audit Ledger */}
+          {activeTab === "history" && (
+            <div className="space-y-6">
+              <LedgerView
+                events={ledgerEvents}
                 isTechnicalMode={isTechnicalMode}
               />
             </div>
-          </div>
-        )}
-
-        {/* Tab 4: Transaction History */}
-        {activeTab === "history" && (
-          <div className="space-y-6 animate-fadeIn">
-            <LedgerView
-              events={ledgerEvents}
-              isTechnicalMode={isTechnicalMode}
-            />
-          </div>
-        )}
+          )}
+        </div>
       </main>
 
       {/* Modals */}
