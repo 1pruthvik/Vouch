@@ -28,10 +28,7 @@ export const ConnectWalletPage: React.FC<ConnectWalletPageProps> = ({
     setLocalError(null);
     onClearError();
     try {
-      const success = await onConnectExtension(provider);
-      if (!success) {
-        setLocalError("Could not connect to extension. Please ensure BridgeKey or MetaMask is unlocked.");
-      }
+      await onConnectExtension(provider);
     } catch (err: any) {
       setLocalError(err.message || "Failed to connect wallet extension.");
     }
