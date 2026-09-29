@@ -3,6 +3,7 @@ import { Shield, Share2, ArrowRight, Plus, Copy, Check, Users, Clock, ExternalLi
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 import { VerificationService, CircleRegistryEntry, JoinRequest } from "../services/verificationService";
 import { ContractService } from "../services/contractService";
+import { extractCircleAddress } from "./JoinCircleView";
 
 interface MyCirclesViewProps {
   account: string;
@@ -31,8 +32,9 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
 
     const counts: { [addr: string]: number } = {};
     myCircles.forEach((c) => {
-      const reqs = VerificationService.getRequestsForCircle(c.address);
-      counts[c.address] = reqs.filter((r) => r.status === "pending").length;
+      const clean = extractCircleAddress(c.address);
+      const reqs = VerificationService.getRequestsForCircle(clean);
+      counts[clean] = reqs.filter((r) => r.status === "pending").length;
     });
     setPendingRequestsMap(counts);
 
@@ -44,8 +46,9 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
       const remoteCounts: { [addr: string]: number } = {};
       await Promise.all(
         remoteCircles.map(async (c) => {
-          const reqs = await VerificationService.fetchRequestsForCircle(c.address);
-          remoteCounts[c.address] = reqs.filter((r) => r.status === "pending").length;
+          const clean = extractCircleAddress(c.address);
+          const reqs = await VerificationService.fetchRequestsForCircle(clean);
+          remoteCounts[clean] = reqs.filter((r) => r.status === "pending").length;
         })
       );
       setPendingRequestsMap(remoteCounts);
@@ -68,10 +71,11 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
   }, [account]);
 
   const copyGroupLink = (circleAddr: string) => {
+    const clean = extractCircleAddress(circleAddr);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const fullLink = `${origin}/grouplink?circle=${circleAddr}`;
+    const fullLink = `${origin}/grouplink?circle=${clean}`;
     navigator.clipboard.writeText(fullLink);
-    setCopiedLink(circleAddr);
+    setCopiedLink(clean);
     setTimeout(() => setCopiedLink(null), 2500);
     onShowNotification("Group invite link copied to clipboard!");
   };
@@ -88,7 +92,7 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
           My Created Circles
         </h2>
         <p className="text-xs sm:text-sm text-neutral-400 max-w-md mx-auto">
-          Manage all the savings circles you have initialized, share invite links, and review member requests.
+          Manage all the savings circles you have initialized, whitelist member public keys, and review requests.
         </p>
       </div>
 
@@ -116,7 +120,8 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
       ) : (
         <div className="space-y-4">
           {createdCircles.map((circle) => {
-            const pendingCount = pendingRequestsMap[circle.address] || 0;
+            const clean = extractCircleAddress(circle.address);
+            const pendingCount = pendingRequestsMap[clean] || pendingRequestsMap[circle.address] || 0;
             const approxInr = Math.round(parseFloat(circle.installmentAmount || "1.0") * MST_TO_INR_RATE);
             const totalPotInr = (circle.memberCount || 5) * approxInr;
 
@@ -142,28 +147,28 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
                       {circle.name}
                     </h3>
                     <p className="font-mono text-[11px] text-neutral-500 break-all">
-                      ID: {circle.address}
+                      ID: {clean}
                     </p>
                   </div>
 
                   <div className="flex items-center gap-2 self-start sm:self-auto">
                     <button
                       type="button"
-                      onClick={() => copyGroupLink(circle.address)}
+                      onClick={() => copyGroupLink(clean)}
                       className="p-2.5 rounded-lg bg-black hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors border-none cursor-pointer flex items-center gap-1.5"
                       title="Copy Invite Link"
                     >
-                      {copiedLink === circle.address ? (
+                      {copiedLink === clean ? (
                         <Check className="w-3.5 h-3.5 text-green-400" />
                       ) : (
                         <Share2 className="w-3.5 h-3.5 text-red-500" />
                       )}
-                      <span className="text-[11px] font-mono">{copiedLink === circle.address ? "Copied" : "Share Link"}</span>
+                      <span className="text-[11px] font-mono">{copiedLink === clean ? "Copied" : "Share Link"}</span>
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => onSelectCircle(circle.address)}
+                      onClick={() => onSelectCircle(clean)}
                       className="btn-primary py-2.5 px-4 text-xs flex items-center gap-1.5 cursor-pointer"
                     >
                       <span>Manage Circle</span>

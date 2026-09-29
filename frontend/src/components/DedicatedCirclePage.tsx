@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, Shield, Share2, Copy, Check, Users, Clock, CheckCircle2, AlertCircle, Coins, ArrowRight, XCircle, CheckCheck, Lock, Sparkles } from "lucide-react";
+import { ArrowLeft, Shield, Share2, Copy, Check, Users, Clock, CheckCircle2, AlertCircle, Coins, ArrowRight, XCircle, CheckCheck, Lock, UserPlus, Trash2, KeyRound } from "lucide-react";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 import { VerificationService, CircleRegistryEntry, JoinRequest } from "../services/verificationService";
 import { ContractService, GroupDetails, MemberDetails } from "../services/contractService";
+import { extractCircleAddress } from "./JoinCircleView";
+import { ethers } from "ethers";
 
 interface DedicatedCirclePageProps {
   circleAddress: string;
@@ -19,12 +21,16 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
   onBack,
   onShowNotification,
 }) => {
+  const cleanCircleAddress = extractCircleAddress(circleAddress);
+
   const [registryCircle, setRegistryCircle] = useState<CircleRegistryEntry | null>(null);
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
   const [memberDetails, setMemberDetails] = useState<MemberDetails | null>(null);
   const [pendingRequests, setPendingRequests] = useState<JoinRequest[]>([]);
   const [verifiedRequests, setVerifiedRequests] = useState<JoinRequest[]>([]);
   const [allowedMembers, setAllowedMembers] = useState<string[]>([]);
+  const [newPublicKeyInput, setNewPublicKeyInput] = useState<string>("");
+  const [isAddingKey, setIsAddingKey] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
@@ -34,34 +40,34 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
     if (!silent) setIsLoading(true);
     try {
       // 1. Registry Data (local + backend)
-      const reg = VerificationService.getCircle(circleAddress);
+      const reg = VerificationService.getCircle(cleanCircleAddress);
       setRegistryCircle(reg);
-      VerificationService.fetchCircle(circleAddress).then((r) => {
+      VerificationService.fetchCircle(cleanCircleAddress).then((r) => {
         if (r) setRegistryCircle(r);
       });
 
       // 2. Initializer Requests (local + backend)
-      const localReqs = VerificationService.getRequestsForCircle(circleAddress);
+      const localReqs = VerificationService.getRequestsForCircle(cleanCircleAddress);
       setPendingRequests(localReqs.filter((r) => r.status === "pending"));
       setVerifiedRequests(localReqs.filter((r) => r.status === "verified"));
 
-      const remoteReqs = await VerificationService.fetchRequestsForCircle(circleAddress);
+      const remoteReqs = await VerificationService.fetchRequestsForCircle(cleanCircleAddress);
       if (Array.isArray(remoteReqs)) {
         setPendingRequests(remoteReqs.filter((r) => r.status === "pending"));
         setVerifiedRequests(remoteReqs.filter((r) => r.status === "verified"));
       }
 
       // 3. Allowed IDs list
-      const allowed = await VerificationService.fetchAllowedMembers(circleAddress);
+      const allowed = await VerificationService.fetchAllowedMembers(cleanCircleAddress);
       setAllowedMembers(allowed);
 
       // 4. On-chain Details
-      if (contractService && circleAddress.startsWith("0x")) {
+      if (contractService && cleanCircleAddress.startsWith("0x")) {
         try {
-          const gDetails = await contractService.getGroupDetails(circleAddress);
+          const gDetails = await contractService.getGroupDetails(cleanCircleAddress);
           setGroupDetails(gDetails);
 
-          const mDetails = await contractService.getMemberDetails(circleAddress, account);
+          const mDetails = await contractService.getMemberDetails(cleanCircleAddress, account);
           setMemberDetails(mDetails);
         } catch (chainErr) {
           console.warn("On-chain details fetch error:", chainErr);
@@ -70,7 +76,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
     } finally {
       if (!silent) setIsLoading(false);
     }
-  }, [circleAddress, account, contractService]);
+  }, [cleanCircleAddress, account, contractService]);
 
   useEffect(() => {
     loadCircleData(false);
@@ -80,19 +86,54 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
     return () => clearInterval(interval);
   }, [loadCircleData]);
 
+  const cleanAccount = (account || "").toLowerCase();
   const isInitializer =
-    (registryCircle && registryCircle.initializer.toLowerCase() === account.toLowerCase()) ||
-    (groupDetails && groupDetails.members[0]?.toLowerCase() === account.toLowerCase()) ||
-    (allowedMembers.length > 0 && allowedMembers[0]?.toLowerCase() === account.toLowerCase());
+    (registryCircle && registryCircle.initializer.toLowerCase() === cleanAccount) ||
+    (groupDetails && groupDetails.members[0]?.toLowerCase() === cleanAccount) ||
+    (allowedMembers.length > 0 && allowedMembers[0]?.toLowerCase() === cleanAccount) ||
+    (registryCircle?.initializer === "Circle Initializer" && allowedMembers.includes(cleanAccount));
+
+  const handleAddPublicKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const candidate = newPublicKeyInput.trim();
+    if (!candidate) return;
+
+    if (!candidate.startsWith("0x") || candidate.length < 42) {
+      onShowNotification("Please enter a valid 0x public key address (42 characters)", true);
+      return;
+    }
+
+    setIsAddingKey(true);
+    try {
+      await VerificationService.addAllowedMember(cleanCircleAddress, candidate, account);
+      setNewPublicKeyInput("");
+      await loadCircleData(true);
+      onShowNotification(`Added ${candidate.substring(0, 8)}... to the Allowed List!`);
+    } catch (err: any) {
+      onShowNotification(err.message || "Failed to add public key", true);
+    } finally {
+      setIsAddingKey(false);
+    }
+  };
+
+  const handleRemoveAllowedMember = async (memberAddress: string) => {
+    try {
+      await VerificationService.removeAllowedMember(cleanCircleAddress, memberAddress);
+      await loadCircleData(true);
+      onShowNotification(`Removed ${memberAddress.substring(0, 6)}... from Allowed List`);
+    } catch (err: any) {
+      onShowNotification("Failed to remove member", true);
+    }
+  };
 
   const handleVerifyApplicant = async (applicantAddress: string) => {
-    await VerificationService.verifyApplicant(circleAddress, applicantAddress);
+    await VerificationService.verifyApplicant(cleanCircleAddress, applicantAddress);
     await loadCircleData(true);
     onShowNotification(`Verified applicant and added to Allowed IDs list!`);
   };
 
   const handleRejectApplicant = async (applicantAddress: string) => {
-    await VerificationService.rejectApplicant(circleAddress, applicantAddress);
+    await VerificationService.rejectApplicant(cleanCircleAddress, applicantAddress);
     await loadCircleData(true);
     onShowNotification(`Rejected applicant ${applicantAddress.substring(0, 6)}...`);
   };
@@ -102,7 +143,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
     setIsPaying(true);
     try {
       onShowNotification("Processing monthly contribution on blockchain...");
-      await contractService.payInstallment(circleAddress, groupDetails.installmentAmount);
+      await contractService.payInstallment(cleanCircleAddress, groupDetails.installmentAmount);
       onShowNotification("Monthly contribution confirmed!");
       await loadCircleData();
     } catch (err: any) {
@@ -115,7 +156,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
 
   const copyLink = () => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const fullLink = `${origin}/grouplink?circle=${circleAddress}`;
+    const fullLink = `${origin}/grouplink?circle=${cleanCircleAddress}`;
     navigator.clipboard.writeText(fullLink);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -123,7 +164,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
   };
 
   const copyId = () => {
-    navigator.clipboard.writeText(circleAddress);
+    navigator.clipboard.writeText(cleanCircleAddress);
     setCopiedId(true);
     setTimeout(() => setCopiedId(false), 2500);
     onShowNotification("Circle address copied to clipboard!");
@@ -176,7 +217,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
             </h1>
             <div className="flex items-center gap-2 mt-1.5">
               <span className="font-mono text-xs text-neutral-400 break-all">
-                {circleAddress}
+                {cleanCircleAddress}
               </span>
               <button
                 type="button"
@@ -243,22 +284,47 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
         </div>
       </div>
 
-      {/* ── Section for Initializer: Verification & Allowed IDs Whitelist ── */}
+      {/* ── Section for Initializer: Public Key Whitelist & Verification Console ── */}
       {isInitializer && (
         <div className="p-6 bg-neutral-950 rounded-2xl space-y-6 text-xs">
           <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
             <div className="space-y-0.5">
               <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
                 <Shield className="w-4 h-4 text-red-500" />
-                <span>Initializer Access & Verification Console</span>
+                <span>Initializer Whitelist & Access Console</span>
               </h3>
               <p className="text-neutral-400 text-[11px]">
-                Only you (the Initializer) have the authority to verify applicants and add them to the Allowed IDs List.
+                People with BridgeKey public keys in the Allowed List are granted access to <span className="text-white font-mono">localhost:3000/grouplink</span>.
               </p>
             </div>
             <span className="px-2.5 py-1 rounded bg-red-950/30 text-red-400 font-semibold text-[11px]">
               {pendingRequests.length} Pending
             </span>
+          </div>
+
+          {/* Direct Add Public Key Form */}
+          <div className="p-4 bg-black rounded-xl space-y-3">
+            <div className="flex items-center gap-2">
+              <KeyRound className="w-4 h-4 text-red-500" />
+              <h4 className="font-semibold text-white text-xs">Add Member Public Key (BridgeKey ID)</h4>
+            </div>
+            <form onSubmit={handleAddPublicKey} className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Enter member public key address (0x...)"
+                value={newPublicKeyInput}
+                onChange={(e) => setNewPublicKeyInput(e.target.value)}
+                className="flex-1 bg-neutral-900 rounded-lg px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-red-500 border-none"
+              />
+              <button
+                type="submit"
+                disabled={isAddingKey || !newPublicKeyInput.trim()}
+                className="btn-primary px-4 py-2.5 text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>{isAddingKey ? "Adding..." : "Add to Allowed List"}</span>
+              </button>
+            </form>
           </div>
 
           {/* Pending Verification Requests */}
@@ -269,8 +335,8 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
             </div>
 
             {pendingRequests.length === 0 ? (
-              <p className="text-[11px] text-neutral-600 italic py-2">
-                No pending join requests. Share your group link with prospective members.
+              <p className="text-[11px] text-neutral-600 italic py-1">
+                No pending join requests. Add public keys directly above or share your group link.
               </p>
             ) : (
               <div className="space-y-2">
@@ -295,7 +361,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
                         className="px-3.5 py-1.5 rounded-lg bg-green-950/40 hover:bg-green-900/50 text-green-400 hover:text-green-300 font-semibold text-xs flex items-center gap-1 transition-all border-none cursor-pointer"
                       >
                         <CheckCheck className="w-3.5 h-3.5" />
-                        <span>Verify & Add to Allowed List</span>
+                        <span>Approve & Whitelist</span>
                       </button>
                       <button
                         type="button"
@@ -316,7 +382,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
           <div className="pt-4 border-t border-neutral-900 space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-neutral-300">
-                Allowed IDs List ({allowedMembers.length})
+                Allowed Public Keys Whitelist ({allowedMembers.length})
               </span>
               <span className="text-[10px] text-green-400 font-semibold flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" />
@@ -326,18 +392,27 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
 
             <div className="flex flex-wrap gap-2">
               {allowedMembers.map((addr) => {
-                const isThisInit = registryCircle && registryCircle.initializer.toLowerCase() === addr.toLowerCase();
+                const isThisInit = (registryCircle && registryCircle.initializer.toLowerCase() === addr.toLowerCase()) || addr.toLowerCase() === cleanAccount;
                 return (
                   <span
                     key={addr}
-                    className="px-3 py-1.5 rounded-lg bg-neutral-900 text-neutral-200 font-mono text-[11px] flex items-center gap-2"
+                    className="px-3 py-1.5 rounded-lg bg-black text-neutral-200 font-mono text-[11px] flex items-center gap-2"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
                     <span>{addr.substring(0, 6)}...{addr.substring(addr.length - 4)}</span>
-                    {isThisInit && (
+                    {isThisInit ? (
                       <span className="px-1.5 py-0.2 rounded bg-red-950/60 text-red-400 text-[9px] font-sans font-semibold">
                         Initializer
                       </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAllowedMember(addr)}
+                        className="text-neutral-500 hover:text-red-400 p-0.5 bg-transparent border-none cursor-pointer"
+                        title="Remove from allowed list"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     )}
                   </span>
                 );

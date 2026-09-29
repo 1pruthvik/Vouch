@@ -344,5 +344,12 @@ export function createApiRouter(indexer: IndexerService, keeper: KeeperBot): Rou
     res.json({ success: true, message: `Member ${memberAddress} added to allowed list for circle ${address}` });
   });
 
+  // Remove a member from allowed list
+  router.delete("/circles/:address/allowed/:memberAddress", (req: Request, res: Response) => {
+    const { address, memberAddress } = req.params;
+    db.removeAllowedMember(address, memberAddress);
+    res.json({ success: true, message: `Member ${memberAddress} removed from allowed list for circle ${address}` });
+  });
+
   return router;
 }

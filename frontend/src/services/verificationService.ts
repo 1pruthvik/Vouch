@@ -429,4 +429,47 @@ export class VerificationService {
     }
     return Array.from(new Set(verifiedReqs));
   }
+
+  // 18. Initializer directly adds a member's public key to the Allowed list
+  public static async addAllowedMember(
+    circleAddress: string,
+    memberAddress: string,
+    addedBy: string = ""
+  ): Promise<void> {
+    if (!circleAddress || !memberAddress) return;
+    const cleanCircle = circleAddress.toLowerCase();
+    const cleanMember = memberAddress.toLowerCase();
+
+    // Local update
+    this.verifyApplicant(cleanCircle, cleanMember).catch(() => {});
+
+    // Backend persist
+    try {
+      await fetch(`${API_URL}/circles/${cleanCircle}/allowed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberAddress: cleanMember, addedBy }),
+      });
+    } catch (err) {
+      console.warn("Backend addAllowedMember error:", err);
+    }
+  }
+
+  // 19. Initializer removes a member's public key from Allowed list
+  public static async removeAllowedMember(
+    circleAddress: string,
+    memberAddress: string
+  ): Promise<void> {
+    if (!circleAddress || !memberAddress) return;
+    const cleanCircle = circleAddress.toLowerCase();
+    const cleanMember = memberAddress.toLowerCase();
+
+    try {
+      await fetch(`${API_URL}/circles/${cleanCircle}/allowed/${cleanMember}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.warn("Backend removeAllowedMember error:", err);
+    }
+  }
 }

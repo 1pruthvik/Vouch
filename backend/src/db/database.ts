@@ -865,6 +865,17 @@ class DatabaseManager {
 
     return results;
   }
+
+  public removeAllowedMember(circleAddress: string, memberAddress: string): void {
+    if (!this.db || !circleAddress || !memberAddress) return;
+    const cleanCircle = this.sanitizeAddress(circleAddress);
+    const cleanMember = this.sanitizeAddress(memberAddress);
+    this.db.run(
+      "DELETE FROM circle_allowed_members WHERE LOWER(circle_address) = ? AND LOWER(member_address) = ?",
+      [cleanCircle, cleanMember]
+    );
+    this.save();
+  }
 }
 
 export const db = new DatabaseManager();
