@@ -1,12 +1,12 @@
 import React from "react";
-import { ShieldCheck, User, Code2, Sparkles, Plus, Wallet, ChevronDown } from "lucide-react";
+import { ShieldCheck, Code2, Plus, Wallet } from "lucide-react";
 import { formatINR } from "../utils/formatters";
 
 interface HeaderProps {
   account: string | null;
   balance: string;
-  groupName?: string;
   isConnecting: boolean;
+  groupName?: string;
   isTechnicalMode: boolean;
   onToggleTechnicalMode: () => void;
   onOpenAccountModal: () => void;
@@ -16,8 +16,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   account,
   balance,
-  groupName = "Alpha Savings Circle",
   isConnecting,
+  groupName,
   isTechnicalMode,
   onToggleTechnicalMode,
   onOpenAccountModal,
@@ -86,18 +86,19 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Account */}
           <button
             onClick={onOpenAccountModal}
+            disabled={isConnecting}
             className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl transition-all duration-200"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: 'linear-gradient(135deg, #f5a623 0%, #e88d10 100%)' }}>
-              {account ? account.substring(2, 4).toUpperCase() : "P"}
+              {account ? account.substring(2, 4).toUpperCase() : <Wallet className="w-3.5 h-3.5 text-white" />}
             </div>
             <div className="text-left hidden sm:block">
               <p className="text-xs font-semibold text-white leading-tight">
-                {account ? `${account.substring(0, 6)}...${account.substring(account.length - 4)}` : "Connect"}
+                {account ? `${account.substring(0, 6)}...${account.substring(account.length - 4)}` : isConnecting ? "Connecting..." : "Connect"}
               </p>
               <p className="text-[10px] leading-tight" style={{ color: '#2dd4a8' }}>
-                {account ? `${formatINR(balance)}` : "UPI / BridgeKey"}
+                {account ? `${formatINR(balance)}` : "UPI / Wallet"}
               </p>
             </div>
           </button>

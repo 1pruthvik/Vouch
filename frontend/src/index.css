@@ -27,11 +27,17 @@
   --accent-sky: #38bdf8;
   --accent-sky-dim: rgba(56, 189, 248, 0.12);
 
+  /* Legacy royal accents */
+  --royal-red: #880d19;
+  --royal-red-hover: #6e0812;
+  --royal-red-active: #56050d;
+
   /* Text hierarchy */
   --text-primary: #f0f2f5;
   --text-secondary: #9ca3b4;
   --text-muted: #5f6578;
   --text-inverse: #0f1117;
+  --text-main: #f0f2f5;
 
   /* Borders */
   --border-subtle: rgba(255, 255, 255, 0.06);
@@ -141,6 +147,13 @@ h1, h2, h3, h4, h5, .font-display {
   border-radius: var(--radius-lg);
 }
 
+.content-card, .cred-card, .cred-hero-card {
+  background-color: var(--bg-surface);
+  border-radius: 14px;
+  border: 1px solid var(--border-subtle);
+  padding: 24px;
+}
+
 /* ─── Buttons ─── */
 .v-btn-primary {
   background: linear-gradient(135deg, var(--accent-teal) 0%, #1aab87 100%);
@@ -188,8 +201,35 @@ h1, h2, h3, h4, h5, .font-display {
 .v-btn-primary:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
+}
+
+.btn-primary, .btn-cred-primary {
+  background-color: var(--royal-red);
+  color: #ffffff;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn-primary:hover, .btn-cred-primary:hover {
+  background-color: var(--royal-red-hover);
+}
+
+.btn-primary:active, .btn-cred-primary:active {
+  background-color: var(--royal-red-active);
+}
+
+.btn-primary:disabled, .btn-cred-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .v-btn-secondary {
@@ -206,12 +246,32 @@ h1, h2, h3, h4, h5, .font-display {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease;
 }
 
 .v-btn-secondary:hover {
   background: rgba(255, 255, 255, 0.09);
   border-color: var(--border-highlight);
+}
+
+.btn-secondary, .btn-cred-secondary {
+  background-color: var(--bg-surface-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background-color 0.15s ease;
+}
+
+.btn-secondary:hover, .btn-cred-secondary:hover {
+  background-color: var(--bg-surface-overlay);
 }
 
 .v-btn-ghost {
@@ -277,6 +337,24 @@ h1, h2, h3, h4, h5, .font-display {
   border: 1px solid rgba(56, 189, 248, 0.2);
 }
 
+.badge, .badge-status-green, .badge-status-yellow, .badge-status-red {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: var(--bg-surface-raised);
+  color: var(--text-secondary);
+}
+
+.badge-royal {
+  background-color: rgba(136, 13, 25, 0.25);
+  color: #fca5a5;
+}
+
 /* ─── Form Inputs ─── */
 .v-input {
   width: 100%;
@@ -328,7 +406,7 @@ input[type=range]::-webkit-slider-thumb:hover {
 }
 
 /* ─── Technical Details Box ─── */
-.v-tech-box {
+.v-tech-box, .tech-details-box {
   background: rgba(139, 92, 246, 0.04);
   border: 1px dashed rgba(139, 92, 246, 0.2);
   border-radius: var(--radius-md);

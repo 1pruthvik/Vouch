@@ -9,11 +9,12 @@ import { JoinGroupModal } from "./components/JoinGroupModal";
 import { ConnectWalletModal } from "./components/ConnectWalletModal";
 import { MandateModal } from "./components/MandateModal";
 import { AccountModal } from "./components/AccountModal";
+import { BlockchainNetwork3D } from "./components/BlockchainNetwork3D";
 import { useWallet } from "./hooks/useWallet";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
 import { fetchLedgerEvents } from "./services/indexerService";
-import { Plus, UserPlus, Shield, CheckCircle2, RefreshCw, AlertCircle, Sparkles, Zap, Layers, History, Home } from "lucide-react";
+import { UserPlus, Shield, CheckCircle2, AlertCircle, Sparkles, Home, Box, History } from "lucide-react";
 
 export function App() {
   const {
@@ -27,7 +28,6 @@ export function App() {
     error: walletError,
     connectWallet,
     connectWithPrivateKey,
-    switchToMSTTestnet,
   } = useWallet();
 
   const [contractService, setContractService] = useState<ContractService | null>(null);
@@ -39,11 +39,11 @@ export function App() {
   const [isMandateModalOpen, setIsMandateModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
-  // Progressive Disclosure: Technical / Pro Details Mode Toggle
+  // Progressive Disclosure: Technical Pro Mode Toggle
   const [isTechnicalMode, setIsTechnicalMode] = useState<boolean>(false);
 
-  // Tabs: Friendly names matching Indian mental models
-  const [activeTab, setActiveTab] = useState<"home" | "draw" | "standing" | "history">("home");
+  // Tabs
+  const [activeTab, setActiveTab] = useState<"home" | "draw" | "standing" | "network" | "history">("home");
 
   // State
   const [activeGroupAddress, setActiveGroupAddress] = useState<string>("");
@@ -52,9 +52,8 @@ export function App() {
   const [ledgerEvents, setLedgerEvents] = useState<LedgerEvent[]>([]);
   const [riskAdvisory, setRiskAdvisory] = useState<RiskPredictionResponse | null>(null);
 
-  const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState<{ message: string; isError?: boolean } | null>(null);
-  const [isMandateActive, setIsMandateActive] = useState(true);
+  const [isMandateActive, setIsMandateActive] = useState(false);
 
   const showNotification = (message: string, isError: boolean = false) => {
     setNotification({ message, isError });
@@ -63,7 +62,7 @@ export function App() {
 
   // Initialize ContractService
   useEffect(() => {
-    const srv = new ContractService(provider as any || undefined);
+    const srv = new ContractService((provider as any) || undefined);
     if (signer) {
       srv.setSigner(signer);
     }
@@ -74,7 +73,6 @@ export function App() {
   const refreshData = useCallback(async () => {
     if (!activeGroupAddress || !contractService) return;
     try {
-      setIsLoading(true);
       const gDetails = await contractService.getGroupDetails(activeGroupAddress);
       setGroupDetails(gDetails);
 
@@ -99,8 +97,6 @@ export function App() {
       setLedgerEvents(events);
     } catch (err: any) {
       console.warn("Could not load group details from chain:", err);
-    } finally {
-      setIsLoading(false);
     }
   }, [activeGroupAddress, contractService, account]);
 
@@ -124,13 +120,13 @@ export function App() {
       return;
     }
     try {
-      showNotification("Creating your savings circle on MST Blockchain...");
+      showNotification("Deploying Chit Group to MST Testnet...");
       const result = await contractService.createGroup(params);
       if (result.groupAddress) {
         setActiveGroupAddress(result.groupAddress);
-        showNotification(`🎉 Circle created! Address: ${result.groupAddress.substring(0, 10)}...`);
+        showNotification(`Group deployed at ${result.groupAddress.substring(0, 10)}...`);
       } else {
-        showNotification("Circle created! Refreshing list...");
+        showNotification("Group creation transaction confirmed.");
       }
       await refreshData();
     } catch (err: any) {
@@ -146,10 +142,10 @@ export function App() {
       return;
     }
     try {
-      showNotification("Depositing security deposit and joining circle...");
+      showNotification("Depositing collateral and joining group...");
       await contractService.joinGroup(groupAddr, bufferDeposit);
       setActiveGroupAddress(groupAddr);
-      showNotification("🎉 You have successfully joined the circle!");
+      showNotification("Successfully joined the group!");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -161,9 +157,9 @@ export function App() {
   const handlePayInstallment = async () => {
     if (!contractService || !activeGroupAddress || !groupDetails) return;
     try {
-      showNotification(`Processing monthly contribution of ${groupDetails.installmentAmount} tMSTC...`);
+      showNotification(`Processing monthly installment of ${groupDetails.installmentAmount} tMSTC...`);
       await contractService.payInstallment(activeGroupAddress, groupDetails.installmentAmount);
-      showNotification("🎉 Monthly payment confirmed on blockchain!");
+      showNotification("Monthly contribution confirmed on blockchain!");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -175,9 +171,9 @@ export function App() {
   const handleCommitBid = async (bidAmountMST: string) => {
     if (!contractService || !activeGroupAddress) return;
     try {
-      showNotification("Submitting encrypted early payout request...");
+      showNotification("Submitting secret encrypted bid...");
       await contractService.commitBid(activeGroupAddress, bidAmountMST);
-      showNotification("🎉 Early payout request submitted!");
+      showNotification("Bid committed successfully!");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -189,9 +185,9 @@ export function App() {
   const handleRevealBid = async (bidAmountMST: string) => {
     if (!contractService || !activeGroupAddress) return;
     try {
-      showNotification("Revealing draw request on chain...");
+      showNotification("Revealing bid on chain...");
       await contractService.revealBid(activeGroupAddress, bidAmountMST);
-      showNotification("🎉 Request verified!");
+      showNotification("Bid revealed successfully!");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -203,9 +199,9 @@ export function App() {
   const handleSettleRound = async () => {
     if (!contractService || !activeGroupAddress) return;
     try {
-      showNotification("Finalizing this month's draw and distributing savings...");
+      showNotification("Settling round and distributing dividends...");
       await contractService.settleRound(activeGroupAddress);
-      showNotification("🎉 Month draw settled! Savings distributed.");
+      showNotification("Round settled! Dividends distributed.");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -217,6 +213,7 @@ export function App() {
     { id: "home" as const, label: "Circle Home", icon: <Home className="w-4 h-4" /> },
     { id: "draw" as const, label: "This Month's Draw", icon: <Sparkles className="w-4 h-4" /> },
     { id: "standing" as const, label: "Your Standing", icon: <Shield className="w-4 h-4" /> },
+    { id: "network" as const, label: "3D Network", icon: <Box className="w-4 h-4" /> },
     { id: "history" as const, label: "Transactions", icon: <History className="w-4 h-4" /> },
   ];
 
@@ -226,8 +223,8 @@ export function App() {
       <Header
         account={account}
         balance={balance}
-        groupName={groupDetails?.name || "Alpha Savings Circle"}
         isConnecting={isConnecting}
+        groupName={groupDetails?.name}
         isTechnicalMode={isTechnicalMode}
         onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
         onOpenAccountModal={() => setIsAccountModalOpen(true)}
@@ -282,7 +279,7 @@ export function App() {
           </div>
         </div>
 
-        {/* Tab 1: Circle Home */}
+        {/* Tab 1: Group Home */}
         {activeTab === "home" && (
           <div className="space-y-5 anim-fade-up">
             <MemberDashboard
@@ -295,34 +292,37 @@ export function App() {
               onOpenMandateModal={() => setIsMandateModalOpen(true)}
               onOpenDrawTab={() => setActiveTab("draw")}
               onJoinGroup={() => setIsJoinModalOpen(true)}
+              onCreateGroup={() => setIsCreateModalOpen(true)}
             />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              <div className="lg:col-span-2">
-                <LedgerView
-                  events={ledgerEvents.slice(0, 4)}
-                  isTechnicalMode={isTechnicalMode}
-                />
+            {groupDetails && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div className="lg:col-span-2">
+                  <LedgerView
+                    events={ledgerEvents.slice(0, 4)}
+                    isTechnicalMode={isTechnicalMode}
+                  />
+                </div>
+                <div>
+                  <RiskAdvisorCard
+                    memberAddress={account || ""}
+                    riskAdvisory={riskAdvisory}
+                    isTechnicalMode={isTechnicalMode}
+                  />
+                </div>
               </div>
-              <div>
-                <RiskAdvisorCard
-                  memberAddress={account || "0x000"}
-                  riskAdvisory={riskAdvisory}
-                  isTechnicalMode={isTechnicalMode}
-                />
-              </div>
-            </div>
+            )}
           </div>
         )}
 
-        {/* Tab 2: This Month's Draw */}
+        {/* Tab 2: Reverse Auction */}
         {activeTab === "draw" && (
           <div className="space-y-5 anim-fade-up">
             <AuctionBidding
               currentRound={groupDetails?.currentRound || 1}
-              totalPot={groupDetails?.currentPot || "2.5"}
-              minBidAllowed={groupDetails?.minBid || "1.75"}
-              phase={groupDetails?.currentState || "Commit"}
+              totalPot={groupDetails?.currentPot || "0"}
+              minBidAllowed={groupDetails?.minBid || "0"}
+              phase={groupDetails?.currentState || "Forming"}
               hasCommitted={false}
               hasRevealed={false}
               hasWonPreviously={memberDetails?.hasWon || false}
@@ -335,7 +335,7 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 3: Your Standing */}
+        {/* Tab 3: Solvency & Standing */}
         {activeTab === "standing" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 anim-fade-up">
             <div className="lg:col-span-2">
@@ -349,11 +349,12 @@ export function App() {
                 onOpenMandateModal={() => setIsMandateModalOpen(true)}
                 onOpenDrawTab={() => setActiveTab("draw")}
                 onJoinGroup={() => setIsJoinModalOpen(true)}
+                onCreateGroup={() => setIsCreateModalOpen(true)}
               />
             </div>
             <div>
               <RiskAdvisorCard
-                memberAddress={account || "0x000"}
+                memberAddress={account || ""}
                 riskAdvisory={riskAdvisory}
                 isTechnicalMode={isTechnicalMode}
               />
@@ -361,7 +362,20 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 4: Transaction History */}
+        {/* Tab 4: 3D Blockchain Network */}
+        {activeTab === "network" && (
+          <div className="space-y-5 anim-fade-up">
+            <BlockchainNetwork3D
+              currentAccount={account}
+              groupDetails={groupDetails}
+              memberDetails={memberDetails}
+              onPayDues={handlePayInstallment}
+              onCommitBid={handleCommitBid}
+            />
+          </div>
+        )}
+
+        {/* Tab 5: Ledger History */}
         {activeTab === "history" && (
           <div className="space-y-5 anim-fade-up">
             <LedgerView
@@ -399,14 +413,14 @@ export function App() {
       <MandateModal
         isOpen={isMandateModalOpen}
         onClose={() => setIsMandateModalOpen(false)}
-        groupName={groupDetails?.name || "Alpha Savings Circle"}
-        installmentAmount={groupDetails?.installmentAmount || "0.5"}
-        cycleDurationSeconds={groupDetails?.cycleDuration || 300}
-        totalMembers={groupDetails?.memberCount || 5}
+        groupName={groupDetails?.name || ""}
+        installmentAmount={groupDetails?.installmentAmount || "0"}
+        cycleDurationSeconds={groupDetails?.cycleDuration || 0}
+        totalMembers={groupDetails?.memberCount || 0}
         isMandateActive={isMandateActive}
         onActivateMandate={async () => {
           setIsMandateActive(true);
-          showNotification("🎉 Auto-Debit Mandate successfully registered!");
+          showNotification("Auto-Debit Mandate authorized.");
         }}
         isTechnicalMode={isTechnicalMode}
       />
@@ -417,13 +431,11 @@ export function App() {
         account={account}
         balance={balance}
         isCorrectNetwork={isCorrectNetwork}
-        onSwitchNetwork={switchToMSTTestnet}
-        onOpenConnectModal={() => {
-          setIsAccountModalOpen(false);
-          setIsConnectModalOpen(true);
-        }}
         isTechnicalMode={isTechnicalMode}
         onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
+        detectedProviders={detectedProviders}
+        onConnectExtension={connectWallet}
+        onConnectPrivateKey={connectWithPrivateKey}
       />
     </div>
   );

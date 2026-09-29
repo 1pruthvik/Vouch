@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { X, CheckCircle2, ShieldCheck, Clock, ArrowRight, Lock, Zap, HelpCircle } from "lucide-react";
-import { formatINR, formatRawINR } from "../utils/formatters";
+import { X, CheckCircle2, ShieldCheck, Clock, ArrowRight, Lock, Zap } from "lucide-react";
+import { formatINR } from "../utils/formatters";
 
 interface MandateModalProps {
   isOpen: boolean;
@@ -19,7 +19,6 @@ export const MandateModal: React.FC<MandateModalProps> = ({
   onClose,
   groupName,
   installmentAmount,
-  cycleDurationSeconds,
   totalMembers,
   isMandateActive,
   onActivateMandate,
@@ -44,7 +43,7 @@ export const MandateModal: React.FC<MandateModalProps> = ({
 
   const features = [
     { icon: <Clock className="w-4 h-4 text-[#f5a623]" />, title: "Never miss a cycle", desc: "Your monthly deposit arrives on time so your standing stays green." },
-    { icon: <ShieldCheck className="w-4 h-4 text-[#2dd4a8]" />, title: "Full transparency", desc: `Funds go directly to the ${groupName} autonomous pool. You earn dividends every round.` },
+    { icon: <ShieldCheck className="w-4 h-4 text-[#2dd4a8]" />, title: "Full transparency", desc: `Funds go directly to the ${groupName || "Circle"} autonomous pool. You earn dividends every round.` },
     { icon: <Lock className="w-4 h-4 text-[#8b5cf6]" />, title: "Cancel anytime", desc: "You maintain full ownership of your deposit and accumulated savings." },
   ];
 
@@ -116,7 +115,7 @@ export const MandateModal: React.FC<MandateModalProps> = ({
             disabled={isProcessing}
             className="v-btn-primary text-xs w-full sm:w-auto"
           >
-            {isProcessing ? "Authorizing..." : isMandateActive ? "Mandate Already Active" : "Confirm Auto-Debit"}
+            {isProcessing ? "Authorizing..." : isMandateActive ? "Mandate Active" : "Confirm Auto-Debit"}
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

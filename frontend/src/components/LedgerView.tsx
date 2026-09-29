@@ -1,6 +1,6 @@
 import React from "react";
-import { ArrowUpRight, ArrowDownLeft, ShieldCheck, ExternalLink, Calendar, Code2, CheckCircle2 } from "lucide-react";
-import { formatINR, formatRawINR } from "../utils/formatters";
+import { ArrowUpRight, ArrowDownLeft, ShieldCheck, ExternalLink, Calendar, Code2, CheckCircle2, History } from "lucide-react";
+import { formatINR } from "../utils/formatters";
 import { MST_TESTNET } from "../config/network";
 
 export interface LedgerEvent {
@@ -22,7 +22,6 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   events = [],
   isTechnicalMode,
 }) => {
-  // Map raw on-chain events to friendly UPI / Bank statement transactions
   const formatTransaction = (ev: LedgerEvent) => {
     let title = "Transaction";
     let isCredit = false;
@@ -60,36 +59,6 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
     return { title, isCredit, icon, inrAmount, iconBg };
   };
 
-  const sampleEvents: LedgerEvent[] = events.length > 0 ? events : [
-    {
-      id: "1",
-      eventName: "AuctionSettled",
-      round: 1,
-      member: "0x71C...392B",
-      amount: "2.1 tMSTC",
-      txHash: "0x58f91a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f",
-      timestamp: "Today, 02:45 PM",
-    },
-    {
-      id: "2",
-      eventName: "InstallmentCollected",
-      round: 1,
-      member: "0x39A...881F",
-      amount: "0.5 tMSTC",
-      txHash: "0x31a04b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a",
-      timestamp: "Yesterday, 11:30 AM",
-    },
-    {
-      id: "3",
-      eventName: "MemberJoined",
-      round: 1,
-      member: "0x91F...221A",
-      amount: "0.5 tMSTC",
-      txHash: "0x77d88c9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e",
-      timestamp: "28 Sep, 06:15 PM",
-    },
-  ];
-
   return (
     <div className="v-card p-6 sm:p-7 space-y-5 anim-fade-up">
       {/* Header */}
@@ -104,67 +73,79 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
         </div>
       </div>
 
-      {/* Transaction List */}
-      <div className="space-y-1">
-        {sampleEvents.map((ev, index) => {
-          const { title, isCredit, icon, inrAmount, iconBg } = formatTransaction(ev);
+      {/* Transaction List or Empty State */}
+      {events.length === 0 ? (
+        <div className="py-12 text-center space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-white/5 text-[#5f6578] flex items-center justify-center mx-auto">
+            <History className="w-6 h-6" />
+          </div>
+          <p className="text-sm font-semibold text-white font-display">No Transactions Yet</p>
+          <p className="text-xs text-[#9ca3b4] max-w-sm mx-auto">
+            Transactions will appear here automatically once group members join, contribute, or settle draws.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {events.map((ev, index) => {
+            const { title, isCredit, icon, inrAmount, iconBg } = formatTransaction(ev);
 
-          return (
-            <div
-              key={ev.id}
-              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl transition-all duration-200 hover:bg-white/[0.02] group"
-              style={{ animationDelay: `${index * 60}ms` }}
-            >
-              {/* Left */}
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105" style={{ background: iconBg }}>
-                  {icon}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">{title}</p>
-                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#5f6578]">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      {ev.timestamp}
-                    </span>
-                    <span>·</span>
-                    <a
-                      href={`${MST_TESTNET.explorerUrl}/tx/${ev.txHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-0.5 font-medium transition-colors duration-200"
-                      style={{ color: '#2dd4a8' }}
-                    >
-                      Verify
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
+            return (
+              <div
+                key={ev.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl transition-all duration-200 hover:bg-white/[0.02] group"
+                style={{ animationDelay: `${index * 60}ms` }}
+              >
+                {/* Left */}
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105" style={{ background: iconBg }}>
+                    {icon}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-white">{title}</p>
+                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#5f6578]">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {ev.timestamp}
+                      </span>
+                      <span>·</span>
+                      <a
+                        href={`${MST_TESTNET.explorerUrl}/tx/${ev.txHash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-0.5 font-medium transition-colors duration-200"
+                        style={{ color: '#2dd4a8' }}
+                      >
+                        Verify
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Right */}
-              <div className="text-right pl-12 sm:pl-0">
-                <p className={`text-sm font-bold font-display ${isCredit ? 'text-[#2dd4a8]' : 'text-white'}`}>
-                  {isCredit ? `+${inrAmount}` : inrAmount}
-                </p>
-                <p className="text-[10px] text-[#5f6578] font-mono">
-                  {ev.amount}
-                </p>
-              </div>
-
-              {/* Technical */}
-              {isTechnicalMode && (
-                <div className="w-full text-[10px] font-mono flex items-center gap-2 pt-1" style={{ color: 'rgba(139, 92, 246, 0.6)' }}>
-                  <Code2 className="w-3 h-3" />
-                  <span>Event: {ev.eventName}</span>
-                  <span>|</span>
-                  <span className="truncate">Tx: {ev.txHash}</span>
+                {/* Right */}
+                <div className="text-right pl-12 sm:pl-0">
+                  <p className={`text-sm font-bold font-display ${isCredit ? 'text-[#2dd4a8]' : 'text-white'}`}>
+                    {isCredit ? `+${inrAmount}` : inrAmount}
+                  </p>
+                  <p className="text-[10px] text-[#5f6578] font-mono">
+                    {ev.amount}
+                  </p>
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+
+                {/* Technical Details */}
+                {isTechnicalMode && (
+                  <div className="w-full text-[10px] font-mono flex items-center gap-2 pt-1" style={{ color: 'rgba(139, 92, 246, 0.6)' }}>
+                    <Code2 className="w-3 h-3" />
+                    <span>Event: {ev.eventName}</span>
+                    <span>|</span>
+                    <span className="truncate">Tx: {ev.txHash}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

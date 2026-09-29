@@ -1,5 +1,5 @@
 import React from "react";
-import { ShieldCheck, Sparkles, Info, AlertTriangle, HeartHandshake, Code2 } from "lucide-react";
+import { Sparkles, Info, Code2, HeartHandshake } from "lucide-react";
 import { RiskPredictionResponse } from "../services/aiService";
 
 interface RiskAdvisorProps {
@@ -9,30 +9,26 @@ interface RiskAdvisorProps {
 }
 
 export const RiskAdvisorCard: React.FC<RiskAdvisorProps> = ({
-  memberAddress,
   riskAdvisory,
   isTechnicalMode,
 }) => {
-  const prob = riskAdvisory?.defaultProbability ?? 0.15;
-  const multiplier = riskAdvisory?.suggestedCollateralMultiplier ?? 1.15;
+  const prob = riskAdvisory?.defaultProbability;
+  const multiplier = riskAdvisory?.suggestedCollateralMultiplier;
 
-  let status: "green" | "yellow" | "red" = "green";
   let label = "Good Standing";
   let badgeClass = "v-badge-green";
-  let advisoryNote = "Your community savings profile is in excellent standing. Standard deposit coverage is active.";
+  let advisoryNote = riskAdvisory?.advisoryNote || "Your community savings profile is in excellent standing. Standard deposit coverage is active.";
   let dotColor = '#2dd4a8';
 
-  if (prob > 0.4) {
-    status = "red";
+  if (prob !== undefined && prob > 0.4) {
     label = "Action Needed";
     badgeClass = "v-badge-rose";
-    advisoryNote = "Payment or deposit adjustment required. Please review your account to stay active.";
+    advisoryNote = riskAdvisory?.advisoryNote || "Payment or deposit adjustment required. Please review your account to stay active.";
     dotColor = '#f43f5e';
-  } else if (prob > 0.22) {
-    status = "yellow";
+  } else if (prob !== undefined && prob > 0.22) {
     label = "Consider Adding Backup";
     badgeClass = "v-badge-amber";
-    advisoryNote = "You are requesting an early draw. Nominating a trusted friend as your backer adds extra peace of mind.";
+    advisoryNote = riskAdvisory?.advisoryNote || "You are requesting an early draw. Nominating a trusted friend as your backer adds extra peace of mind.";
     dotColor = '#f5a623';
   }
 
@@ -85,11 +81,11 @@ export const RiskAdvisorCard: React.FC<RiskAdvisorProps> = ({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <p className="text-[#5f6578]">Suggested Multiplier:</p>
-              <p className="font-mono text-[#2dd4a8] font-bold">{multiplier}x</p>
+              <p className="font-mono text-[#2dd4a8] font-bold">{multiplier ? `${multiplier}x` : "1.00x"}</p>
             </div>
             <div>
               <p className="text-[#5f6578]">Risk Model:</p>
-              <p className="font-mono text-[#9ca3b4]">FastAPI / XGBoost</p>
+              <p className="font-mono text-[#9ca3b4]">FastAPI / XGBoost (GPU)</p>
             </div>
           </div>
         </div>

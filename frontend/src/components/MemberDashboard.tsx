@@ -3,22 +3,19 @@ import {
   ShieldCheck,
   TrendingUp,
   Coins,
-  Users,
   ChevronDown,
   ChevronUp,
   ArrowRight,
   Sparkles,
-  Info,
-  Calendar,
-  Zap,
   Lock,
   HeartHandshake,
   CheckCircle2,
-  AlertTriangle,
-  CreditCard,
-  Code2
+  Zap,
+  Code2,
+  Plus,
+  UserPlus
 } from "lucide-react";
-import { formatINR, getTrafficLightStatus, getFriendlyMemberName } from "../utils/formatters";
+import { formatINR, getTrafficLightStatus } from "../utils/formatters";
 import { GroupDetails, MemberDetails } from "../services/contractService";
 import { RiskPredictionResponse } from "../services/aiService";
 
@@ -32,31 +29,57 @@ interface MemberDashboardProps {
   onOpenMandateModal: () => void;
   onOpenDrawTab: () => void;
   onJoinGroup: () => void;
+  onCreateGroup?: () => void;
 }
 
 export const MemberDashboard: React.FC<MemberDashboardProps> = ({
-  account,
   groupDetails,
   memberDetails,
-  riskAdvisory,
   isTechnicalMode,
   onPayInstallment,
   onOpenMandateModal,
   onOpenDrawTab,
   onJoinGroup,
+  onCreateGroup,
 }) => {
   const [isBackupLayersExpanded, setIsBackupLayersExpanded] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  // Defaults if no group is loaded
-  const groupName = groupDetails?.name || "Alpha Savings Circle";
-  const currentRound = groupDetails?.currentRound || 1;
-  const totalRounds = groupDetails?.memberCount || 5;
-  const rawInstallment = groupDetails?.installmentAmount || "0.5";
+  // If no group is loaded, display welcoming state
+  if (!groupDetails) {
+    return (
+      <div className="v-card text-center py-16 px-6 space-y-6">
+        <div className="w-14 h-14 rounded-2xl bg-white/5 text-[#f5a623] flex items-center justify-center mx-auto">
+          <Coins className="w-7 h-7" />
+        </div>
+        <div className="max-w-md mx-auto">
+          <h2 className="text-xl font-bold text-white font-display">No Active Savings Circle Selected</h2>
+          <p className="text-xs text-[#9ca3b4] mt-1.5">Join an existing circle or create a new autonomous pool to start saving.</p>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+          {onCreateGroup && (
+            <button onClick={onCreateGroup} className="v-btn-primary">
+              <Plus className="w-4 h-4" />
+              Start New Circle
+            </button>
+          )}
+          <button onClick={onJoinGroup} className="v-btn-secondary">
+            <UserPlus className="w-4 h-4" />
+            Join Existing Circle
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const groupName = groupDetails.name;
+  const currentRound = groupDetails.currentRound || 1;
+  const totalRounds = groupDetails.memberCount || 1;
+  const rawInstallment = groupDetails.installmentAmount || "0";
   const formattedInstallment = formatINR(rawInstallment);
 
-  const bufferBalance = memberDetails?.bufferBalance || "0.5";
-  const lockedDividends = memberDetails?.lockedDividends || "0.08";
+  const bufferBalance = memberDetails?.bufferBalance || "0";
+  const lockedDividends = memberDetails?.lockedDividends || "0";
   const hasPaidCurrentRound = memberDetails?.hasPaidCurrentRound || false;
   const isMember = !!memberDetails;
 
@@ -248,7 +271,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
       <div className="v-card p-5 sm:p-6">
         <div
           onClick={() => setIsBackupLayersExpanded(!isBackupLayersExpanded)}
-          className="flex items-center justify-between cursor-pointer group select-none"
+          className="flex items-center justify-between cursor-pointer select-none"
         >
           <div className="flex items-center gap-3.5">
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 anim-float" style={{ background: 'rgba(45, 212, 168, 0.1)', border: '1px solid rgba(45, 212, 168, 0.15)' }}>

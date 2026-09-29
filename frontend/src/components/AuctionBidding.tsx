@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Sparkles, Clock, CheckCircle2, ArrowRight, Gift, Trophy, HelpCircle, Code2, AlertCircle } from "lucide-react";
-import { formatINR, inrToMST, MST_TO_INR_RATE, formatRawINR } from "../utils/formatters";
+import { Sparkles, Clock, CheckCircle2, ArrowRight, Gift, Trophy, Code2 } from "lucide-react";
+import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 import { GroupDetails } from "../services/contractService";
 
 interface AuctionBiddingProps {
@@ -20,9 +20,9 @@ interface AuctionBiddingProps {
 
 export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
   currentRound = 1,
-  totalPot = "2.5",
-  minBidAllowed = "1.75",
-  phase = "Commit",
+  totalPot = "0",
+  minBidAllowed = "0",
+  phase = "Forming",
   hasCommitted = false,
   hasRevealed = false,
   hasWonPreviously = false,
@@ -32,22 +32,23 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
   onRevealBid,
   onSettleRound,
 }) => {
-  const potFloat = parseFloat(totalPot) || 2.5;
-  const minBidFloat = parseFloat(minBidAllowed) || potFloat * 0.7;
+  const potFloat = parseFloat(totalPot) || 0;
+  const minBidFloat = parseFloat(minBidAllowed) || (potFloat > 0 ? potFloat * 0.7 : 0);
 
   const maxPotINR = Math.round(potFloat * MST_TO_INR_RATE);
   const minPotINR = Math.round(minBidFloat * MST_TO_INR_RATE);
 
   // Slider value in INR
-  const [requestedPayoutINR, setRequestedPayoutINR] = useState<number>(Math.round(maxPotINR * 0.92));
+  const [requestedPayoutINR, setRequestedPayoutINR] = useState<number>(maxPotINR);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    setRequestedPayoutINR(Math.round(maxPotINR * 0.92));
+    setRequestedPayoutINR(maxPotINR > 0 ? Math.round(maxPotINR * 0.95) : 0);
   }, [maxPotINR]);
 
-  const discountOfferedINR = maxPotINR - requestedPayoutINR;
-  const memberSavingsShareINR = Math.round(discountOfferedINR / (groupDetails?.memberCount || 5));
+  const discountOfferedINR = Math.max(0, maxPotINR - requestedPayoutINR);
+  const memberCount = groupDetails?.memberCount || 1;
+  const memberSavingsShareINR = memberCount > 0 ? Math.round(discountOfferedINR / memberCount) : 0;
 
   const handleRequestPayout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +67,20 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
     }
   };
 
+  if (!groupDetails || potFloat === 0) {
+    return (
+      <div className="v-card text-center py-12 px-6 space-y-3">
+        <div className="w-12 h-12 rounded-2xl bg-white/5 text-[#f5a623] flex items-center justify-center mx-auto">
+          <Sparkles className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-bold text-white font-display">No Active Round Draw</h3>
+        <p className="text-xs text-[#9ca3b4] max-w-md mx-auto">
+          Reverse auction bidding will open automatically when all member contributions for the round are collected.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5 anim-fade-up">
       {/* ── DRAW HEADER ── */}
@@ -74,7 +89,7 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
           <div>
             <div className="v-badge v-badge-green mb-3">
               <Sparkles className="w-3.5 h-3.5" />
-              MONTH {currentRound} DRAW
+              ROUND {currentRound} DRAW
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-white font-display">
               This Month's Savings Pot
@@ -90,21 +105,26 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
               {formatRawINR(maxPotINR)}
             </p>
             <p className="text-[11px] text-[#5f6578] mt-1">
-              Funded by all {groupDetails?.memberCount || 5} members
+              {potFloat} tMSTC ({groupDetails.memberCount} members)
             </p>
           </div>
         </div>
 
-        {/* Countdown */}
+        {/* Phase / Countdown */}
         <div className="mt-6 pt-5 flex flex-wrap items-center justify-between gap-3 text-xs" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-[#f5a623]" />
             <span className="font-semibold text-white font-display">
-              Draw results announced shortly
+              Phase: {phase}
             </span>
           </div>
-          <span className="text-[#5f6578]">
-            {phase === "Reveal" ? "Revealing verified requests..." : "Accepting early payout requests"}
+          <span className="text-[#9ca3b4]">
+            {phase === "Commit" && "Secret payout request phase open"}
+            {phase === "Reveal" && "Revealing verified requests..."}
+            {phase === "Collect" && "Collecting member installments"}
+            {phase === "Settle" && "Round ready for settlement"}
+            {phase === "Forming" && "Waiting for members to join"}
+            {phase === "Closed" && "Circle closed"}
           </span>
         </div>
       </div>
@@ -127,7 +147,7 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[#9ca3b4] font-medium">Your Requested Payout</span>
-                <span className="text-2xl font-bold text-white font-display" style={{ color: '#2dd4a8' }}>
+                <span className="text-2xl font-bold font-display" style={{ color: '#2dd4a8' }}>
                   {formatRawINR(requestedPayoutINR)}
                 </span>
               </div>
@@ -136,11 +156,11 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
                 type="range"
                 min={minPotINR}
                 max={maxPotINR}
-                step={500}
+                step={100}
                 value={requestedPayoutINR}
                 onChange={(e) => setRequestedPayoutINR(parseInt(e.target.value))}
                 className="w-full"
-                disabled={hasCommitted || phase !== "Commit"}
+                disabled={hasCommitted || (phase !== "Commit" && phase !== "Reveal")}
               />
 
               <div className="flex justify-between text-[11px] text-[#5f6578] font-medium">
@@ -208,7 +228,7 @@ export const AuctionBidding: React.FC<AuctionBiddingProps> = ({
             <Trophy className="w-7 h-7 text-[#f5a623]" />
           </div>
           <h3 className="text-lg font-bold text-white font-display">
-            You've already received your early payout!
+            You received your payout in Round {groupDetails.currentRound}!
           </h3>
           <p className="text-sm text-[#9ca3b4] max-w-md mx-auto">
             You'll continue earning monthly savings dividends while contributing your standard payment until the circle finishes.

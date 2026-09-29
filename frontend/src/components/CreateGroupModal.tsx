@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Plus, Users, ShieldCheck, Sparkles, HelpCircle, Code2, ArrowRight } from "lucide-react";
+import { X, Plus, ArrowRight, Code2 } from "lucide-react";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 
 interface CreateGroupModalProps {
@@ -13,36 +13,49 @@ interface CreateGroupModalProps {
     discountCapBps: number;
     reserveFeeBps: number;
   }) => void;
-  isTechnicalMode: boolean;
+  isTechnicalMode?: boolean;
 }
+
+export const INR_PER_TMSTC = MST_TO_INR_RATE;
 
 export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  isTechnicalMode,
+  isTechnicalMode = false,
 }) => {
   const [groupName, setGroupName] = useState("Alpha Savings Circle");
-  const [memberCount, setMemberCount] = useState(5);
-  const [installmentAmountINR, setInstallmentAmountINR] = useState(5000);
-  const [cycleDurationMins, setCycleDurationMins] = useState(5);
-  const [discountCapPercent, setDiscountCapPercent] = useState(30);
-  const [reserveFeePercent, setReserveFeePercent] = useState(5);
+  const [memberCount, setMemberCount] = useState<number>(5);
+  const [installmentInr, setInstallmentInr] = useState<number>(5000);
+  const [reserveFeeInr, setReserveFeeInr] = useState<number>(250);
+  const [cycleDurationMonths, setCycleDurationMonths] = useState<number>(1);
+  const [discountCapPercent, setDiscountCapPercent] = useState<number>(30);
 
   if (!isOpen) return null;
 
-  const totalPotINR = installmentAmountINR * memberCount;
-  const installmentMST = (installmentAmountINR / MST_TO_INR_RATE).toFixed(4);
+  const numInstallmentInr = Number(installmentInr) || 0;
+  const numMembers = Number(memberCount) || 1;
+  const installmentTokens = (numInstallmentInr / INR_PER_TMSTC).toFixed(4);
+  const totalPotInr = numMembers * numInstallmentInr;
+  const numReserveFeeInr = Number(reserveFeeInr) || 0;
+
+  const calculatedReserveFeeBps = totalPotInr > 0
+    ? Math.min(2000, Math.max(100, Math.round((numReserveFeeInr / totalPotInr) * 10000)))
+    : 500;
+
+  const numMonths = Number(cycleDurationMonths) || 1;
+  const cycleDurationSeconds = numMonths * 30 * 24 * 3600;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!groupName || !memberCount || !installmentInr) return;
     onSubmit({
       groupName,
-      memberCount,
-      installmentAmount: installmentMST,
-      cycleDuration: cycleDurationMins * 60,
+      memberCount: Number(memberCount),
+      installmentAmount: installmentTokens,
+      cycleDuration: cycleDurationSeconds,
       discountCapBps: discountCapPercent * 100,
-      reserveFeeBps: reserveFeePercent * 100,
+      reserveFeeBps: calculatedReserveFeeBps,
     });
     onClose();
   };
@@ -80,28 +93,58 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             />
           </div>
 
-          {/* Members & Contribution */}
+          {/* Members & Monthly Contribution */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-[#9ca3b4] mb-2">Total Members</label>
               <input
                 type="number"
                 min="2"
-                max="20"
+                max="50"
                 value={memberCount}
                 onChange={(e) => setMemberCount(parseInt(e.target.value) || 2)}
                 className="v-input text-xs"
+                required
               />
             </div>
             <div>
               <label className="block font-semibold text-[#9ca3b4] mb-2">Monthly Contribution (₹)</label>
               <input
                 type="number"
-                min="500"
-                step="500"
-                value={installmentAmountINR}
-                onChange={(e) => setInstallmentAmountINR(parseInt(e.target.value) || 500)}
+                min="100"
+                step="100"
+                value={installmentInr}
+                onChange={(e) => setInstallmentInr(parseFloat(e.target.value) || 0)}
                 className="v-input text-xs"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Reserve Fee & Cycle Months */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block font-semibold text-[#9ca3b4] mb-2">Reserve Security Fee (₹)</label>
+              <input
+                type="number"
+                min="0"
+                step="50"
+                value={reserveFeeInr}
+                onChange={(e) => setReserveFeeInr(parseFloat(e.target.value) || 0)}
+                className="v-input text-xs"
+                required
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-[#9ca3b4] mb-2">Round Cycle (Months)</label>
+              <input
+                type="number"
+                min="1"
+                max="24"
+                value={cycleDurationMonths}
+                onChange={(e) => setCycleDurationMonths(parseInt(e.target.value) || 1)}
+                className="v-input text-xs"
+                required
               />
             </div>
           </div>
@@ -111,17 +154,17 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             <div className="flex items-center justify-between text-[#9ca3b4]">
               <span>Total Monthly Pot</span>
               <span className="text-base font-bold text-white font-display">
-                {formatRawINR(totalPotINR)}
+                {formatRawINR(totalPotInr)}
               </span>
             </div>
             <div className="flex items-center justify-between text-[11px]" style={{ color: '#5f6578' }}>
               <span>Duration</span>
-              <span className="font-semibold text-[#9ca3b4]">{memberCount} Months ({memberCount} Draws)</span>
+              <span className="font-semibold text-[#9ca3b4]">{numMembers} Months ({numMembers} Draws)</span>
             </div>
             <div className="flex items-center justify-between text-[11px]" style={{ color: '#5f6578' }}>
               <span>Security Deposit</span>
               <span className="font-semibold text-[#2dd4a8]">
-                {formatRawINR(installmentAmountINR)} (100% Refundable)
+                {formatRawINR(numInstallmentInr)} (100% Refundable)
               </span>
             </div>
           </div>
@@ -136,18 +179,17 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                 <div>
                   <p className="text-[#5f6578]">Max Discount Floor (%):</p>
                   <input
-                    type="number" min="5" max="50" value={discountCapPercent}
+                    type="number"
+                    min="5"
+                    max="50"
+                    value={discountCapPercent}
                     onChange={(e) => setDiscountCapPercent(parseInt(e.target.value) || 30)}
                     className="v-input text-xs mt-1 font-mono"
                   />
                 </div>
                 <div>
-                  <p className="text-[#5f6578]">Reserve Fund Cut (%):</p>
-                  <input
-                    type="number" min="1" max="10" value={reserveFeePercent}
-                    onChange={(e) => setReserveFeePercent(parseInt(e.target.value) || 5)}
-                    className="v-input text-xs mt-1 font-mono"
-                  />
+                  <p className="text-[#5f6578]">Calculated Reserve Fee:</p>
+                  <p className="font-mono text-white mt-2">{calculatedReserveFeeBps} BPS ({(calculatedReserveFeeBps / 100).toFixed(2)}%)</p>
                 </div>
               </div>
             </div>

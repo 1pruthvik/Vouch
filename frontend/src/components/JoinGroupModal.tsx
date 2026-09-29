@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { X, UserPlus, ShieldCheck, Lock, ArrowRight, Code2, CheckCircle2 } from "lucide-react";
-import { formatRawINR } from "../utils/formatters";
+import { X, UserPlus, Lock, ArrowRight, Code2 } from "lucide-react";
+import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 
 interface JoinGroupModalProps {
   isOpen: boolean;
@@ -16,17 +16,19 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
   isTechnicalMode,
 }) => {
   const [groupAddress, setGroupAddress] = useState("");
-  const [bufferDepositINR, setBufferDepositINR] = useState(5000);
+  const [bufferDepositINR, setBufferDepositINR] = useState<number | "">("");
   const [isJoining, setIsJoining] = useState(false);
 
   if (!isOpen) return null;
 
+  const depositInr = Number(bufferDepositINR) || 0;
+  const bufferMST = (depositInr / MST_TO_INR_RATE).toFixed(4);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!groupAddress) return;
+    if (!groupAddress || !bufferDepositINR) return;
     try {
       setIsJoining(true);
-      const bufferMST = (bufferDepositINR / 10000).toFixed(4);
       onJoin(groupAddress, bufferMST);
       onClose();
     } catch (err) {
@@ -57,12 +59,12 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-5 text-xs">
           <div>
-            <label className="block font-semibold text-[#9ca3b4] mb-2">Circle Code / Invite Address</label>
+            <label className="block font-semibold text-[#9ca3b4] mb-2">Circle Address / Invite Code</label>
             <input
               type="text"
               value={groupAddress}
               onChange={(e) => setGroupAddress(e.target.value.trim())}
-              placeholder="0x... or Circle Invite Link"
+              placeholder="0x..."
               className="v-input text-xs font-mono"
               required
             />
@@ -72,12 +74,19 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
             <label className="block font-semibold text-[#9ca3b4] mb-2">Refundable Security Deposit (₹)</label>
             <input
               type="number"
-              min="500"
-              step="500"
+              min="100"
+              step="50"
+              placeholder="Enter deposit in ₹"
               value={bufferDepositINR}
-              onChange={(e) => setBufferDepositINR(parseInt(e.target.value) || 500)}
+              onChange={(e) => setBufferDepositINR(e.target.value === "" ? "" : parseFloat(e.target.value))}
               className="v-input text-xs"
+              required
             />
+            {depositInr > 0 && (
+              <p className="text-[11px] text-[#9ca3b4] mt-1.5 font-mono">
+                ≈ {bufferMST} tMSTC (1 tMSTC = ₹{MST_TO_INR_RATE.toLocaleString()})
+              </p>
+            )}
             <p className="text-[11px] text-[#5f6578] mt-1.5 flex items-center gap-1.5">
               <Lock className="w-3.5 h-3.5 text-[#2dd4a8]" />
               100% refundable when all circle rounds complete.
@@ -91,7 +100,7 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
                 <Code2 className="w-3.5 h-3.5" /> Contract Execution
               </p>
               <p className="text-[#9ca3b4]">• Calls <code className="text-white/80">ChitGroup.joinGroup{`{value: deposit}`}()</code></p>
-              <p className="text-[#9ca3b4]">• Equivalent: <code className="text-white/80">{(bufferDepositINR / 10000).toFixed(4)} tMSTC</code></p>
+              <p className="text-[#9ca3b4]">• Equivalent: <code className="text-white/80">{bufferMST} tMSTC</code></p>
             </div>
           )}
 
@@ -100,10 +109,10 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
             <button type="button" onClick={onClose} className="v-btn-secondary text-xs">Cancel</button>
             <button
               type="submit"
-              disabled={isJoining || !groupAddress}
+              disabled={isJoining || !groupAddress || !bufferDepositINR}
               className="v-btn-primary text-xs"
             >
-              {isJoining ? "Joining..." : `Confirm & Join (${formatRawINR(bufferDepositINR)})`}
+              {isJoining ? "Joining..." : `Join Circle (${depositInr > 0 ? formatRawINR(depositInr) : "Deposit"})`}
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
