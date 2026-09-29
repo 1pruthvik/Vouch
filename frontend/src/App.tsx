@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Header } from "./components/Header";
-import { MemberDashboard, AvailableCircle } from "./components/MemberDashboard";
+import { HomeView } from "./components/HomeView";
+import { PoolView } from "./components/PoolView";
 import { AuctionBidding } from "./components/AuctionBidding";
+import { TreasuryView } from "./components/TreasuryView";
+import { ActivityView } from "./components/ActivityView";
+import { StandingView } from "./components/StandingView";
+import { MemberDashboard, AvailableCircle } from "./components/MemberDashboard";
 import { RiskAdvisorCard } from "./components/RiskAdvisorCard";
 import { LedgerView, LedgerEvent } from "./components/LedgerView";
 import { CreateGroupModal } from "./components/CreateGroupModal";
@@ -14,7 +19,19 @@ import { useWallet } from "./hooks/useWallet";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
 import { fetchLedgerEvents, fetchIndexedGroups } from "./services/indexerService";
-import { UserPlus, Shield, CheckCircle2, AlertCircle, Sparkles, Home, Box, History } from "lucide-react";
+import {
+  UserPlus,
+  Shield,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  Home,
+  Box,
+  History,
+  Building,
+  TrendingUp,
+  Layers
+} from "lucide-react";
 
 export function App() {
   const {
@@ -43,8 +60,8 @@ export function App() {
   // Progressive Disclosure: Technical Pro Mode Toggle
   const [isTechnicalMode, setIsTechnicalMode] = useState<boolean>(false);
 
-  // Tabs
-  const [activeTab, setActiveTab] = useState<"home" | "draw" | "standing" | "network" | "history">("home");
+  // Tabs (aligned with Product Definition: Home, Pool, Draw, Treasury, Activity, Standing)
+  const [activeTab, setActiveTab] = useState<"home" | "pool" | "draw" | "treasury" | "activity" | "standing" | "network">("home");
 
   // State
   const [activeGroupAddress, setActiveGroupAddress] = useState<string>(() => {
@@ -316,13 +333,22 @@ export function App() {
     }
   };
 
-  const tabs = [
-    { id: "home" as const, label: "Circle Home", icon: <Home className="w-4 h-4" /> },
-    { id: "draw" as const, label: "This Month's Draw", icon: <Sparkles className="w-4 h-4" /> },
-    { id: "standing" as const, label: "Your Standing", icon: <Shield className="w-4 h-4" /> },
-    { id: "network" as const, label: "3D Network", icon: <Box className="w-4 h-4" /> },
-    { id: "history" as const, label: "Transactions", icon: <History className="w-4 h-4" /> },
+  const tabs: {
+    id: "home" | "pool" | "draw" | "treasury" | "activity" | "standing" | "network";
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
+    { id: "home", label: "Home", icon: <Home className="w-4 h-4" /> },
+    { id: "pool", label: "Pool", icon: <Building className="w-4 h-4" /> },
+    { id: "draw", label: "Draw", icon: <Sparkles className="w-4 h-4" /> },
+    { id: "treasury", label: "Treasury", icon: <TrendingUp className="w-4 h-4" /> },
+    { id: "activity", label: "Activity", icon: <History className="w-4 h-4" /> },
+    { id: "standing", label: "Standing", icon: <Shield className="w-4 h-4" /> },
   ];
+
+  if (isTechnicalMode) {
+    tabs.push({ id: "network", label: "3D Network", icon: <Box className="w-4 h-4" /> });
+  }
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
@@ -331,7 +357,7 @@ export function App() {
         account={account}
         balance={balance}
         isConnecting={isConnecting}
-        groupName={groupDetails?.name}
+        groupName={groupDetails?.name || "Community 07"}
         isTechnicalMode={isTechnicalMode}
         onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
         onOpenAccountModal={() => {
@@ -377,7 +403,7 @@ export function App() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => setActiveTab(tab.id as any)}
                 className={`v-nav-pill ${activeTab === tab.id ? 'v-nav-pill--active' : 'v-nav-pill--inactive'}`}
               >
                 {tab.icon}
@@ -397,96 +423,78 @@ export function App() {
           </div>
         </div>
 
-        {/* Tab 1: Group Home */}
+        {/* Tab 1: Home View */}
         {activeTab === "home" && (
-          <div className="space-y-5 anim-fade-up">
-            <MemberDashboard
-              account={account}
-              groupDetails={groupDetails}
-              memberDetails={memberDetails}
-              riskAdvisory={riskAdvisory}
-              isTechnicalMode={isTechnicalMode}
-              isMandateActive={isMandateActive}
-              availableGroups={availableGroups}
-              onSelectGroup={handleSelectGroup}
-              onPayInstallment={handlePayInstallment}
-              onOpenMandateModal={() => setIsMandateModalOpen(true)}
-              onOpenDrawTab={() => setActiveTab("draw")}
-              onJoinGroup={() => setIsJoinModalOpen(true)}
-              onCreateGroup={() => setIsCreateModalOpen(true)}
-            />
-
-            {groupDetails && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <div className="lg:col-span-2">
-                  <LedgerView
-                    events={ledgerEvents.slice(0, 4)}
-                    isTechnicalMode={isTechnicalMode}
-                  />
-                </div>
-                <div>
-                  <RiskAdvisorCard
-                    memberAddress={account || ""}
-                    riskAdvisory={riskAdvisory}
-                    isTechnicalMode={isTechnicalMode}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          <HomeView
+            account={account}
+            groupDetails={groupDetails}
+            memberDetails={memberDetails}
+            riskAdvisory={riskAdvisory}
+            isMandateActive={isMandateActive}
+            isTechnicalMode={isTechnicalMode}
+            onPayInstallment={handlePayInstallment}
+            onOpenMandateModal={() => setIsMandateModalOpen(true)}
+            onOpenDrawTab={() => setActiveTab("draw")}
+            onOpenPoolTab={() => setActiveTab("pool")}
+            onOpenTreasuryTab={() => setActiveTab("treasury")}
+            onOpenActivityTab={() => setActiveTab("activity")}
+            onJoinGroup={() => setIsJoinModalOpen(true)}
+          />
         )}
 
-        {/* Tab 2: Reverse Auction */}
+        {/* Tab 2: Pool Details & Members */}
+        {activeTab === "pool" && (
+          <PoolView
+            groupDetails={groupDetails}
+            memberDetails={memberDetails}
+            account={account}
+            isTechnicalMode={isTechnicalMode}
+            onOpenDrawTab={() => setActiveTab("draw")}
+            onOpenMandateModal={() => setIsMandateModalOpen(true)}
+          />
+        )}
+
+        {/* Tab 3: Monthly Draw & Reverse Auction */}
         {activeTab === "draw" && (
-          <div className="space-y-5 anim-fade-up">
-            <AuctionBidding
-              currentRound={groupDetails?.currentRound || 1}
-              totalPot={groupDetails?.currentPot || "0"}
-              minBidAllowed={groupDetails?.minBid || "0"}
-              phase={groupDetails?.currentState || "Forming"}
-              hasCommitted={false}
-              hasRevealed={false}
-              hasWonPreviously={memberDetails?.hasWon || false}
-              isTechnicalMode={isTechnicalMode}
-              groupDetails={groupDetails}
-              onCommitBid={handleCommitBid}
-              onRevealBid={handleRevealBid}
-              onSettleRound={handleSettleRound}
-            />
-          </div>
+          <AuctionBidding
+            currentRound={groupDetails?.currentRound || 5}
+            totalPot={groupDetails?.currentPot || "500"}
+            minBidAllowed={groupDetails?.minBid || "350"}
+            phase={groupDetails?.currentState || "Commit"}
+            hasCommitted={false}
+            hasRevealed={false}
+            hasWonPreviously={memberDetails?.hasWon || false}
+            isTechnicalMode={isTechnicalMode}
+            groupDetails={groupDetails}
+            memberDetails={memberDetails}
+            onCommitBid={handleCommitBid}
+            onRevealBid={handleRevealBid}
+            onSettleRound={handleSettleRound}
+          />
         )}
 
-        {/* Tab 3: Solvency & Standing */}
+        {/* Tab 4: Pool Treasury & Yield Engine */}
+        {activeTab === "treasury" && (
+          <TreasuryView isTechnicalMode={isTechnicalMode} />
+        )}
+
+        {/* Tab 5: Activity & Transaction History */}
+        {activeTab === "activity" && (
+          <ActivityView events={ledgerEvents} isTechnicalMode={isTechnicalMode} />
+        )}
+
+        {/* Tab 6: Standing & Trust Profile */}
         {activeTab === "standing" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 anim-fade-up">
-            <div className="lg:col-span-2">
-              <MemberDashboard
-                account={account}
-                groupDetails={groupDetails}
-                memberDetails={memberDetails}
-                riskAdvisory={riskAdvisory}
-                isTechnicalMode={isTechnicalMode}
-                isMandateActive={isMandateActive}
-                availableGroups={availableGroups}
-                onSelectGroup={handleSelectGroup}
-                onPayInstallment={handlePayInstallment}
-                onOpenMandateModal={() => setIsMandateModalOpen(true)}
-                onOpenDrawTab={() => setActiveTab("draw")}
-                onJoinGroup={() => setIsJoinModalOpen(true)}
-                onCreateGroup={() => setIsCreateModalOpen(true)}
-              />
-            </div>
-            <div>
-              <RiskAdvisorCard
-                memberAddress={account || ""}
-                riskAdvisory={riskAdvisory}
-                isTechnicalMode={isTechnicalMode}
-              />
-            </div>
-          </div>
+          <StandingView
+            account={account}
+            memberDetails={memberDetails}
+            groupDetails={groupDetails}
+            riskAdvisory={riskAdvisory}
+            isTechnicalMode={isTechnicalMode}
+          />
         )}
 
-        {/* Tab 4: 3D Blockchain Network */}
+        {/* Tab 7: 3D Blockchain Network (when Technical Mode is active) */}
         {activeTab === "network" && (
           <div className="space-y-5 anim-fade-up">
             <BlockchainNetwork3D
@@ -495,16 +503,6 @@ export function App() {
               memberDetails={memberDetails}
               onPayDues={handlePayInstallment}
               onCommitBid={handleCommitBid}
-            />
-          </div>
-        )}
-
-        {/* Tab 5: Ledger History */}
-        {activeTab === "history" && (
-          <div className="space-y-5 anim-fade-up">
-            <LedgerView
-              events={ledgerEvents}
-              isTechnicalMode={isTechnicalMode}
             />
           </div>
         )}
