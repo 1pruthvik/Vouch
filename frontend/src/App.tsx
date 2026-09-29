@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Header } from "./components/Header";
+import { KYCOnboarding, UserKYCProfile } from "./components/KYCOnboarding";
+import { HubChoiceScreen } from "./components/HubChoiceScreen";
 import { HomeView } from "./components/HomeView";
 import { PoolView } from "./components/PoolView";
 import { AuctionBidding } from "./components/AuctionBidding";
 import { TreasuryView } from "./components/TreasuryView";
 import { ActivityView } from "./components/ActivityView";
 import { StandingView } from "./components/StandingView";
-import { MemberDashboard, AvailableCircle } from "./components/MemberDashboard";
-import { RiskAdvisorCard } from "./components/RiskAdvisorCard";
+import { AvailableCircle } from "./components/MemberDashboard";
 import { LedgerView, LedgerEvent } from "./components/LedgerView";
 import { CreateGroupModal } from "./components/CreateGroupModal";
 import { JoinGroupModal } from "./components/JoinGroupModal";
@@ -30,7 +31,7 @@ import {
   History,
   Building,
   TrendingUp,
-  Layers
+  ArrowLeft
 } from "lucide-react";
 
 export function App() {
@@ -49,6 +50,27 @@ export function App() {
   } = useWallet();
 
   const [contractService, setContractService] = useState<ContractService | null>(null);
+
+  // Onboarding & Flow Navigation State
+  // "kyc" -> Authentication/KYC Page
+  // "hub" -> 2-Option Choice Hub (Join vs Create)
+  // "portal" -> Community Chit Fund Portal
+  const [userProfile, setUserProfile] = useState<UserKYCProfile | null>(() => {
+    try {
+      const saved = localStorage.getItem("vouch_user_kyc");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [onboardingState, setOnboardingState] = useState<"kyc" | "hub" | "portal">(() => {
+    const savedKYC = localStorage.getItem("vouch_user_kyc");
+    const savedState = localStorage.getItem("vouch_onboarding_state");
+    if (!savedKYC) return "kyc";
+    if (savedState === "portal") return "portal";
+    return "hub";
+  });
 
   // Modals
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
@@ -77,6 +99,11 @@ export function App() {
   const [isMandateActive, setIsMandateActive] = useState<boolean>(() => {
     return localStorage.getItem("vouch_autopay_active") === "true";
   });
+
+  // Save onboarding state
+  useEffect(() => {
+    localStorage.setItem("vouch_onboarding_state", onboardingState);
+  }, [onboardingState]);
 
   // Load available groups dynamically from backend and localStorage
   const loadAvailableGroups = useCallback(async () => {
@@ -204,13 +231,14 @@ export function App() {
     } catch (e) {
       console.warn("Could not load group details on selection:", e);
     }
+    setOnboardingState("portal");
   };
 
   useEffect(() => {
-    if (activeGroupAddress) {
+    if (activeGroupAddress && onboardingState === "portal") {
       refreshData();
     }
-  }, [activeGroupAddress, refreshData]);
+  }, [activeGroupAddress, onboardingState, refreshData]);
 
   // Handler: Create Group
   const handleCreateGroup = async (params: {
@@ -249,6 +277,7 @@ export function App() {
         loadAvailableGroups();
         setActiveGroupAddress(result.groupAddress);
         showNotification(`Circle "${params.groupName}" deployed at ${result.groupAddress.substring(0, 10)}...`);
+        setOnboardingState("portal");
       } else {
         showNotification("Group creation transaction confirmed.");
       }
@@ -270,6 +299,7 @@ export function App() {
       await contractService.joinGroup(groupAddr, bufferDeposit);
       setActiveGroupAddress(groupAddr);
       showNotification("Successfully joined the group!");
+      setOnboardingState("portal");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -350,14 +380,126 @@ export function App() {
     tabs.push({ id: "network", label: "3D Network", icon: <Box className="w-4 h-4" /> });
   }
 
+  // SCREEN 1: Member Authentication & KYC Page
+  if (onboardingState === "kyc" || !userProfile) {
+    return (
+      <div className="min-h-screen" style={{ background: "var(--bg-app)", color: "var(--text-primary)" }}>
+        <KYCOnboarding
+          onVerificationComplete={(profile) => {
+            setUserProfile(profile);
+            setOnboardingState("hub");
+            showNotification(`Welcome, ${profile.fullName}! Identity verified.`);
+          }}
+        />
+      </div>
+    );
+  }
+
+  // SCREEN 2: Post-Verification Hub Choice Screen (Join Chain vs. Create Chain)
+  if (onboardingState === "hub") {
+    return (
+      <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-app)", color: "var(--text-primary)" }}>
+        {/* Hub Header */}
+        <Header
+          account={account}
+          balance={balance}
+          isConnecting={isConnecting}
+          userName={userProfile?.fullName}
+          isTechnicalMode={isTechnicalMode}
+          onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
+          onOpenAccountModal={() => {
+            if (!account) {
+              clearError();
+              setIsConnectModalOpen(true);
+            } else {
+              setIsAccountModalOpen(true);
+            }
+          }}
+          onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
+          onReturnToHub={() => setOnboardingState("hub")}
+        />
+
+        {/* Toast */}
+        {notification && (
+          <div className="max-w-xl mx-auto px-4 mt-4 w-full">
+            <div className={`v-toast ${notification.isError ? "v-toast-error" : "v-toast-success"}`}>
+              <div className="flex items-center gap-2.5">
+                {notification.isError ? <AlertCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                <span>{notification.message}</span>
+              </div>
+              <button onClick={() => setNotification(null)} className="opacity-60 hover:opacity-100 ml-4">✕</button>
+            </div>
+          </div>
+        )}
+
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <HubChoiceScreen
+            userProfile={userProfile}
+            availableGroups={availableGroups}
+            onSelectJoinOption={() => setIsJoinModalOpen(true)}
+            onSelectCreateOption={() => setIsCreateModalOpen(true)}
+            onQuickJoinCircle={(address) => handleSelectGroup(address)}
+            onReVerifyKYC={() => {
+              localStorage.removeItem("vouch_user_kyc");
+              setUserProfile(null);
+              setOnboardingState("kyc");
+            }}
+          />
+        </main>
+
+        {/* Modals */}
+        <ConnectWalletModal
+          isOpen={isConnectModalOpen}
+          onClose={() => setIsConnectModalOpen(false)}
+          onConnectExtension={connectWallet}
+          onConnectPrivateKey={connectWithPrivateKey}
+          onClearError={clearError}
+          detectedProviders={detectedProviders}
+          error={walletError}
+        />
+
+        <CreateGroupModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          onSubmit={handleCreateGroup}
+          isTechnicalMode={isTechnicalMode}
+        />
+
+        <JoinGroupModal
+          isOpen={isJoinModalOpen}
+          onClose={() => setIsJoinModalOpen(false)}
+          defaultGroupAddress={activeGroupAddress}
+          defaultDepositINR={5000}
+          onJoin={handleJoinGroup}
+          isTechnicalMode={isTechnicalMode}
+        />
+
+        <AccountModal
+          isOpen={isAccountModalOpen}
+          onClose={() => setIsAccountModalOpen(false)}
+          account={account}
+          balance={balance}
+          isCorrectNetwork={isCorrectNetwork}
+          isTechnicalMode={isTechnicalMode}
+          onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
+          detectedProviders={detectedProviders}
+          onConnectExtension={connectWallet}
+          onConnectPrivateKey={connectWithPrivateKey}
+        />
+      </div>
+    );
+  }
+
+  // SCREEN 3: Active Community Chit Fund Portal
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-app)", color: "var(--text-primary)" }}>
       {/* Header */}
       <Header
         account={account}
         balance={balance}
         isConnecting={isConnecting}
-        groupName={groupDetails?.name || "Community 07"}
+        groupName={groupDetails?.name || "Community Chain"}
+        userName={userProfile?.fullName}
         isTechnicalMode={isTechnicalMode}
         onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
         onOpenAccountModal={() => {
@@ -369,17 +511,15 @@ export function App() {
           }
         }}
         onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
-        onSwitchGroup={() => {
-          setActiveGroupAddress("");
-          setGroupDetails(null);
-        }}
+        onReturnToHub={() => setOnboardingState("hub")}
+        onSwitchGroup={() => setOnboardingState("hub")}
       />
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
         {/* Toast */}
         {notification && (
-          <div className={`v-toast ${notification.isError ? 'v-toast-error' : 'v-toast-success'}`}>
+          <div className={`v-toast ${notification.isError ? "v-toast-error" : "v-toast-success"}`}>
             <div className="flex items-center gap-2.5">
               {notification.isError ? (
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -397,14 +537,14 @@ export function App() {
           </div>
         )}
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs & Hub Back Action */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`v-nav-pill ${activeTab === tab.id ? 'v-nav-pill--active' : 'v-nav-pill--inactive'}`}
+                className={`v-nav-pill ${activeTab === tab.id ? "v-nav-pill--active" : "v-nav-pill--inactive"}`}
               >
                 {tab.icon}
                 <span className="hidden sm:inline">{tab.label}</span>
@@ -412,13 +552,21 @@ export function App() {
             ))}
           </div>
 
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setOnboardingState("hub")}
+              className="v-btn-secondary text-xs flex items-center gap-1.5"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-[#00D9F5]" />
+              <span className="hidden sm:inline">Hub Choice</span>
+            </button>
+
             <button
               onClick={() => setIsJoinModalOpen(true)}
-              className="v-btn-ghost text-xs"
+              className="v-btn-primary text-xs"
             >
-              <UserPlus className="w-3.5 h-3.5 text-[#2dd4a8]" />
-              Join Circle
+              <UserPlus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Join Another Chain</span>
             </button>
           </div>
         </div>
@@ -570,3 +718,4 @@ export function App() {
   );
 }
 export default App;
+

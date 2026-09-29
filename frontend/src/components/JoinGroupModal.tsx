@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, UserPlus, Lock, ArrowRight, Code2 } from "lucide-react";
+import { X, UserPlus, Lock, ArrowRight, Code2, ShieldCheck, Sparkles } from "lucide-react";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 
 interface JoinGroupModalProps {
@@ -15,7 +15,7 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
   isOpen,
   onClose,
   defaultGroupAddress = "",
-  defaultDepositINR = 5000,
+  defaultDepositINR = 50000,
   onJoin,
   isTechnicalMode,
 }) => {
@@ -53,79 +53,91 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
 
   return (
     <div className="v-overlay">
-      <div className="v-modal p-6 sm:p-7 max-w-md">
+      <div className="v-modal-card p-6 sm:p-8 max-w-md space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(45, 212, 168, 0.1)', border: '1px solid rgba(45, 212, 168, 0.2)' }}>
-              <UserPlus className="w-5 h-5 text-[#2dd4a8] stroke-[2.5]" />
+            <div className="w-11 h-11 rounded-2xl bg-[#00F5A0]/10 border border-[#00F5A0]/25 text-[#00F5A0] flex items-center justify-center">
+              <UserPlus className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white font-display">Join a Savings Circle</h2>
-              <p className="text-xs text-[#5f6578]">Enter your circle invite code</p>
+              <h2 className="text-lg font-bold text-white font-display">Join a Community Chain</h2>
+              <p className="text-xs text-[#94A3B8]">Enter private chain code or pool address</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-[#5f6578] hover:text-white hover:bg-white/5 transition-all duration-200">
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl text-[#64748B] hover:text-white hover:bg-white/5 transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-5 text-xs">
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          {/* Chain Code / Address */}
           <div>
-            <label className="block font-semibold text-[#9ca3b4] mb-2">Circle Address / Invite Code</label>
+            <label className="block font-semibold text-[#94A3B8] mb-1.5">
+              Community Chain Code / Contract Address
+            </label>
             <input
               type="text"
               value={groupAddress}
               onChange={(e) => setGroupAddress(e.target.value.trim())}
-              placeholder="0x..."
-              className="v-input text-xs font-mono"
+              placeholder="0x... or community code"
+              className="v-input font-mono text-xs"
               required
             />
           </div>
 
+          {/* Refundable Collateral Buffer */}
           <div>
-            <label className="block font-semibold text-[#9ca3b4] mb-2">Refundable Security Deposit (₹)</label>
+            <label className="block font-semibold text-[#94A3B8] mb-1.5">
+              Refundable Security Buffer Deposit (₹)
+            </label>
             <input
               type="number"
-              min="100"
-              step="50"
-              placeholder="Enter deposit in ₹"
+              min="1000"
+              step="500"
               value={bufferDepositINR}
               onChange={(e) => setBufferDepositINR(e.target.value === "" ? "" : parseFloat(e.target.value))}
+              placeholder="e.g. 50000"
               className="v-input text-xs"
               required
             />
-            {depositInr > 0 && (
-              <p className="text-[11px] text-[#9ca3b4] mt-1.5 font-mono">
-                ≈ {bufferMST} tMSTC (1 tMSTC = ₹{MST_TO_INR_RATE.toLocaleString()})
+            <div className="mt-2 p-3 rounded-xl bg-[#00F5A0]/[0.04] border border-[#00F5A0]/15 space-y-1">
+              <p className="text-[11px] text-[#00F5A0] font-semibold flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" /> 100% Refundable Default Defense
               </p>
-            )}
-            <p className="text-[11px] text-[#5f6578] mt-1.5 flex items-center gap-1.5">
-              <Lock className="w-3.5 h-3.5 text-[#2dd4a8]" />
-              100% refundable when all circle rounds complete.
-            </p>
+              <p className="text-[10px] text-[#94A3B8] leading-relaxed">
+                Deposited directly into the autonomous smart contract escrow. Returned in full upon 12-month term completion.
+              </p>
+            </div>
           </div>
 
-          {/* Technical Details */}
+          {/* Technical Box */}
           {isTechnicalMode && (
-            <div className="v-tech-box text-[11px] space-y-1">
-              <p className="font-bold text-[#8b5cf6] flex items-center gap-1">
-                <Code2 className="w-3.5 h-3.5" /> Contract Execution
+            <div className="p-3 rounded-xl bg-violet-500/[0.05] border border-violet-500/20 text-[10px] font-mono space-y-1 text-[#A78BFA]">
+              <p className="font-bold flex items-center gap-1">
+                <Code2 className="w-3 h-3" /> Contract Call: ChitGroup.joinGroup(value: {bufferMST} tMSTC)
               </p>
-              <p className="text-[#9ca3b4]">• Calls <code className="text-white/80">ChitGroup.joinGroup{`{value: deposit}`}()</code></p>
-              <p className="text-[#9ca3b4]">• Equivalent: <code className="text-white/80">{bufferMST} tMSTC</code></p>
             </div>
           )}
 
           {/* Actions */}
-          <div className="pt-2 flex items-center justify-end gap-3">
-            <button type="button" onClick={onClose} className="v-btn-secondary text-xs">Cancel</button>
+          <div className="pt-3 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="v-btn-secondary text-xs"
+            >
+              Cancel
+            </button>
             <button
               type="submit"
               disabled={isJoining || !groupAddress || !bufferDepositINR}
               className="v-btn-primary text-xs"
             >
-              {isJoining ? "Joining..." : `Join Circle (${depositInr > 0 ? formatRawINR(depositInr) : "Deposit"})`}
+              {isJoining ? "Joining on Chain..." : `Confirm & Join Chain`}
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
