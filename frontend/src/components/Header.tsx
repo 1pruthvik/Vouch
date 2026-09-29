@@ -6,7 +6,7 @@ interface HeaderProps {
   balance: string;
   isConnecting: boolean;
   onOpenAccountModal: () => void;
-  onOpenCreateGroupModal: () => void;
+  onOpenCreateGroupModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,14 +29,15 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right Controls */}
       <div className="flex items-center gap-3">
-
-        <button
-          onClick={onOpenCreateGroupModal}
-          className="btn-primary"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Create Group</span>
-        </button>
+        {onOpenCreateGroupModal && (
+          <button
+            onClick={onOpenCreateGroupModal}
+            className="btn-primary"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Create Group</span>
+          </button>
+        )}
 
         <button
           onClick={onOpenAccountModal}
