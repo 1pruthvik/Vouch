@@ -15,6 +15,11 @@ import {
   Code2,
   Clock,
   Compass,
+  Landmark,
+  Zap,
+  Award,
+  Unlock,
+  KeyRound,
 } from "lucide-react";
 import { formatINR, formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 import { GroupDetails, MemberDetails } from "../services/contractService";
@@ -249,6 +254,127 @@ export const VouchOverview: React.FC<VouchOverviewProps> = ({
             <p className="text-xs text-[#5F6368] leading-relaxed">
               The winning discount is distributed proportionally back to all non-winning members as automated savings yield.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 4.5. DIGITALISED SELF-HELP FUNDS ARCHITECTURE & CHIT FUND LIFECYCLE ── */}
+      <section className="max-w-5xl mx-auto px-4 space-y-8">
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold">
+            <Landmark className="w-3.5 h-3.5 text-emerald-600" />
+            Big Chit Funds & Community Self-Help Protocol
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-normal text-[#121316] font-display">
+            Digitalised Self-Help Funds for Real Communities
+          </h2>
+          <p className="text-sm text-[#5F6368] max-w-2xl mx-auto leading-relaxed">
+            Helps users & communities who can't or don't want to invest money in banks, providing superior returns compared to stagnant Fixed Deposits (FDs).
+          </p>
+        </div>
+
+        {/* 6-Step End-to-End Workflow Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+          {/* Step 1: Sign In & Decrypt Code */}
+          <div className="p-5 rounded-3xl bg-white border border-black/[0.06] shadow-sm space-y-2.5 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="w-6 h-6 rounded-full bg-[#121316] text-white flex items-center justify-center text-[11px] font-bold font-mono">1</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/[0.04] text-[#5F6368]">Workplace Access</span>
+              </div>
+              <h3 className="font-bold text-sm text-[#121316] font-display">Sign In & Decrypt Community Code</h3>
+              <p className="text-[#5F6368] text-[11px] leading-relaxed">
+                A user joins a community by decrypting the Admin's <strong>Encrypted Group Code</strong>. Decryption is only possible if you belong to the Admin's verified workplace/community domain.
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#FAF9F5] border border-black/[0.04] text-[10px] text-[#8F959E] font-mono">
+              ECIES Key Predicate Verified ✓
+            </div>
+          </div>
+
+          {/* Step 2: Bridgekey Wallet & RPC */}
+          <div className="p-5 rounded-3xl bg-white border border-black/[0.06] shadow-sm space-y-2.5 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="w-6 h-6 rounded-full bg-[#121316] text-white flex items-center justify-center text-[11px] font-bold font-mono">2</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-50 text-[#946800] border border-amber-200">Bridgekey Core</span>
+              </div>
+              <h3 className="font-bold text-sm text-[#121316] font-display">Bridgekey Wallet & RPC Activation</h3>
+              <p className="text-[#5F6368] text-[11px] leading-relaxed">
+                Generate your public/private keypair in Bridgekey. Key creation initiates an RPC Remote Procedure Call node, activating the <strong>MST Blockchain (Chain ID 91562037)</strong>. Invites are sent via public keys.
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#FAF9F5] border border-black/[0.04] text-[10px] text-[#8F959E] font-mono">
+              RPC: https://testnetrpc.mstblockchain.com
+            </div>
+          </div>
+
+          {/* Step 3: Blockchain Private Block Ledger */}
+          <div className="p-5 rounded-3xl bg-white border border-black/[0.06] shadow-sm space-y-2.5 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="w-6 h-6 rounded-full bg-[#121316] text-white flex items-center justify-center text-[11px] font-bold font-mono">3</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200">Private Block</span>
+              </div>
+              <h3 className="font-bold text-sm text-[#121316] font-display">Private Ledger Block & Admin Role</h3>
+              <p className="text-[#5F6368] text-[11px] leading-relaxed">
+                Ledger records private block details: a) Total members allowed, b) Term of transaction, c) Monthly deposit amount. Admin writes details initially, but can <strong>step down later</strong> to decentralized governance.
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#FAF9F5] border border-black/[0.04] text-[10px] text-[#8F959E] font-mono">
+              Governance Phase: Admin ➔ Timelock
+            </div>
+          </div>
+
+          {/* Step 4: OMNET Mandates & 1st of Month Pooling */}
+          <div className="p-5 rounded-3xl bg-white border border-black/[0.06] shadow-sm space-y-2.5 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="w-6 h-6 rounded-full bg-[#121316] text-white flex items-center justify-center text-[11px] font-bold font-mono">4</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">1st of Month</span>
+              </div>
+              <h3 className="font-bold text-sm text-[#121316] font-display">OMNET Autopay & Day 1 Pooling</h3>
+              <p className="text-[#5F6368] text-[11px] leading-relaxed">
+                Mandates take real-life wallets / UPI, utilize <strong>OMNET</strong> to convert to crypto tokens, and stay in user's Bridgekey wallet. On the 1st of each month, all members' monthly dues are pooled into escrow.
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#FAF9F5] border border-black/[0.04] text-[10px] text-[#8F959E] font-mono">
+              Real Wallet ➔ OMNET ➔ Bridgekey ➔ Escrow
+            </div>
+          </div>
+
+          {/* Step 5: Days 2-30 DeFi & Overcollateralized FX */}
+          <div className="p-5 rounded-3xl bg-white border border-black/[0.06] shadow-sm space-y-2.5 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="w-6 h-6 rounded-full bg-[#121316] text-white flex items-center justify-center text-[11px] font-bold font-mono">5</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-50 text-purple-800 border border-purple-200">2nd – 30th Days</span>
+              </div>
+              <h3 className="font-bold text-sm text-[#121316] font-display">Aave DeFi & 150% Higher Collateral FX</h3>
+              <p className="text-[#5F6368] text-[11px] leading-relaxed">
+                Pooled money is supplied to Aave and international currency exchange. Borrowers lock $\ge 150\%$ collateral over stablecoins. If they fail to repay on time, the protocol seizes their higher collateral!
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#FAF9F5] border border-black/[0.04] text-[10px] text-[#8F959E] font-mono">
+              Overcollateralized Collateral Protection
+            </div>
+          </div>
+
+          {/* Step 6: Day 31 Bidding, BIT & End of Term Profit */}
+          <div className="p-5 rounded-3xl bg-white border border-black/[0.06] shadow-sm space-y-2.5 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="w-6 h-6 rounded-full bg-[#121316] text-white flex items-center justify-center text-[11px] font-bold font-mono">6</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">31st & End-Term</span>
+              </div>
+              <h3 className="font-bold text-sm text-[#121316] font-display">BIT Cut, Dividends & 5–9% P.A. Profits</h3>
+              <p className="text-[#5F6368] text-[11px] leading-relaxed">
+                Reverse bidding deducts a small 5% <strong>BIT</strong> (pooled for interest). Unclaimed discount becomes dividends. At end of term, members receive <strong>Dividends + BIT + 5–9% P.A. extra gained profits</strong>!
+              </p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#FAF9F5] border border-black/[0.04] text-[10px] text-emerald-700 font-bold font-mono">
+              Beats Stagnant Bank FDs
+            </div>
           </div>
         </div>
       </section>

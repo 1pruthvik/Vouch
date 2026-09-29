@@ -239,30 +239,30 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           </div>
         )}
 
-        {/* Network Info */}
+        {/* Network & Bridgekey RPC Connection Telemetry */}
         <div className="p-3.5 rounded-2xl bg-black/[0.02] border border-black/[0.06] space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-[#121316] flex items-center gap-1.5">
               <Globe className="w-3.5 h-3.5 text-[#137333]" />
-              Network
+              Bridgekey RPC Node & MST Blockchain
             </span>
-            <span className="v-badge v-badge-green">
+            <span className="v-badge v-badge-green text-[10px]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#137333]" />
-              MST Testnet
+              RPC Active (91562037)
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-[11px] pt-1">
             <div>
+              <p className="text-[#5F6368]">Wallet Core</p>
+              <p className="font-mono font-semibold text-[#121316]">Bridgekey Keypair</p>
+            </div>
+            <div>
               <p className="text-[#5F6368]">Chain ID</p>
-              <p className="font-mono font-semibold text-[#121316]">91562037</p>
+              <p className="font-mono font-semibold text-[#121316]">91562037 (MST Testnet)</p>
             </div>
             <div>
-              <p className="text-[#5F6368]">EVM Target</p>
-              <p className="font-mono font-semibold text-[#121316]">Paris (0.8.24)</p>
-            </div>
-            <div>
-              <p className="text-[#5F6368]">RPC</p>
+              <p className="text-[#5F6368]">RPC Node</p>
               <p className="font-mono text-[#121316] truncate">{MST_TESTNET.rpcUrl}</p>
             </div>
             <div>

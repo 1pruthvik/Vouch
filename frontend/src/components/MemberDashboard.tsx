@@ -53,6 +53,7 @@ interface MemberDashboardProps {
   onOpenDrawTab: () => void;
   onJoinGroup: () => void;
   onCreateGroup?: () => void;
+  onOpenDecryptModal?: () => void;
 }
 
 export const MemberDashboard: React.FC<MemberDashboardProps> = ({
@@ -69,6 +70,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
   onOpenDrawTab,
   onJoinGroup,
   onCreateGroup,
+  onOpenDecryptModal,
 }) => {
   const [isBackupLayersExpanded, setIsBackupLayersExpanded] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -166,11 +168,17 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
               {onCreateGroup && (
                 <button onClick={onCreateGroup} className="btn-pill-primary text-xs">
                   <Plus className="w-4 h-4" />
                   Launch New Circle
+                </button>
+              )}
+              {onOpenDecryptModal && (
+                <button onClick={onOpenDecryptModal} className="btn-pill-secondary text-xs border-amber-300/80 hover:bg-amber-50/50">
+                  <Lock className="w-3.5 h-3.5 text-[#946800]" />
+                  Decrypt Workplace Code
                 </button>
               )}
               <button onClick={onJoinGroup} className="btn-pill-secondary text-xs">

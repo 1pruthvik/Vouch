@@ -11,6 +11,7 @@ import { JoinGroupModal } from "./components/JoinGroupModal";
 import { ConnectWalletModal } from "./components/ConnectWalletModal";
 import { MandateModal } from "./components/MandateModal";
 import { AccountModal } from "./components/AccountModal";
+import { WorkplaceCommunityDecryptModal } from "./components/WorkplaceCommunityDecryptModal";
 import { BlockchainNetwork3D } from "./components/BlockchainNetwork3D";
 import { useWallet } from "./hooks/useWallet";
 import { useLenis } from "./hooks/useLenis";
@@ -49,6 +50,7 @@ export function App() {
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isMandateModalOpen, setIsMandateModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [isDecryptModalOpen, setIsDecryptModalOpen] = useState(false);
 
   // Progressive Disclosure: Technical Pro Mode Toggle
   const [isTechnicalMode, setIsTechnicalMode] = useState<boolean>(false);
@@ -526,6 +528,7 @@ export function App() {
                   onOpenDrawTab={() => navigateTo("draw")}
                   onJoinGroup={() => setIsJoinModalOpen(true)}
                   onCreateGroup={() => setIsCreateModalOpen(true)}
+                  onOpenDecryptModal={() => setIsDecryptModalOpen(true)}
                 />
 
                 {groupDetails && (
@@ -648,6 +651,13 @@ export function App() {
         defaultGroupAddress={activeGroupAddress}
         defaultDepositINR={groupDetails ? Math.round(parseFloat(groupDetails.installmentAmount) * 1000) : 5000}
         onJoin={handleJoinGroup}
+        isTechnicalMode={isTechnicalMode}
+      />
+
+      <WorkplaceCommunityDecryptModal
+        isOpen={isDecryptModalOpen}
+        onClose={() => setIsDecryptModalOpen(false)}
+        onSuccessJoin={handleJoinGroup}
         isTechnicalMode={isTechnicalMode}
       />
 

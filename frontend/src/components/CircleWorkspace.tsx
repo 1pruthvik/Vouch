@@ -27,6 +27,9 @@ import {
   HelpCircle,
   Activity,
   Calendar,
+  Landmark,
+  Building,
+  Zap,
 } from "lucide-react";
 import gsap from "gsap";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
@@ -64,6 +67,7 @@ export const CircleWorkspace: React.FC<CircleWorkspaceProps> = ({
   // Auction form state
   const [requestedPayoutINR, setRequestedPayoutINR] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAdminSteppedDown, setIsAdminSteppedDown] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -910,6 +914,105 @@ export const CircleWorkspace: React.FC<CircleWorkspaceProps> = ({
           </div>
         </div>
       )}
+
+      {/* ── 5.5. AUTONOMOUS CHIT FUND FINANCIAL PIPELINE & STAGNANT FD COMPARISON ── */}
+      <div className="v-card p-5 sm:p-6 border border-black/[0.06] space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-black/[0.05]">
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#946800] uppercase tracking-wider mb-1">
+              <Landmark className="w-3.5 h-3.5" />
+              Community Self-Help Fund vs Stagnant Bank FDs
+            </div>
+            <h3 className="text-base font-bold text-[#121316] font-display">
+              Autonomous Financial Cycle & 5–9% P.A. Extra Profit Engine
+            </h3>
+            <p className="text-xs text-[#5F6368]">
+              Empowers communities who don't want or can't invest in banks, generating higher yields through DeFi and overcollateralized currency exchange.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isAdminSteppedDown ? (
+              <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 text-[11px] font-semibold flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                Decentralized Community Timelock
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAdminSteppedDown(true);
+                  onShowNotification("Admin stepped down. Full circle governance transferred to autonomous community timelock.");
+                }}
+                className="px-3 py-1.5 rounded-full bg-black/[0.03] hover:bg-black/[0.07] border border-black/[0.08] text-[11px] font-semibold text-[#121316] transition-colors flex items-center gap-1.5"
+                title="Transfer administrative control to decentralized community timelock"
+              >
+                <Unlock className="w-3.5 h-3.5 text-[#946800]" />
+                Step Down Admin
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 4-Stage Monthly Financial Pipeline Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          {/* Stage 1: 1st of Month */}
+          <div className="p-4 rounded-2xl bg-[#FAF9F5] border border-black/[0.05] space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                1st of Month
+              </span>
+              <Coins className="w-3.5 h-3.5 text-indigo-600" />
+            </div>
+            <p className="font-bold text-[#121316] font-display text-sm">Monthly Pooling</p>
+            <p className="text-[11px] text-[#5F6368] leading-relaxed">
+              All {circle.memberCount} members' monthly contributions (₹{circle.installmentAmountINR.toLocaleString("en-IN")}) pooled into autonomous smart contract escrow via OMNET mandates.
+            </p>
+          </div>
+
+          {/* Stage 2: 2nd - 30th of Month */}
+          <div className="p-4 rounded-2xl bg-[#FAF9F5] border border-black/[0.05] space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                2nd – 30th of Month
+              </span>
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+            </div>
+            <p className="font-bold text-[#121316] font-display text-sm">Aave DeFi & FX Loans</p>
+            <p className="text-[11px] text-[#5F6368] leading-relaxed">
+              Pooled funds deployed into Aave DeFi + 150% overcollateralized currency exchange (borrower fails to repay ➔ protocol seizes higher collateral).
+            </p>
+          </div>
+
+          {/* Stage 3: 31st of Month */}
+          <div className="p-4 rounded-2xl bg-[#FAF9F5] border border-black/[0.05] space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                31st of Month
+              </span>
+              <Trophy className="w-3.5 h-3.5 text-purple-600" />
+            </div>
+            <p className="font-bold text-[#121316] font-display text-sm">Bidding & BIT Cut</p>
+            <p className="text-[11px] text-[#5F6368] leading-relaxed">
+              Reverse auction settles winner. 5% cut as BIT (Buffer & Insurance Tranche, pooled for interest) + discount shared as dividends to non-winning peers.
+            </p>
+          </div>
+
+          {/* Stage 4: End of Term */}
+          <div className="p-4 rounded-2xl bg-[#FAF9F5] border border-black/[0.05] space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#946800] bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                End of Term
+              </span>
+              <Award className="w-3.5 h-3.5 text-[#946800]" />
+            </div>
+            <p className="font-bold text-[#121316] font-display text-sm">Dividends + BIT + 5–9% P.A.</p>
+            <p className="text-[11px] text-[#5F6368] leading-relaxed">
+              100% Principal returned + Accumulated BIT reserve + All Dividends + 5–9% P.A. extra gained interest, beating stagnant bank Fixed Deposits!
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* ── 6. MEMBERS DIRECTORY SECTION ── */}
       <div className="v-card p-5 sm:p-6 border border-black/[0.06] space-y-4">

@@ -146,7 +146,23 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           </div>
         </div>
 
-        {/* Summary Card */}
+        {/* Workplace / Community Access Restriction */}
+        <div className="p-3.5 rounded-2xl bg-[#FAF9F5] border border-black/[0.06] space-y-2">
+          <label className="block font-semibold text-[#121316]">
+            Restricted Workplace / Community Domain
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. microsoft.com or google.com or locality.community"
+            defaultValue="microsoft.com"
+            className="v-input font-mono text-xs"
+          />
+          <p className="text-[10px] text-[#5F6368] leading-normal">
+            Generates an <strong>Encrypted Group Code</strong>. Only peers belonging to this workplace/community can decrypt this code using their public/private keys to join.
+          </p>
+        </div>
+
+        {/* Summary Card & Private Ledger Notice */}
         <div className="p-4 rounded-2xl bg-white border border-black/[0.06] space-y-2.5">
           <div className="flex items-center justify-between text-[#5F6368]">
             <span className="font-medium">Total Monthly Pot</span>
@@ -155,14 +171,12 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             </span>
           </div>
           <div className="flex items-center justify-between text-[11px] text-[#5F6368]">
-            <span>Duration</span>
-            <span className="font-semibold text-[#121316]">{numMembers} Months ({numMembers} Draws)</span>
+            <span>Private Ledger Block</span>
+            <span className="font-semibold text-[#121316]">{numMembers} Members · {numMonths} Months · {formatRawINR(numInstallmentInr)}/mo</span>
           </div>
           <div className="flex items-center justify-between text-[11px] text-[#5F6368]">
-            <span>Required Security Buffer</span>
-            <span className="font-semibold text-emerald-700">
-              {formatRawINR(numInstallmentInr)} (100% Refundable)
-            </span>
+            <span>Admin Governance</span>
+            <span className="font-semibold text-[#946800]">Initial Setup (Admin can step down later)</span>
           </div>
         </div>
 

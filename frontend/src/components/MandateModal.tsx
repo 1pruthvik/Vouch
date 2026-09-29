@@ -92,6 +92,36 @@ export const MandateModal: React.FC<MandateModalProps> = ({
           </div>
         </div>
 
+        {/* OMNET Fiat-to-Crypto Conversion Flow Card */}
+        <div className="p-3.5 rounded-2xl bg-[#FAF9F5] border border-black/[0.06] space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-[#121316] flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-[#E9B949]" />
+              OMNET Fiat-to-Crypto Engine
+            </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+              Auto-Custody in Bridgekey
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] pt-1">
+            <div className="p-2 rounded-xl bg-white border border-black/[0.04]">
+              <p className="text-[#5F6368]">1. Real Wallet</p>
+              <p className="font-bold text-[#121316] mt-0.5">UPI / Bank</p>
+            </div>
+            <div className="p-2 rounded-xl bg-white border border-black/[0.04]">
+              <p className="text-[#5F6368]">2. OMNET</p>
+              <p className="font-bold text-[#946800] mt-0.5">Fiat ➔ Token</p>
+            </div>
+            <div className="p-2 rounded-xl bg-white border border-black/[0.04]">
+              <p className="text-[#5F6368]">3. Bridgekey</p>
+              <p className="font-bold text-emerald-700 mt-0.5">tMSTC Saved</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-[#5F6368] leading-normal">
+            OMNET debits your linked real-life wallet on the 1st of every month, converts to stable tokens, and safeguards them in your Bridgekey Wallet.
+          </p>
+        </div>
+
         {/* UPI ID Setup */}
         <div className="p-4 rounded-2xl bg-white border border-black/[0.06] space-y-2">
           <label className="block text-xs font-semibold text-[#5F6368] flex items-center gap-1.5">
@@ -103,10 +133,10 @@ export const MandateModal: React.FC<MandateModalProps> = ({
             value={upiId}
             onChange={(e) => setUpiId(e.target.value)}
             placeholder="e.g. mobile@upi or username@okhdfcbank"
-            className="v-input text-xs"
+            className="v-input text-xs font-mono"
           />
           <p className="text-[11px] text-[#8F959E]">
-            Simulated e-Mandate authorization via smart contract allowance.
+            Authorized OMNET recurring e-Mandate allowance.
           </p>
         </div>
 
