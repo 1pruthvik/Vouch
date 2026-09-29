@@ -876,6 +876,16 @@ class DatabaseManager {
     );
     this.save();
   }
+
+  public deleteCircleRegistration(circleAddress: string): void {
+    if (!this.db || !circleAddress) return;
+    const cleanCircle = this.sanitizeAddress(circleAddress);
+    this.db.run("DELETE FROM circle_registrations WHERE LOWER(address) = ?", [cleanCircle]);
+    this.db.run("DELETE FROM circle_allowed_members WHERE LOWER(circle_address) = ?", [cleanCircle]);
+    this.db.run("DELETE FROM circle_join_requests WHERE LOWER(circle_address) = ?", [cleanCircle]);
+    this.db.run("DELETE FROM groups WHERE LOWER(address) = ?", [cleanCircle]);
+    this.save();
+  }
 }
 
 export const db = new DatabaseManager();

@@ -138,6 +138,19 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
     onShowNotification(`Rejected applicant ${applicantAddress.substring(0, 6)}...`);
   };
 
+  const handleDeleteThisCircle = async () => {
+    if (!window.confirm("Are you sure you want to permanently delete this circle?")) {
+      return;
+    }
+    try {
+      await VerificationService.deleteCircle(cleanCircleAddress);
+      onShowNotification("Circle deleted successfully.");
+      onBack();
+    } catch (err: any) {
+      onShowNotification("Failed to delete circle", true);
+    }
+  };
+
   const handlePayContribution = async () => {
     if (!contractService || !groupDetails) return;
     setIsPaying(true);
@@ -418,6 +431,24 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
                 );
               })}
             </div>
+          </div>
+
+          {/* Danger Zone: Delete Circle */}
+          <div className="pt-4 border-t border-neutral-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-red-950/10 p-4 rounded-xl">
+            <div className="space-y-0.5">
+              <h5 className="font-semibold text-red-400 text-xs">Delete Savings Circle</h5>
+              <p className="text-[11px] text-neutral-400">
+                Permanently delete this circle and remove all whitelist registrations.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleDeleteThisCircle}
+              className="px-4 py-2 rounded-lg bg-red-950 hover:bg-red-900 text-red-400 hover:text-red-200 text-xs font-semibold flex items-center gap-1.5 border-none cursor-pointer self-start sm:self-auto transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete Circle</span>
+            </button>
           </div>
         </div>
       )}

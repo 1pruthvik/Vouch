@@ -472,4 +472,37 @@ export class VerificationService {
       console.warn("Backend removeAllowedMember error:", err);
     }
   }
+
+  // 20. Initializer deletes a circle completely
+  public static async deleteCircle(circleAddress: string): Promise<void> {
+    if (!circleAddress) return;
+    const cleanCircle = circleAddress.toLowerCase();
+
+    // 1. Local cache cleanup
+    try {
+      const circles = this.getAllCircles().filter(
+        (c) => c.address.toLowerCase() !== cleanCircle
+      );
+      localStorage.setItem(STORAGE_CIRCLES_KEY, JSON.stringify(circles));
+
+      const requests = this.getAllRequests().filter(
+        (r) => r.circleAddress.toLowerCase() !== cleanCircle
+      );
+      localStorage.setItem(STORAGE_REQUESTS_KEY, JSON.stringify(requests));
+
+      const custom = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]").filter(
+        (g: any) => (g.address || "").toLowerCase() !== cleanCircle
+      );
+      localStorage.setItem("vouch_custom_groups", JSON.stringify(custom));
+    } catch {}
+
+    // 2. Backend cleanup
+    try {
+      await fetch(`${API_URL}/circles/${cleanCircle}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.warn("Backend deleteCircle error:", err);
+    }
+  }
 }

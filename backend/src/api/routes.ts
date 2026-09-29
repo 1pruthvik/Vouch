@@ -351,5 +351,12 @@ export function createApiRouter(indexer: IndexerService, keeper: KeeperBot): Rou
     res.json({ success: true, message: `Member ${memberAddress} removed from allowed list for circle ${address}` });
   });
 
+  // Delete a circle from registry & indexer
+  router.delete("/circles/:address", (req: Request, res: Response) => {
+    const { address } = req.params;
+    db.deleteCircleRegistration(address);
+    res.json({ success: true, message: `Circle ${address} deleted from registry` });
+  });
+
   return router;
 }

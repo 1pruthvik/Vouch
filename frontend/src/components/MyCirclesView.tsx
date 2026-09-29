@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Shield, Share2, ArrowRight, Plus, Copy, Check, Users, Clock, ExternalLink } from "lucide-react";
+import { Shield, Share2, ArrowRight, Plus, Copy, Check, Users, Clock, ExternalLink, Trash2 } from "lucide-react";
 import { formatRawINR, MST_TO_INR_RATE } from "../utils/formatters";
 import { VerificationService, CircleRegistryEntry, JoinRequest } from "../services/verificationService";
 import { ContractService } from "../services/contractService";
@@ -23,6 +23,25 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
   const [createdCircles, setCreatedCircles] = useState<CircleRegistryEntry[]>([]);
   const [pendingRequestsMap, setPendingRequestsMap] = useState<{ [addr: string]: number }>({});
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [deletingAddr, setDeletingAddr] = useState<string | null>(null);
+
+  const handleDeleteCircle = async (circleAddr: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const clean = extractCircleAddress(circleAddr);
+    if (!window.confirm("Are you sure you want to delete this circle? This will remove it from the active registry.")) {
+      return;
+    }
+    setDeletingAddr(clean);
+    try {
+      await VerificationService.deleteCircle(clean);
+      await loadMyCircles();
+      onShowNotification("Circle deleted successfully.");
+    } catch (err: any) {
+      onShowNotification("Failed to delete circle.", true);
+    } finally {
+      setDeletingAddr(null);
+    }
+  };
 
   const loadMyCircles = async () => {
     if (!account) return;
@@ -164,6 +183,16 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
                         <Share2 className="w-3.5 h-3.5 text-red-500" />
                       )}
                       <span className="text-[11px] font-mono">{copiedLink === clean ? "Copied" : "Share Link"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteCircle(clean, e)}
+                      disabled={deletingAddr === clean}
+                      className="p-2.5 rounded-lg bg-black hover:bg-red-950/40 text-neutral-500 hover:text-red-400 transition-colors border-none cursor-pointer flex items-center gap-1"
+                      title="Delete Circle"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
 
                     <button
