@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Copy, Check, Key, Shield, ArrowRight, AlertCircle, ExternalLink, Code2 } from "lucide-react";
+import { X, Copy, Check, Key, Shield, ArrowRight, AlertCircle, ExternalLink } from "lucide-react";
 import { formatINR } from "../utils/formatters";
 import { EIP6963ProviderDetail } from "../types/global";
 import { MST_TESTNET } from "../config/network";
@@ -10,8 +10,6 @@ interface AccountModalProps {
   account: string | null;
   balance: string;
   isCorrectNetwork?: boolean;
-  isTechnicalMode?: boolean;
-  onToggleTechnicalMode?: () => void;
   detectedProviders?: EIP6963ProviderDetail[];
   onConnectExtension?: (detail?: EIP6963ProviderDetail) => Promise<boolean>;
   onConnectPrivateKey?: (key: string) => Promise<boolean>;
@@ -23,8 +21,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   onClose,
   account,
   balance,
-  isTechnicalMode,
-  onToggleTechnicalMode,
   detectedProviders = [],
   onConnectExtension,
   onConnectPrivateKey,
@@ -125,19 +121,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 {balance} tMSTC • MST Testnet (Chain ID 91562037)
               </p>
             </div>
-
-            {onToggleTechnicalMode && (
-              <button
-                onClick={onToggleTechnicalMode}
-                className="w-full py-2.5 px-4 rounded-lg bg-neutral-950 hover:bg-neutral-900 transition-all flex items-center justify-between text-xs font-semibold text-white cursor-pointer border-none"
-              >
-                <div className="flex items-center gap-2">
-                  <Code2 className="w-4 h-4 text-red-500" />
-                  <span>Technical EVM Telemetry</span>
-                </div>
-                <span className="text-red-400">{isTechnicalMode ? "Enabled" : "Disabled"}</span>
-              </button>
-            )}
 
             {onDisconnect && (
               <button

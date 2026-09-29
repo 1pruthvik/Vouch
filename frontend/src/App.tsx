@@ -506,8 +506,6 @@ export function App() {
         account={account}
         balance={balance}
         isCorrectNetwork={isCorrectNetwork}
-        isTechnicalMode={isTechnicalMode}
-        onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
         detectedProviders={detectedProviders}
         onConnectExtension={connectWallet}
         onConnectPrivateKey={connectWithPrivateKey}
