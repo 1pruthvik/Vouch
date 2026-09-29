@@ -16,7 +16,8 @@
     "ethers": "^6.11.1",
     "express": "^4.19.2",
     "sql.js": "^1.14.2",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "viem": "^2.56.9"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
