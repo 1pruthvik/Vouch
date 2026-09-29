@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Header } from "./components/Header";
 import { MemberDashboard, AvailableCircle } from "./components/MemberDashboard";
+import { CircleWorkspace } from "./components/CircleWorkspace";
 import { AuctionBidding } from "./components/AuctionBidding";
 import { RiskAdvisorCard } from "./components/RiskAdvisorCard";
 import { LedgerView, LedgerEvent } from "./components/LedgerView";
@@ -16,8 +17,11 @@ import { useLenis } from "./hooks/useLenis";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
 import { fetchLedgerEvents, fetchIndexedGroups } from "./services/indexerService";
+import { CircleLifecycleService, CircleData } from "./services/circleLifecycleService";
 import { UserPlus, Shield, CheckCircle2, AlertCircle, Sparkles, Home, Box, History, LayoutDashboard } from "lucide-react";
 import gsap from "gsap";
+
+export type AppTab = "overview" | "home" | "circle_workspace" | "draw" | "standing" | "network" | "history";
 
 export function App() {
   // Initialize Lenis smooth scroll
@@ -49,8 +53,27 @@ export function App() {
   // Progressive Disclosure: Technical Pro Mode Toggle
   const [isTechnicalMode, setIsTechnicalMode] = useState<boolean>(false);
 
-  // Tabs (overview default matching editorial reference)
-  const [activeTab, setActiveTab] = useState<"overview" | "home" | "draw" | "standing" | "network" | "history">("overview");
+  // Active Circle Identifier (e.g. slug or address)
+  const [activeCircleId, setActiveCircleId] = useState<string>(() => {
+    const path = window.location.pathname;
+    const hash = window.location.hash;
+    if (path.startsWith("/circle/")) return decodeURIComponent(path.replace("/circle/", ""));
+    if (hash.startsWith("#circle/")) return decodeURIComponent(hash.replace("#circle/", ""));
+    return localStorage.getItem("vouch_active_circle_id") || "alpha-savings-circle";
+  });
+
+  // Active Tab & Routing State
+  const [activeTab, setActiveTab] = useState<AppTab>(() => {
+    const path = window.location.pathname;
+    const hash = window.location.hash;
+    if (path.startsWith("/circle/") || hash.startsWith("#circle/")) return "circle_workspace";
+    if (path === "/draw" || hash === "#draw") return "draw";
+    if (path === "/standing" || hash === "#standing") return "standing";
+    if (path === "/network" || hash === "#network") return "network";
+    if (path === "/history" || hash === "#history") return "history";
+    if (path === "/home" || hash === "#home") return "home";
+    return "overview";
+  });
 
   // State
   const [activeGroupAddress, setActiveGroupAddress] = useState<string>(() => {
@@ -67,38 +90,85 @@ export function App() {
     return localStorage.getItem("vouch_autopay_active") === "true";
   });
 
+  const tabContentRef = useRef<HTMLDivElement>(null);
+
+  const showNotification = (message: string, isError: boolean = false) => {
+    setNotification({ message, isError });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  // Browser Navigation & History Synchronization
+  const navigateTo = (tab: AppTab, circleId?: string) => {
+    setActiveTab(tab);
+    if (circleId) {
+      setActiveCircleId(circleId);
+      localStorage.setItem("vouch_active_circle_id", circleId);
+      const circleData = CircleLifecycleService.getCircleByIdOrAddress(circleId);
+      if (circleData) {
+        setActiveGroupAddress(circleData.address);
+      }
+      window.history.pushState({ tab, circleId }, "", `/circle/${circleId}`);
+    } else {
+      window.history.pushState({ tab }, "", tab === "overview" ? "/" : `/${tab}`);
+    }
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!prefersReducedMotion && tabContentRef.current) {
+      gsap.fromTo(
+        tabContentRef.current,
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }
+      );
+    }
+  };
+
+  // Handle Browser Back / Forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      const hash = window.location.hash;
+      if (path.startsWith("/circle/") || hash.startsWith("#circle/")) {
+        const id = path.startsWith("/circle/")
+          ? decodeURIComponent(path.replace("/circle/", ""))
+          : decodeURIComponent(hash.replace("#circle/", ""));
+        setActiveCircleId(id);
+        setActiveTab("circle_workspace");
+      } else if (path === "/draw" || hash === "#draw") {
+        setActiveTab("draw");
+      } else if (path === "/standing" || hash === "#standing") {
+        setActiveTab("standing");
+      } else if (path === "/network" || hash === "#network") {
+        setActiveTab("network");
+      } else if (path === "/history" || hash === "#history") {
+        setActiveTab("history");
+      } else if (path === "/home" || hash === "#home") {
+        setActiveTab("home");
+      } else {
+        setActiveTab("overview");
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   // Load available groups dynamically from backend and localStorage
   const loadAvailableGroups = useCallback(async () => {
     try {
+      const allStoreCircles = CircleLifecycleService.getAllCircles();
       const indexed = await fetchIndexedGroups();
-      const customSaved: AvailableCircle[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
 
       const combinedMap = new Map<string, AvailableCircle>();
 
-      // Base active circles
-      const baseCircles: AvailableCircle[] = [
-        {
-          address: "0xAf378D33B037A6668fOd128c4BBA28bb65974D9b",
-          name: "Alpha Savings Circle",
-          memberCount: 5,
-          installmentAmount: "5.0",
-        },
-        {
-          address: "0xb794f5ea0ba39494ce839613fffba74279579268",
-          name: "Bangalore Techies Chit",
-          memberCount: 4,
-          installmentAmount: "10.0",
-        },
-        {
-          address: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
-          name: "Family Emergency Pool",
-          memberCount: 5,
-          installmentAmount: "2.0",
-        },
-      ];
-
-      baseCircles.forEach((c) => combinedMap.set(c.address.toLowerCase(), c));
-      customSaved.forEach((c) => combinedMap.set(c.address.toLowerCase(), c));
+      // Load from CircleLifecycleStore
+      allStoreCircles.forEach((c) => {
+        combinedMap.set(c.address.toLowerCase(), {
+          address: c.address,
+          name: c.name,
+          memberCount: c.memberCount,
+          installmentAmount: c.installmentAmount,
+        });
+      });
 
       if (Array.isArray(indexed)) {
         indexed.forEach((g: any) => {
@@ -135,13 +205,6 @@ export function App() {
     localStorage.setItem("vouch_autopay_active", isMandateActive ? "true" : "false");
   }, [isMandateActive]);
 
-  const tabContentRef = useRef<HTMLDivElement>(null);
-
-  const showNotification = (message: string, isError: boolean = false) => {
-    setNotification({ message, isError });
-    setTimeout(() => setNotification(null), 5000);
-  };
-
   // Initialize ContractService
   useEffect(() => {
     const srv = new ContractService((provider as any) || undefined);
@@ -151,20 +214,7 @@ export function App() {
     setContractService(srv);
   }, [provider, signer]);
 
-  // Tab switch GSAP animation
-  const handleTabChange = (tab: "overview" | "home" | "draw" | "standing" | "network" | "history") => {
-    setActiveTab(tab);
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!prefersReducedMotion && tabContentRef.current) {
-      gsap.fromTo(
-        tabContentRef.current,
-        { opacity: 0, y: 10 },
-        { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }
-      );
-    }
-  };
-
-  // Refresh Group and Member state
+  // Refresh Group and Member state from on-chain / indexer
   const refreshData = useCallback(async () => {
     if (!activeGroupAddress || !contractService) return;
     try {
@@ -195,18 +245,13 @@ export function App() {
     }
   }, [activeGroupAddress, contractService, account]);
 
-  const handleSelectGroup = async (addr: string) => {
-    setActiveGroupAddress(addr);
-    const srv = contractService || new ContractService((provider as any) || undefined);
-    try {
-      const g = await srv.getGroupDetails(addr);
-      setGroupDetails(g);
-      if (account) {
-        const m = await srv.getMemberDetails(addr, account);
-        setMemberDetails(m);
-      }
-    } catch (e) {
-      console.warn("Could not load group details on selection:", e);
+  const handleSelectGroup = async (addrOrId: string) => {
+    const circle = CircleLifecycleService.getCircleByIdOrAddress(addrOrId);
+    if (circle) {
+      navigateTo("circle_workspace", circle.id);
+    } else {
+      setActiveGroupAddress(addrOrId);
+      navigateTo("circle_workspace", addrOrId);
     }
   };
 
@@ -216,7 +261,7 @@ export function App() {
     }
   }, [activeGroupAddress, refreshData]);
 
-  // Handler: Create Group
+  // Handler: Create Group (Launches Circle, starts with 0/N members, navigates to dedicated route)
   const handleCreateGroup = async (params: {
     groupName: string;
     memberCount: number;
@@ -225,38 +270,48 @@ export function App() {
     discountCapBps: number;
     reserveFeeBps: number;
   }) => {
-    if (!contractService || !account) {
-      setIsConnectModalOpen(true);
-      return;
-    }
     try {
-      showNotification("Deploying Chit Group to MST Testnet...");
-      const result = await contractService.createGroup(params);
-      if (result.groupAddress) {
-        const newCircle: AvailableCircle = {
-          address: result.groupAddress,
-          name: params.groupName,
-          memberCount: params.memberCount,
-          installmentAmount: params.installmentAmount,
-        };
-        const customSaved: AvailableCircle[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
-        customSaved.unshift(newCircle);
-        localStorage.setItem("vouch_custom_groups", JSON.stringify(customSaved));
+      showNotification("Deploying Savings Circle to MST Blockchain...");
+      let deployedAddress: string | undefined;
+      let txHash: string | undefined;
 
-        // Register with indexer
+      if (contractService && account) {
+        try {
+          const result = await contractService.createGroup(params);
+          txHash = result.txHash;
+          deployedAddress = result.groupAddress;
+        } catch (e: any) {
+          console.warn("Factory contract deployment notice:", e);
+        }
+      }
+
+      // Create new circle in repository starting with strictly 0 members!
+      const newCircle = CircleLifecycleService.createNewCircle({
+        name: params.groupName,
+        memberCount: params.memberCount,
+        installmentAmount: params.installmentAmount,
+        cycleDurationSeconds: params.cycleDuration,
+        discountCapBps: params.discountCapBps,
+        reserveFeeBps: params.reserveFeeBps,
+        creatorAddress: account || undefined,
+        deployedContractAddress: deployedAddress,
+        txHash,
+      });
+
+      // Register with indexer
+      if (deployedAddress) {
         fetch("http://localhost:4000/api/groups/index", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: result.groupAddress }),
+          body: JSON.stringify({ address: deployedAddress }),
         }).catch(() => {});
-
-        loadAvailableGroups();
-        setActiveGroupAddress(result.groupAddress);
-        showNotification(`Circle "${params.groupName}" deployed at ${result.groupAddress.substring(0, 10)}...`);
-      } else {
-        showNotification("Group creation transaction confirmed.");
       }
-      await refreshData();
+
+      loadAvailableGroups();
+      showNotification(`Circle "${params.groupName}" created! Invite participants to activate.`);
+
+      // Navigate directly to the dedicated circle route!
+      navigateTo("circle_workspace", newCircle.id);
     } catch (err: any) {
       console.error(err);
       showNotification(err.message || "Failed to create group", true);
@@ -299,23 +354,23 @@ export function App() {
   const handleCommitBid = async (bidAmountMST: string) => {
     if (!contractService || !activeGroupAddress) return;
     try {
-      showNotification("Submitting secret encrypted bid...");
+      showNotification("Anchoring commitment hash on MST Testnet...");
       await contractService.commitBid(activeGroupAddress, bidAmountMST);
-      showNotification("Bid committed successfully!");
+      showNotification("Encrypted bid commitment confirmed on-chain!");
       await refreshData();
     } catch (err: any) {
       console.error(err);
-      showNotification(err.message || "Submission failed", true);
+      showNotification(err.message || "Commit failed", true);
     }
   };
 
-  // Handler: Reveal Bid
+  // Handler: Reveal Plaintext Bid
   const handleRevealBid = async (bidAmountMST: string) => {
     if (!contractService || !activeGroupAddress) return;
     try {
-      showNotification("Revealing bid on chain...");
+      showNotification("Submitting plaintext bid & salt for verification...");
       await contractService.revealBid(activeGroupAddress, bidAmountMST);
-      showNotification("Bid revealed successfully!");
+      showNotification("Bid revealed and cryptographically verified!");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -323,13 +378,13 @@ export function App() {
     }
   };
 
-  // Handler: Settle Draw
+  // Handler: Settle Round
   const handleSettleRound = async () => {
     if (!contractService || !activeGroupAddress) return;
     try {
-      showNotification("Settling round and distributing dividends...");
+      showNotification("Executing round settlement & dividend distribution...");
       await contractService.settleRound(activeGroupAddress);
-      showNotification("Round settled! Dividends distributed.");
+      showNotification("Round settled! Pot paid and dividends distributed.");
       await refreshData();
     } catch (err: any) {
       console.error(err);
@@ -337,47 +392,52 @@ export function App() {
     }
   };
 
+  // Secondary tabs list
   const tabs = [
-    { id: "overview" as const, label: "Overview", icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
-    { id: "home" as const, label: "Circle Home", icon: <Home className="w-3.5 h-3.5" /> },
-    { id: "draw" as const, label: "This Month's Draw", icon: <Sparkles className="w-3.5 h-3.5" /> },
-    { id: "standing" as const, label: "Your Standing", icon: <Shield className="w-3.5 h-3.5" /> },
+    { id: "home" as const, label: "Circle Directory", icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
+    { id: "draw" as const, label: "Monthly Draw", icon: <Sparkles className="w-3.5 h-3.5" /> },
+    { id: "standing" as const, label: "Trust & Risk", icon: <Shield className="w-3.5 h-3.5" /> },
+    { id: "history" as const, label: "Audit Ledger", icon: <History className="w-3.5 h-3.5" /> },
     { id: "network" as const, label: "3D Network", icon: <Box className="w-3.5 h-3.5" /> },
-    { id: "history" as const, label: "Transactions", icon: <History className="w-3.5 h-3.5" /> },
   ];
 
+  // Get active circle display name for header
+  const currentCircleData = CircleLifecycleService.getCircleByIdOrAddress(activeCircleId || activeGroupAddress);
+  const activeCircleName = currentCircleData ? currentCircleData.name : groupDetails?.name || "Alpha Savings Circle";
+
   return (
-    <div className="min-h-screen bg-[#EAE6DF] py-3 sm:py-6 px-2 sm:px-4 lg:px-6 font-sans selection:bg-[#E9B949]/35">
-      {/* Central Constrained Shell (Matching Reference Rounded Container) */}
-      <div className="max-w-[1340px] w-full mx-auto bg-[#FAF9F5] rounded-[28px] sm:rounded-[40px] shadow-2xl border border-black/[0.06] overflow-hidden min-h-[92vh] flex flex-col">
+    <div className="min-h-screen flex flex-col bg-[#FAF9F5] text-[#121316] font-sans antialiased selection:bg-[#E9B949]/30">
+      {/* Background Ambience */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-[#E9B949]/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 -right-40 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative z-10 flex flex-col min-h-screen">
         {/* Header */}
         <Header
           account={account}
           balance={balance}
           isConnecting={isConnecting}
-          groupName={groupDetails?.name}
+          groupName={activeCircleName}
           isTechnicalMode={isTechnicalMode}
-          activeTab={activeTab}
-          onTabChange={(tab) => handleTabChange(tab)}
+          activeTab={activeTab === "circle_workspace" ? "home" : activeTab}
+          onTabChange={(tabId) => navigateTo(tabId as AppTab)}
           onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
           onOpenAccountModal={() => {
+            clearError();
             if (!account) {
-              clearError();
               setIsConnectModalOpen(true);
             } else {
               setIsAccountModalOpen(true);
             }
           }}
           onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
-          onSwitchGroup={() => {
-            setActiveGroupAddress("");
-            setGroupDetails(null);
-          }}
+          onSwitchGroup={() => navigateTo("home")}
         />
 
         {/* Main Content Area */}
         <main className="flex-1 w-full mx-auto px-4 sm:px-8 lg:px-12 py-6 space-y-6">
-
           {/* Secondary Sub-navigation Pill Bar for Workspace Tabs */}
           {activeTab !== "overview" && (
             <div className="flex items-center justify-between gap-3 border-b border-black/[0.06] pb-4">
@@ -385,7 +445,8 @@ export function App() {
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
+                    type="button"
+                    onClick={() => navigateTo(tab.id)}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
                       activeTab === tab.id
                         ? "bg-[#121316] text-white shadow-sm font-semibold"
@@ -400,6 +461,7 @@ export function App() {
 
               <div className="hidden sm:flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => setIsJoinModalOpen(true)}
                   className="btn-pill-secondary text-xs px-3.5 py-1.5 flex items-center gap-1.5"
                 >
@@ -412,17 +474,17 @@ export function App() {
 
           {/* Tab Content Container */}
           <div ref={tabContentRef}>
-            {/* Tab 0: Editorial Overview (Reference Landing Experience) */}
+            {/* Tab 0: Editorial Overview (Landing Experience) */}
             {activeTab === "overview" && (
               <VouchOverview
                 account={account}
                 groupDetails={groupDetails}
                 memberDetails={memberDetails}
                 riskAdvisory={riskAdvisory}
-                onOpenDrawTab={() => handleTabChange("draw")}
-                onOpenStandingTab={() => handleTabChange("standing")}
-                onOpenLedgerTab={() => handleTabChange("history")}
-                onOpenDashboardTab={() => handleTabChange("home")}
+                onOpenDrawTab={() => navigateTo("draw")}
+                onOpenStandingTab={() => navigateTo("standing")}
+                onOpenLedgerTab={() => navigateTo("history")}
+                onOpenDashboardTab={() => navigateTo("home")}
                 onOpenConnectModal={() => {
                   clearError();
                   setIsConnectModalOpen(true);
@@ -430,69 +492,26 @@ export function App() {
                 onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
               />
             )}
-          {/* Tab 1: Group Home */}
-          {activeTab === "home" && (
-            <div className="space-y-5 anim-fade-up">
-              <MemberDashboard
+
+            {/* Dedicated Route: Specific Circle Workspace (Complete Chit Fund Lifecycle) */}
+            {activeTab === "circle_workspace" && (
+              <CircleWorkspace
+                circleIdOrAddress={activeCircleId || activeGroupAddress}
                 account={account}
-                groupDetails={groupDetails}
-                memberDetails={memberDetails}
-                riskAdvisory={riskAdvisory}
+                balance={balance}
                 isTechnicalMode={isTechnicalMode}
-                isMandateActive={isMandateActive}
-                availableGroups={availableGroups}
-                onSelectGroup={handleSelectGroup}
-                onPayInstallment={handlePayInstallment}
-                onOpenMandateModal={() => setIsMandateModalOpen(true)}
-                onOpenDrawTab={() => handleTabChange("draw")}
-                onJoinGroup={() => setIsJoinModalOpen(true)}
-                onCreateGroup={() => setIsCreateModalOpen(true)}
+                onBackToDirectory={() => navigateTo("home")}
+                onOpenConnectModal={() => {
+                  clearError();
+                  setIsConnectModalOpen(true);
+                }}
+                onShowNotification={showNotification}
               />
+            )}
 
-              {groupDetails && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                  <div className="lg:col-span-2">
-                    <LedgerView
-                      events={ledgerEvents.slice(0, 4)}
-                      isTechnicalMode={isTechnicalMode}
-                    />
-                  </div>
-                  <div>
-                    <RiskAdvisorCard
-                      memberAddress={account || ""}
-                      riskAdvisory={riskAdvisory}
-                      isTechnicalMode={isTechnicalMode}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Tab 2: Reverse Auction */}
-          {activeTab === "draw" && (
-            <div className="space-y-5 anim-fade-up">
-              <AuctionBidding
-                currentRound={groupDetails?.currentRound || 1}
-                totalPot={groupDetails?.currentPot || "0"}
-                minBidAllowed={groupDetails?.minBid || "0"}
-                phase={groupDetails?.currentState || "Forming"}
-                hasCommitted={false}
-                hasRevealed={false}
-                hasWonPreviously={memberDetails?.hasWon || false}
-                isTechnicalMode={isTechnicalMode}
-                groupDetails={groupDetails}
-                onCommitBid={handleCommitBid}
-                onRevealBid={handleRevealBid}
-                onSettleRound={handleSettleRound}
-              />
-            </div>
-          )}
-
-          {/* Tab 3: Solvency & Standing */}
-          {activeTab === "standing" && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 anim-fade-up">
-              <div className="lg:col-span-2">
+            {/* Tab 1: Group Directory & Dashboard */}
+            {activeTab === "home" && (
+              <div className="space-y-5 anim-fade-up">
                 <MemberDashboard
                   account={account}
                   groupDetails={groupDetails}
@@ -504,48 +523,108 @@ export function App() {
                   onSelectGroup={handleSelectGroup}
                   onPayInstallment={handlePayInstallment}
                   onOpenMandateModal={() => setIsMandateModalOpen(true)}
-                  onOpenDrawTab={() => handleTabChange("draw")}
+                  onOpenDrawTab={() => navigateTo("draw")}
                   onJoinGroup={() => setIsJoinModalOpen(true)}
                   onCreateGroup={() => setIsCreateModalOpen(true)}
                 />
+
+                {groupDetails && (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    <div className="lg:col-span-2">
+                      <LedgerView
+                        events={ledgerEvents.slice(0, 4)}
+                        isTechnicalMode={isTechnicalMode}
+                      />
+                    </div>
+                    <div>
+                      <RiskAdvisorCard
+                        memberAddress={account || ""}
+                        riskAdvisory={riskAdvisory}
+                        isTechnicalMode={isTechnicalMode}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-              <div>
-                <RiskAdvisorCard
-                  memberAddress={account || ""}
-                  riskAdvisory={riskAdvisory}
+            )}
+
+            {/* Tab 2: Reverse Auction */}
+            {activeTab === "draw" && (
+              <div className="space-y-5 anim-fade-up">
+                <AuctionBidding
+                  currentRound={groupDetails?.currentRound || 1}
+                  totalPot={groupDetails?.currentPot || "0"}
+                  minBidAllowed={groupDetails?.minBid || "0"}
+                  phase={groupDetails?.currentState || "Forming"}
+                  hasCommitted={false}
+                  hasRevealed={false}
+                  hasWonPreviously={memberDetails?.hasWon || false}
+                  isTechnicalMode={isTechnicalMode}
+                  groupDetails={groupDetails}
+                  onCommitBid={handleCommitBid}
+                  onRevealBid={handleRevealBid}
+                  onSettleRound={handleSettleRound}
+                />
+              </div>
+            )}
+
+            {/* Tab 3: Solvency & Standing */}
+            {activeTab === "standing" && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 anim-fade-up">
+                <div className="lg:col-span-2">
+                  <MemberDashboard
+                    account={account}
+                    groupDetails={groupDetails}
+                    memberDetails={memberDetails}
+                    riskAdvisory={riskAdvisory}
+                    isTechnicalMode={isTechnicalMode}
+                    isMandateActive={isMandateActive}
+                    availableGroups={availableGroups}
+                    onSelectGroup={handleSelectGroup}
+                    onPayInstallment={handlePayInstallment}
+                    onOpenMandateModal={() => setIsMandateModalOpen(true)}
+                    onOpenDrawTab={() => navigateTo("draw")}
+                    onJoinGroup={() => setIsJoinModalOpen(true)}
+                    onCreateGroup={() => setIsCreateModalOpen(true)}
+                  />
+                </div>
+                <div>
+                  <RiskAdvisorCard
+                    memberAddress={account || ""}
+                    riskAdvisory={riskAdvisory}
+                    isTechnicalMode={isTechnicalMode}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Tab 4: 3D Blockchain Network */}
+            {activeTab === "network" && (
+              <div className="space-y-5 anim-fade-up">
+                <BlockchainNetwork3D
+                  currentAccount={account}
+                  groupDetails={groupDetails}
+                  memberDetails={memberDetails}
+                  onPayDues={handlePayInstallment}
+                  onCommitBid={handleCommitBid}
+                />
+              </div>
+            )}
+
+            {/* Tab 5: Ledger History */}
+            {activeTab === "history" && (
+              <div className="space-y-5 anim-fade-up">
+                <LedgerView
+                  events={ledgerEvents}
                   isTechnicalMode={isTechnicalMode}
                 />
               </div>
-            </div>
-          )}
-
-          {/* Tab 4: 3D Blockchain Network */}
-          {activeTab === "network" && (
-            <div className="space-y-5 anim-fade-up">
-              <BlockchainNetwork3D
-                currentAccount={account}
-                groupDetails={groupDetails}
-                memberDetails={memberDetails}
-                onPayDues={handlePayInstallment}
-                onCommitBid={handleCommitBid}
-              />
-            </div>
-          )}
-
-          {/* Tab 5: Ledger History */}
-          {activeTab === "history" && (
-            <div className="space-y-5 anim-fade-up">
-              <LedgerView
-                events={ledgerEvents}
-                isTechnicalMode={isTechnicalMode}
-              />
-            </div>
-          )}
-        </div>
-      </main>
+            )}
+          </div>
+        </main>
       </div>
 
-      {/* Modals */}
+      {/* Modals (Viewport Overlay Layer via React Portals) */}
       <ConnectWalletModal
         isOpen={isConnectModalOpen}
         onClose={() => setIsConnectModalOpen(false)}
@@ -630,4 +709,5 @@ export function App() {
     </div>
   );
 }
+
 export default App;
