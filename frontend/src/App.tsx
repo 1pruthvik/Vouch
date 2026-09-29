@@ -30,9 +30,7 @@ export function App() {
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [lastDeployedAddress, setLastDeployedAddress] = useState<string | null>(null);
-  const [activeCircleAddress, setActiveCircleAddress] = useState<string | null>(() => {
-    return localStorage.getItem("vouch_active_circle_view") || null;
-  });
+  const [activeCircleAddress, setActiveCircleAddress] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; isError?: boolean } | null>(null);
 
   // Check URL query parameters for invitation links
@@ -46,7 +44,7 @@ export function App() {
     return "join";
   });
 
-  const [initialCircleId] = useState<string>(() => {
+  const [initialCircleId, setInitialCircleId] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       return params.get("circle") || params.get("join") || "";
@@ -60,12 +58,15 @@ export function App() {
   };
 
   useEffect(() => {
-    if (activeCircleAddress) {
-      localStorage.setItem("vouch_active_circle_view", activeCircleAddress);
-    } else {
-      localStorage.removeItem("vouch_active_circle_view");
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlCircle = params.get("circle") || params.get("join");
+      if (urlCircle) {
+        setInitialCircleId(urlCircle);
+        setActiveTab("join");
+      }
     }
-  }, [activeCircleAddress]);
+  }, []);
 
   useEffect(() => {
     const srv = new ContractService((provider as any) || undefined);
