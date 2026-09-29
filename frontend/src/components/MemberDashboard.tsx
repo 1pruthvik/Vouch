@@ -386,15 +386,24 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
               <HeartHandshake className="w-4 h-4 text-[#8b5cf6]" />
             </div>
           </div>
-          <div className="flex items-center gap-2.5 mt-1">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
-              P
+          {parseFloat(memberDetails?.solvency?.totalBacking || "0") > 0 ? (
+            <div className="flex items-center gap-2.5 mt-1">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
+                V
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white font-display">
+                  {formatINR(memberDetails?.solvency?.totalBacking || "0")} Staked
+                </p>
+                <p className="text-[11px] text-[#2dd4a8]">Active Trust Bond</p>
+              </div>
             </div>
+          ) : (
             <div>
-              <p className="text-sm font-bold text-white font-display">Priya R.</p>
-              <p className="text-[11px] text-[#9ca3b4]">Active Trust Bond</p>
+              <p className="text-sm font-bold text-white font-display">Self-Secured</p>
+              <p className="text-[11px] text-[#9ca3b4] mt-0.5">Collateral buffer covers dues</p>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Standing */}

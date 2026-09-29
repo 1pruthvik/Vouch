@@ -24,12 +24,12 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   onSubmit,
   isTechnicalMode = false,
 }) => {
-  const [groupName, setGroupName] = useState("Alpha Savings Circle");
-  const [memberCount, setMemberCount] = useState<number>(5);
-  const [installmentInr, setInstallmentInr] = useState<number>(5000);
-  const [reserveFeeInr, setReserveFeeInr] = useState<number>(250);
-  const [cycleDurationMonths, setCycleDurationMonths] = useState<number>(1);
-  const [discountCapPercent, setDiscountCapPercent] = useState<number>(30);
+  const [groupName, setGroupName] = useState("");
+  const [memberCount, setMemberCount] = useState<number | "">(5);
+  const [installmentInr, setInstallmentInr] = useState<number | "">(5000);
+  const [reserveFeeInr, setReserveFeeInr] = useState<number | "">(250);
+  const [cycleDurationMonths, setCycleDurationMonths] = useState<number | "">(1);
+  const [discountCapPercent, setDiscountCapPercent] = useState<number | "">(30);
 
   if (!isOpen) return null;
 
@@ -54,7 +54,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       memberCount: Number(memberCount),
       installmentAmount: installmentTokens,
       cycleDuration: cycleDurationSeconds,
-      discountCapBps: discountCapPercent * 100,
+      discountCapBps: (Number(discountCapPercent) || 30) * 100,
       reserveFeeBps: calculatedReserveFeeBps,
     });
     onClose();

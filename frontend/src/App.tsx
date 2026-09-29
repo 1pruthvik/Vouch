@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Header } from "./components/Header";
-import { MemberDashboard } from "./components/MemberDashboard";
+import { MemberDashboard, AvailableCircle } from "./components/MemberDashboard";
 import { AuctionBidding } from "./components/AuctionBidding";
 import { RiskAdvisorCard } from "./components/RiskAdvisorCard";
 import { LedgerView, LedgerEvent } from "./components/LedgerView";
@@ -13,7 +13,7 @@ import { BlockchainNetwork3D } from "./components/BlockchainNetwork3D";
 import { useWallet } from "./hooks/useWallet";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
-import { fetchLedgerEvents } from "./services/indexerService";
+import { fetchLedgerEvents, fetchIndexedGroups } from "./services/indexerService";
 import { UserPlus, Shield, CheckCircle2, AlertCircle, Sparkles, Home, Box, History } from "lucide-react";
 
 export function App() {
@@ -50,6 +50,7 @@ export function App() {
   const [activeGroupAddress, setActiveGroupAddress] = useState<string>(() => {
     return localStorage.getItem("vouch_active_group") || "0xAf378D33B037A6668fOd128c4BBA28bb65974D9b";
   });
+  const [availableGroups, setAvailableGroups] = useState<AvailableCircle[]>([]);
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
   const [memberDetails, setMemberDetails] = useState<MemberDetails | null>(null);
   const [ledgerEvents, setLedgerEvents] = useState<LedgerEvent[]>([]);
@@ -59,6 +60,62 @@ export function App() {
   const [isMandateActive, setIsMandateActive] = useState<boolean>(() => {
     return localStorage.getItem("vouch_autopay_active") === "true";
   });
+
+  // Load available groups dynamically from backend and localStorage
+  const loadAvailableGroups = useCallback(async () => {
+    try {
+      const indexed = await fetchIndexedGroups();
+      const customSaved: AvailableCircle[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
+
+      const combinedMap = new Map<string, AvailableCircle>();
+
+      // Base active circles
+      const baseCircles: AvailableCircle[] = [
+        {
+          address: "0xAf378D33B037A6668fOd128c4BBA28bb65974D9b",
+          name: "Alpha Savings Circle",
+          memberCount: 5,
+          installmentAmount: "5.0",
+        },
+        {
+          address: "0xb794f5ea0ba39494ce839613fffba74279579268",
+          name: "Bangalore Techies Chit",
+          memberCount: 4,
+          installmentAmount: "10.0",
+        },
+        {
+          address: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+          name: "Family Emergency Pool",
+          memberCount: 5,
+          installmentAmount: "2.0",
+        },
+      ];
+
+      baseCircles.forEach((c) => combinedMap.set(c.address.toLowerCase(), c));
+      customSaved.forEach((c) => combinedMap.set(c.address.toLowerCase(), c));
+
+      if (Array.isArray(indexed)) {
+        indexed.forEach((g: any) => {
+          if (g.address) {
+            combinedMap.set(g.address.toLowerCase(), {
+              address: g.address,
+              name: g.group_name || g.name || "Community Pool",
+              memberCount: g.member_count || g.memberCount || 5,
+              installmentAmount: g.installment_amount || g.installmentAmount || "5.0",
+            });
+          }
+        });
+      }
+
+      setAvailableGroups(Array.from(combinedMap.values()));
+    } catch (err) {
+      console.warn("Could not load available groups:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAvailableGroups();
+  }, [loadAvailableGroups]);
 
   // Persist activeGroupAddress
   useEffect(() => {
@@ -155,8 +212,26 @@ export function App() {
       showNotification("Deploying Chit Group to MST Testnet...");
       const result = await contractService.createGroup(params);
       if (result.groupAddress) {
+        const newCircle: AvailableCircle = {
+          address: result.groupAddress,
+          name: params.groupName,
+          memberCount: params.memberCount,
+          installmentAmount: params.installmentAmount,
+        };
+        const customSaved: AvailableCircle[] = JSON.parse(localStorage.getItem("vouch_custom_groups") || "[]");
+        customSaved.unshift(newCircle);
+        localStorage.setItem("vouch_custom_groups", JSON.stringify(customSaved));
+
+        // Register with indexer
+        fetch("http://localhost:4000/api/groups/index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: result.groupAddress }),
+        }).catch(() => {});
+
+        loadAvailableGroups();
         setActiveGroupAddress(result.groupAddress);
-        showNotification(`Group deployed at ${result.groupAddress.substring(0, 10)}...`);
+        showNotification(`Circle "${params.groupName}" deployed at ${result.groupAddress.substring(0, 10)}...`);
       } else {
         showNotification("Group creation transaction confirmed.");
       }
@@ -332,6 +407,7 @@ export function App() {
               riskAdvisory={riskAdvisory}
               isTechnicalMode={isTechnicalMode}
               isMandateActive={isMandateActive}
+              availableGroups={availableGroups}
               onSelectGroup={handleSelectGroup}
               onPayInstallment={handlePayInstallment}
               onOpenMandateModal={() => setIsMandateModalOpen(true)}
@@ -391,6 +467,7 @@ export function App() {
                 riskAdvisory={riskAdvisory}
                 isTechnicalMode={isTechnicalMode}
                 isMandateActive={isMandateActive}
+                availableGroups={availableGroups}
                 onSelectGroup={handleSelectGroup}
                 onPayInstallment={handlePayInstallment}
                 onOpenMandateModal={() => setIsMandateModalOpen(true)}
