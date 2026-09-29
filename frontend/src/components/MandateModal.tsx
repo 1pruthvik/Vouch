@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { CheckCircle2, ShieldCheck, Clock, ArrowRight, Lock, Zap, Smartphone, AlertCircle } from "lucide-react";
+import { X, CheckCircle2, ShieldCheck, Clock, ArrowRight, Zap, Smartphone } from "lucide-react";
 import { formatINR } from "../utils/formatters";
-import { Modal } from "./ui/Modal";
 
 interface MandateModalProps {
   isOpen: boolean;
@@ -25,11 +24,12 @@ export const MandateModal: React.FC<MandateModalProps> = ({
   isMandateActive,
   onActivateMandate,
   onCancelMandate,
-  isTechnicalMode,
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [upiId, setUpiId] = useState("user@okhdfcbank");
+  const [upiId, setUpiId] = useState("");
   const inrInstallment = formatINR(installmentAmount);
+
+  if (!isOpen) return null;
 
   const handleConfirm = async () => {
     try {
@@ -52,150 +52,107 @@ export const MandateModal: React.FC<MandateModalProps> = ({
 
   const features = [
     {
-      icon: <Clock className="w-4 h-4 text-[#E9B949]" />,
-      title: "Never miss a cycle draw",
-      desc: "Your monthly installment automatically debits on round start so your solvency standing stays green.",
+      icon: <Clock className="w-4 h-4 text-red-500" />,
+      title: "Automatic on-time contributions",
+      desc: "Your monthly installment automatically debits on round start.",
     },
     {
-      icon: <ShieldCheck className="w-4 h-4 text-emerald-600" />,
-      title: "Zero Penalty & Direct Escrow",
-      desc: `Funds go straight into ${groupName || "the Circle"} autonomous vault on MST Testnet.`,
-    },
-    {
-      icon: <Lock className="w-4 h-4 text-indigo-600" />,
-      title: "100% Control · Cancel Anytime",
-      desc: "You maintain complete control. Disable AutoPay with one click at any time without fees.",
+      icon: <ShieldCheck className="w-4 h-4 text-red-500" />,
+      title: "Zero late penalties",
+      desc: "Avoid accidental defaults or collateral deductions.",
     },
   ];
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="UPI AutoPay & Mandate"
-      description="Recurring automated community savings on-chain"
-      icon={<Zap className="w-5 h-5 text-[#946800]" />}
-      maxWidth="max-w-md"
-    >
-      <div className="space-y-4">
-        {/* Amount Card */}
-        <div className="p-5 rounded-2xl text-center bg-white border border-black/[0.06] shadow-sm">
-          <p className="text-xs text-[#5F6368] font-medium mb-1">Monthly AutoPay Deduction</p>
-          <p className="text-3xl font-extrabold text-[#121316] font-display tracking-tight tabular-nums">
-            {inrInstallment}
-          </p>
-          <div className="mt-3 flex items-center justify-center gap-2">
-            <span className={`v-badge ${isMandateActive ? 'v-badge-green' : 'v-badge-amber'}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isMandateActive ? 'bg-emerald-600' : 'bg-amber-600'}`} />
-              {isMandateActive ? "AutoPay Active ✓" : "Mandate Not Configured"}
-            </span>
-          </div>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90">
+      <div className="bg-black max-w-lg w-full p-8 rounded-xl relative space-y-6">
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 text-neutral-400 hover:text-white"
+        >
+          <X className="w-5 h-5" />
+        </button>
 
-        {/* OMNET Fiat-to-Crypto Conversion Flow Card */}
-        <div className="p-3.5 rounded-2xl bg-[#FAF9F5] border border-black/[0.06] space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-[#121316] flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-[#E9B949]" />
-              OMNET Fiat-to-Crypto Engine
-            </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-              Auto-Custody in Bridgekey
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] pt-1">
-            <div className="p-2 rounded-xl bg-white border border-black/[0.04]">
-              <p className="text-[#5F6368]">1. Real Wallet</p>
-              <p className="font-bold text-[#121316] mt-0.5">UPI / Bank</p>
-            </div>
-            <div className="p-2 rounded-xl bg-white border border-black/[0.04]">
-              <p className="text-[#5F6368]">2. OMNET</p>
-              <p className="font-bold text-[#946800] mt-0.5">Fiat ➔ Token</p>
-            </div>
-            <div className="p-2 rounded-xl bg-white border border-black/[0.04]">
-              <p className="text-[#5F6368]">3. Bridgekey</p>
-              <p className="font-bold text-emerald-700 mt-0.5">tMSTC Saved</p>
-            </div>
-          </div>
-          <p className="text-[10px] text-[#5F6368] leading-normal">
-            OMNET debits your linked real-life wallet on the 1st of every month, converts to stable tokens, and safeguards them in your Bridgekey Wallet.
-          </p>
-        </div>
-
-        {/* UPI ID Setup */}
-        <div className="p-4 rounded-2xl bg-white border border-black/[0.06] space-y-2">
-          <label className="block text-xs font-semibold text-[#5F6368] flex items-center gap-1.5">
-            <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-            Linked UPI / Payment ID
-          </label>
-          <input
-            type="text"
-            value={upiId}
-            onChange={(e) => setUpiId(e.target.value)}
-            placeholder="e.g. mobile@upi or username@okhdfcbank"
-            className="v-input text-xs font-mono"
-          />
-          <p className="text-[11px] text-[#8F959E]">
-            Authorized OMNET recurring e-Mandate allowance.
-          </p>
-        </div>
-
-        {/* Features */}
         <div className="space-y-2">
-          {features.map((f, i) => (
-            <div key={i} className="flex items-start gap-3 p-3.5 rounded-2xl bg-white border border-black/[0.05]">
-              <div className="mt-0.5 flex-shrink-0">{f.icon}</div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-red-500">
+            <Zap className="w-4 h-4" />
+            Recurring Auto-Debit Mandate
+          </div>
+          <h2 className="text-xl font-bold text-white font-display">
+            UPI AutoPay Authorization
+          </h2>
+          <p className="text-xs text-neutral-400">
+            Authorize recurring monthly debits for <strong className="text-white">{groupName || "Savings Circle"}</strong>
+          </p>
+        </div>
+
+        <div className="p-4 rounded-lg bg-neutral-950 space-y-3 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-neutral-400">Monthly Contribution:</span>
+            <span className="font-bold text-white text-sm font-display">{inrInstallment}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-neutral-400">Duration:</span>
+            <span className="font-bold text-white">{totalMembers} Months</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-neutral-400">Current Mandate Status:</span>
+            <span className={`font-bold ${isMandateActive ? "text-green-400" : "text-neutral-400"}`}>
+              {isMandateActive ? "Active" : "Inactive"}
+            </span>
+          </div>
+        </div>
+
+        {!isMandateActive && (
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
+              <Smartphone className="w-3.5 h-3.5 text-red-500" />
+              Enter UPI ID / VPA
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. yourname@okhdfcbank"
+              value={upiId}
+              onChange={(e) => setUpiId(e.target.value)}
+              className="w-full bg-neutral-950 rounded-lg px-4 py-3 text-xs text-white placeholder:text-neutral-600 focus:outline-none"
+            />
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {features.map((feat, i) => (
+            <div key={i} className="flex items-start gap-3">
+              <div className="p-1 text-red-500 mt-0.5">
+                {feat.icon}
+              </div>
               <div>
-                <p className="text-xs font-semibold text-[#121316]">{f.title}</p>
-                <p className="text-[11px] text-[#5F6368] mt-0.5 leading-relaxed">{f.desc}</p>
+                <p className="text-xs font-bold text-white">{feat.title}</p>
+                <p className="text-[11px] text-neutral-400">{feat.desc}</p>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Technical Details */}
-        {isTechnicalMode && (
-          <div className="v-tech-box text-[11px] space-y-1">
-            <p className="font-bold text-[#121316] flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" /> On-Chain Mandate Specs
-            </p>
-            <p className="text-[#5F6368]">• Contract Method: <code className="text-[#121316] font-mono">ChitGroup.payInstallment()</code></p>
-            <p className="text-[#5F6368]">• Amount: <code className="text-[#121316] font-mono">{installmentAmount} tMSTC</code></p>
-            <p className="text-[#5F6368]">• Execution Trigger: Keeper bot calls automatically at cycle start</p>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="pt-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 pt-2">
           {isMandateActive ? (
             <button
-              type="button"
               onClick={handleDisable}
-              className="px-4 py-2 rounded-full text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors border border-rose-200"
+              className="btn-secondary w-full text-red-400"
             >
-              Cancel AutoPay
+              Cancel AutoPay Mandate
             </button>
           ) : (
             <button
-              type="button"
-              onClick={onClose}
-              className="btn-pill-secondary text-xs px-4 py-2"
+              onClick={handleConfirm}
+              disabled={isProcessing}
+              className="btn-primary w-full py-3"
             >
-              Close
+              {isProcessing ? "Authorizing..." : "Authorize UPI AutoPay"}
+              <ArrowRight className="w-4 h-4" />
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={isProcessing}
-            className="btn-pill-primary text-xs px-5 py-2.5 flex items-center gap-1.5"
-          >
-            {isProcessing ? "Authorizing..." : isMandateActive ? "Update AutoPay" : "Enable UPI AutoPay"}
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 };

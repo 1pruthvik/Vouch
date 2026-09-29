@@ -64,9 +64,18 @@ export function getTrafficLightStatus(
 export function parseWalletError(err: any): string {
   if (!err) return "An unknown error occurred.";
 
-  const rawMsg = typeof err === "string" ? err : err.message || err.reason || err.shortMessage || "";
+  const rawMsg = typeof err === "string" ? err : err.message || err.reason || err.shortMessage || JSON.stringify(err);
 
-  // 1. Check for user rejection
+  // 1. Check for BridgeKey / Extension updated error
+  if (
+    rawMsg.includes("BridgeKey was updated") ||
+    rawMsg.includes("updated. Refresh this page") ||
+    rawMsg.includes("-32603")
+  ) {
+    return "BridgeKey extension was updated. Please refresh this page and reconnect your wallet.";
+  }
+
+  // 2. Check for user rejection
   if (
     err.code === 4001 ||
     err.code === "ACTION_REJECTED" ||
@@ -74,28 +83,23 @@ export function parseWalletError(err: any): string {
     rawMsg.includes("User rejected") ||
     rawMsg.includes("User denied")
   ) {
-    return "Connection request was cancelled in your wallet.";
-  }
-
-  // 2. Check for BridgeKey / Extension updated
-  if (rawMsg.includes("BridgeKey was updated") || rawMsg.includes("updated. Refresh this page")) {
-    return "BridgeKey extension was updated. Please refresh the page, then click Connect Wallet again.";
+    return "Transaction was cancelled in your wallet.";
   }
 
   // 3. Not a group member revert
   if (rawMsg.includes("Not a group member")) {
-    return "You have not joined this circle yet. Please click 'Join Circle with Deposit' first to deposit your security buffer.";
+    return "You have not joined this circle yet.";
   }
 
-  // 3. Extract nested message from ethers v6 "could not coalesce error"
+  // 4. Extract nested message from ethers v6 "could not coalesce error"
   const messageMatch = rawMsg.match(/"message":\s*"([^"]+)"/);
   if (messageMatch && messageMatch[1]) {
     const inner = messageMatch[1];
     if (inner.includes("BridgeKey was updated")) {
-      return "BridgeKey extension was updated. Please refresh the page, then click Connect Wallet again.";
+      return "BridgeKey extension was updated. Please refresh this page and reconnect your wallet.";
     }
     if (inner.includes("User rejected") || inner.includes("user rejected") || inner.includes("User denied")) {
-      return "Connection request was cancelled in your wallet.";
+      return "Transaction was cancelled in your wallet.";
     }
     return inner;
   }

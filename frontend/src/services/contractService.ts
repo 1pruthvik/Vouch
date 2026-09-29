@@ -1,70 +1,70 @@
-/**
- * ContractService — High-level abstraction layer backed by Vouch Blockchain SDK (Viem)
- * Architecture: Frontend/Backend -> Vouch Blockchain SDK -> Viem -> MST Testnet -> Smart Contracts
- */
+import { ethers } from "ethers";
+import { ChitFactoryABI, ChitGroupABI, VouchRegistryABI } from "../contracts/abis";
+import { CONTRACT_ADDRESSES, MST_TESTNET } from "../config/network";
 
-import type { Address, Hex } from "viem";
-import { VouchSDK } from "../sdk/VouchSDK";
-import {
-  type GroupDetails,
-  type MemberDetails,
-  type SolvencyInfo,
-  type CreateGroupParams,
-  type CreateGroupResult,
-  type TransactionResult,
-  type PhaseType,
-  PHASE_NAMES,
-} from "../sdk/types";
-import { ChitFactoryABI } from "../sdk/contracts";
+export const PHASE_NAMES = [
+  "Forming",
+  "Collect",
+  "Commit",
+  "Reveal",
+  "Settle",
+  "Closed",
+] as const;
 
-export { PHASE_NAMES, type PhaseType, type GroupDetails, type MemberDetails, type SolvencyInfo };
+export type PhaseType = typeof PHASE_NAMES[number];
 
-// Global VouchSDK singleton instance
-export const vouchSDK = new VouchSDK();
+export interface GroupDetails {
+  address: string;
+  name: string;
+  memberCount: number;
+  installmentAmount: string;
+  cycleDuration: number;
+  discountCapBps: number;
+  reserveFeeBps: number;
+  safetyFactorBps: number;
+  currentState: PhaseType;
+  currentRound: number;
+  currentPot: string;
+  minBid: string;
+  reserveFundBalance: string;
+  members: string[];
+}
+
+export interface MemberDetails {
+  address: string;
+  isMember: boolean;
+  bufferBalance: string;
+  lockedDividends: string;
+  paidInstallments: number;
+  hasPaidCurrentRound?: boolean;
+  hasWon: boolean;
+  winRound: number;
+  isDefaulted: boolean;
+  solvency: {
+    isSolvent: boolean;
+    totalBacking: string;
+    requiredBacking: string;
+  };
+}
 
 export class ContractService {
-  private sdk: VouchSDK;
+  private provider: ethers.BrowserProvider | ethers.JsonRpcProvider;
+  private signer: ethers.Signer | null = null;
 
-  constructor(injectedProvider?: any) {
-    this.sdk = vouchSDK;
-    if (injectedProvider) {
-      this.sdk.connectInjectedProvider(injectedProvider).catch(() => {});
+  constructor(provider?: ethers.BrowserProvider) {
+    if (provider) {
+      this.provider = provider;
+    } else {
+      this.provider = new ethers.JsonRpcProvider(MST_TESTNET.rpcUrl);
     }
-  }
-
-  public async setProvider(injectedProvider: any) {
-    if (injectedProvider) {
-      await this.sdk.connectInjectedProvider(injectedProvider);
-    }
-  }
-
-  public async setSigner(signerOrProvider: any) {
-    if (signerOrProvider && signerOrProvider.provider) {
-      // Ethers Signer adapter
-      const rawProvider = (signerOrProvider.provider as any)._networkProvider || (signerOrProvider.provider as any).provider || (window as any).ethereum;
-      if (rawProvider) {
-        await this.sdk.connectInjectedProvider(rawProvider);
-      }
-    } else if (signerOrProvider) {
-      await this.sdk.connectInjectedProvider(signerOrProvider);
-    }
-  }
-
-  public setPrivateKey(privateKey: Hex) {
-    return this.sdk.connectPrivateKey(privateKey);
-  }
-
-  public getSDK(): VouchSDK {
-    return this.sdk;
   }
 
   public async getDeployedGroupsFromFactory(): Promise<string[]> {
+    const factoryAddr = CONTRACT_ADDRESSES.ChitFactory;
+    if (!factoryAddr) return [];
     try {
-      const groups = await this.sdk.publicClient.readContract({
-        address: this.sdk.factoryAddress,
-        abi: ChitFactoryABI,
-        functionName: "getDeployedGroups",
-      }) as string[];
+      const factory = new ethers.Contract(factoryAddr, ChitFactoryABI, this.provider);
+      const groups = await factory.getDeployedGroups();
       return groups || [];
     } catch (err) {
       console.warn("Could not fetch deployed groups from factory:", err);
@@ -72,10 +72,11 @@ export class ContractService {
     }
   }
 
-  // ==========================================
-  // Group Actions (Forwarded to VouchSDK)
-  // ==========================================
+  public async setSigner(signer: ethers.Signer) {
+    this.signer = signer;
+  }
 
+  // Create a new group via ChitFactory or direct ChitGroup deployment
   public async createGroup(params: {
     factoryAddress?: string;
     groupName: string;
@@ -86,99 +87,353 @@ export class ContractService {
     reserveFeeBps: number;
     safetyFactorBps?: number;
   }): Promise<{ txHash: string; groupAddress?: string }> {
-    const result: CreateGroupResult = await this.sdk.createGroup({
-      factoryAddress: params.factoryAddress as Address | undefined,
-      groupName: params.groupName,
-      memberCount: params.memberCount,
-      installmentAmount: params.installmentAmount,
-      cycleDuration: params.cycleDuration,
-      discountCapBps: params.discountCapBps,
-      reserveFeeBps: params.reserveFeeBps,
-      safetyFactorBps: params.safetyFactorBps,
-    });
+    if (!this.signer) throw new Error("Wallet not connected");
+    const factoryAddr = params.factoryAddress || CONTRACT_ADDRESSES.ChitFactory;
+    const parsedInstallment = ethers.parseEther(params.installmentAmount);
+    const safetyFactor = params.safetyFactorBps || 12000;
+
+    // 1. If factory address is configured, use ChitFactory
+    if (factoryAddr && factoryAddr.trim() !== "") {
+      const factory = new ethers.Contract(factoryAddr, ChitFactoryABI, this.signer);
+      const tx = await factory.createGroup(
+        params.groupName,
+        params.memberCount,
+        parsedInstallment,
+        params.cycleDuration,
+        params.discountCapBps,
+        params.reserveFeeBps,
+        safetyFactor,
+        { gasLimit: 3000000 }
+      );
+
+      let groupAddress: string | undefined;
+      let receipt: any = null;
+
+      try {
+        receipt = await Promise.race([
+          tx.wait(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("wait timeout")), 15000)),
+        ]);
+      } catch {
+        // Direct RPC fallback polling to avoid extension listener drop
+        const rpcProvider = new ethers.JsonRpcProvider(MST_TESTNET.rpcUrl);
+        for (let i = 0; i < 20; i++) {
+          try {
+            receipt = await rpcProvider.getTransactionReceipt(tx.hash);
+            if (receipt && receipt.blockNumber) break;
+          } catch {}
+          await new Promise((res) => setTimeout(res, 1200));
+        }
+      }
+
+      if (receipt && receipt.logs) {
+        for (const log of receipt.logs) {
+          try {
+            const parsed = factory.interface.parseLog({ topics: [...log.topics], data: log.data });
+            if (parsed && (parsed.name === "GroupCreated" || parsed.args?.groupAddress)) {
+              groupAddress = ethers.getAddress(parsed.args.groupAddress);
+              break;
+            }
+          } catch {}
+
+          if (!groupAddress && log.topics && log.topics.length >= 2) {
+            try {
+              const candidate = "0x" + log.topics[1].slice(-40);
+              if (ethers.isAddress(candidate)) {
+                groupAddress = ethers.getAddress(candidate);
+                break;
+              }
+            } catch {}
+          }
+        }
+      }
+
+      if (!groupAddress || !ethers.isAddress(groupAddress)) {
+        try {
+          const rpcProvider = new ethers.JsonRpcProvider(MST_TESTNET.rpcUrl);
+          const readonlyFactory = new ethers.Contract(factoryAddr, ChitFactoryABI, rpcProvider);
+          const deployedList = await readonlyFactory.getDeployedGroups();
+          if (deployedList && deployedList.length > 0) {
+            const lastAddr = deployedList[deployedList.length - 1];
+            if (ethers.isAddress(lastAddr)) {
+              groupAddress = ethers.getAddress(lastAddr);
+            }
+          }
+        } catch {}
+      }
+
+      return { txHash: tx.hash, groupAddress: (groupAddress && ethers.isAddress(groupAddress)) ? groupAddress : undefined };
+    }
+
+    // Direct on-chain deployment of ChitGroup from user wallet
+    const { ChitGroupBytecode } = await import("../contracts/abis");
+    const factory = new ethers.ContractFactory(ChitGroupABI, ChitGroupBytecode, this.signer);
+
+    const registryAddr = CONTRACT_ADDRESSES.VouchRegistry || ethers.ZeroAddress;
+    const yieldAddr = CONTRACT_ADDRESSES.MockYieldVault || ethers.ZeroAddress;
+
+    const deployedContract = await factory.deploy(
+      params.groupName,
+      params.memberCount,
+      parsedInstallment,
+      params.cycleDuration,
+      params.discountCapBps,
+      params.reserveFeeBps,
+      safetyFactor,
+      registryAddr,
+      yieldAddr,
+      { gasLimit: 4500000 }
+    );
+
+    const deploymentTx = deployedContract.deploymentTransaction();
+    const txHash = deploymentTx ? deploymentTx.hash : "0x0";
+    let groupAddress = "";
+
+    // Robust independent polling via direct JSON-RPC to avoid BrowserProvider block listener hangs
+    const rpcProvider = new ethers.JsonRpcProvider(MST_TESTNET.rpcUrl);
+    const maxPolls = 25; // 25 * 1.5s = 37.5s max
+    for (let attempt = 0; attempt < maxPolls; attempt++) {
+      try {
+        if (txHash && txHash !== "0x0") {
+          const receipt = await rpcProvider.getTransactionReceipt(txHash);
+          if (receipt && receipt.blockNumber) {
+            groupAddress = receipt.contractAddress || (await deployedContract.getAddress());
+            break;
+          }
+        }
+      } catch (pollErr) {
+        console.warn("Polling receipt attempt error:", pollErr);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+
+    if (!groupAddress) {
+      try {
+        groupAddress = await deployedContract.getAddress();
+      } catch {
+        const signerAddr = await this.signer.getAddress();
+        const nonce = deploymentTx ? deploymentTx.nonce : await rpcProvider.getTransactionCount(signerAddr);
+        groupAddress = ethers.getCreateAddress({ from: signerAddr, nonce });
+      }
+    }
 
     return {
-      txHash: result.hash,
-      groupAddress: result.groupAddress,
+      txHash,
+      groupAddress,
     };
   }
 
+  // Join group with initial collateral buffer deposit
   public async joinGroup(groupAddress: string, bufferAmount: string): Promise<string> {
-    const result = await this.sdk.joinGroup(groupAddress as Address, bufferAmount);
-    return result.hash;
+    if (!this.signer) throw new Error("Wallet not connected");
+    const group = new ethers.Contract(groupAddress, ChitGroupABI, this.signer);
+    const tx = await group.joinGroup({
+      value: ethers.parseEther(bufferAmount),
+      gasLimit: 400000,
+    });
+    try {
+      await Promise.race([
+        tx.wait(),
+        new Promise((resolve) => setTimeout(resolve, 15000)),
+      ]);
+    } catch {}
+    return tx.hash;
   }
 
+  // Pay monthly installment in Collect phase
   public async payInstallment(groupAddress: string, amount: string): Promise<string> {
-    const result = await this.sdk.payInstallment(groupAddress as Address, amount);
-    return result.hash;
+    if (!this.signer) throw new Error("Wallet not connected");
+    const group = new ethers.Contract(groupAddress, ChitGroupABI, this.signer);
+    const tx = await group.payInstallment({
+      value: ethers.parseEther(amount),
+    });
+    await tx.wait();
+    return tx.hash;
   }
 
-  public async depositCollateralBuffer(groupAddress: string, amount: string): Promise<string> {
-    const result = await this.sdk.depositCollateralBuffer(groupAddress as Address, amount);
-    return result.hash;
-  }
-
+  // Commit secret bid hash in Commit phase
   public async commitBid(
     groupAddress: string,
     bidAmountOrHash: string,
     salt: string = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
   ): Promise<string> {
-    const result = await this.sdk.commitBid(groupAddress as Address, bidAmountOrHash, salt);
-    return result.hash;
+    if (!this.signer) throw new Error("Wallet not connected");
+    const group = new ethers.Contract(groupAddress, ChitGroupABI, this.signer);
+    let commitmentHash = bidAmountOrHash;
+    if (!bidAmountOrHash.startsWith("0x") || bidAmountOrHash.length !== 66) {
+      const userAddr = await this.signer.getAddress();
+      const parsedBid = ethers.parseEther(bidAmountOrHash);
+      const saltBytes = salt.startsWith("0x") ? salt : ethers.keccak256(ethers.toUtf8Bytes(salt));
+      commitmentHash = ethers.solidityPackedKeccak256(
+        ["uint256", "bytes32", "address"],
+        [parsedBid, saltBytes, userAddr]
+      );
+    }
+    const tx = await group.commitBid(commitmentHash);
+    await tx.wait();
+    return tx.hash;
   }
 
+  // Reveal secret bid in Reveal phase
   public async revealBid(
     groupAddress: string,
     bidAmount: string,
     salt: string = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
   ): Promise<string> {
-    const result = await this.sdk.revealBid(groupAddress as Address, bidAmount, salt);
-    return result.hash;
+    if (!this.signer) throw new Error("Wallet not connected");
+    const group = new ethers.Contract(groupAddress, ChitGroupABI, this.signer);
+    const parsedBid = ethers.parseEther(bidAmount);
+    const saltBytes = salt.startsWith("0x") ? salt : ethers.keccak256(ethers.toUtf8Bytes(salt));
+    const tx = await group.revealBid(parsedBid, saltBytes);
+    await tx.wait();
+    return tx.hash;
   }
 
+  // Settle round and distribute pot + dividends
   public async settleRound(groupAddress: string): Promise<string> {
-    const result = await this.sdk.settleRound(groupAddress as Address);
-    return result.hash;
+    if (!this.signer) throw new Error("Wallet not connected");
+    const group = new ethers.Contract(groupAddress, ChitGroupABI, this.signer);
+    const tx = await group.settleRound();
+    await tx.wait();
+    return tx.hash;
   }
 
-  public async settleAuction(groupAddress: string): Promise<string> {
-    const result = await this.sdk.settleAuction(groupAddress as Address);
-    return result.hash;
-  }
-
+  // Stake backing as a social voucher
   public async stakeVoucher(voucheeAddress: string, amount: string): Promise<string> {
-    const result = await this.sdk.stakeVoucher(voucheeAddress as Address, amount);
-    return result.hash;
+    if (!this.signer) throw new Error("Wallet not connected");
+    const registryAddr = CONTRACT_ADDRESSES.VouchRegistry;
+    if (!registryAddr) throw new Error("VouchRegistry address not configured");
+    const registry = new ethers.Contract(registryAddr, VouchRegistryABI, this.signer);
+    const tx = await registry.stake(voucheeAddress, {
+      value: ethers.parseEther(amount),
+    });
+    await tx.wait();
+    return tx.hash;
   }
 
-  // ==========================================
-  // Read Queries
-  // ==========================================
-
+  // Fetch full details of a ChitGroup
+  // Fetch full details of a ChitGroup
   public async getGroupDetails(groupAddress: string): Promise<GroupDetails> {
-    return this.sdk.getGroupDetails(groupAddress as Address);
-  }
+    const cleanAddr = ethers.getAddress(groupAddress.trim());
+    const rpcProv = new ethers.JsonRpcProvider(MST_TESTNET.rpcUrl);
+    const group = new ethers.Contract(cleanAddr, ChitGroupABI, this.provider || rpcProv);
 
-  public async getMemberDetails(
-    groupAddress: string,
-    memberAddress: string
-  ): Promise<MemberDetails & { isMember?: boolean }> {
-    const details = await this.sdk.getMemberDetails(groupAddress as Address, memberAddress as Address);
-    const isMember = details.bufferBalanceRaw > 0n || details.paidInstallments > 0 || details.hasWon;
+    let name = "Savings Circle";
+    let memberCount = 5n;
+    let installmentAmount = ethers.parseEther("1.0");
+    let cycleDuration = 2592000n;
+    let discountCapBps = 3000n;
+    let reserveFeeBps = 500n;
+    let safetyFactorBps = 12000n;
+    let stateNum = 0n;
+    let currentRound = 1n;
+    let currentPot = 0n;
+    let reserveFundBalance = 0n;
+    let members: string[] = [];
+
+    try {
+      [
+        name,
+        memberCount,
+        installmentAmount,
+        cycleDuration,
+        discountCapBps,
+        reserveFeeBps,
+        safetyFactorBps,
+        stateNum,
+        currentRound,
+        currentPot,
+        reserveFundBalance,
+        members,
+      ] = await Promise.all([
+        group.groupName().catch(() => "Savings Circle"),
+        group.memberCount().catch(() => 5n),
+        group.installmentAmount().catch(() => ethers.parseEther("1.0")),
+        group.cycleDuration().catch(() => 2592000n),
+        group.discountCapBps().catch(() => 3000n),
+        group.reserveFeeBps().catch(() => 500n),
+        group.safetyFactorBps().catch(() => 12000n),
+        group.currentState().catch(() => 0n),
+        group.currentRound().catch(() => 1n),
+        group.currentPot().catch(() => 0n),
+        group.reserveFundBalance().catch(() => 0n),
+        group.getMembers().catch(() => []),
+      ]);
+    } catch (err) {
+      console.warn("Could not query all contract fields, using direct fallback:", err);
+    }
+
+    const count = Number(memberCount) || 5;
+    const instAmt = ethers.formatEther(installmentAmount);
+    const totalPotNum = count * (parseFloat(instAmt) || 1.0);
+    const capPercent = (Number(discountCapBps) || 3000) / 10000;
+    const minBidCalc = (totalPotNum * (1 - capPercent)).toFixed(4);
+
     return {
-      ...details,
-      isMember,
+      address: cleanAddr,
+      name: name || "Savings Circle",
+      memberCount: count,
+      installmentAmount: instAmt,
+      cycleDuration: Number(cycleDuration) || 2592000,
+      discountCapBps: Number(discountCapBps) || 3000,
+      reserveFeeBps: Number(reserveFeeBps) || 500,
+      safetyFactorBps: Number(safetyFactorBps) || 12000,
+      currentState: PHASE_NAMES[Number(stateNum)] || "Collect",
+      currentRound: Number(currentRound) || 1,
+      currentPot: ethers.formatEther(currentPot),
+      minBid: minBidCalc,
+      reserveFundBalance: ethers.formatEther(reserveFundBalance),
+      members: members || [],
     };
   }
 
-  public async checkSolvency(
-    groupAddress: string,
-    memberAddress: string
-  ): Promise<SolvencyInfo> {
-    return this.sdk.checkSolvency(groupAddress as Address, memberAddress as Address);
-  }
+  // Fetch member profile and solvency status
+  public async getMemberDetails(groupAddress: string, memberAddress: string): Promise<MemberDetails> {
+    try {
+      const group = new ethers.Contract(groupAddress, ChitGroupABI, this.provider);
 
-  public async getBalance(address: string): Promise<string> {
-    return this.sdk.getBalance(address as Address);
+      const [m, solvency, membersList] = await Promise.all([
+        group.members(memberAddress).catch(() => null),
+        group.checkSolvency(memberAddress).catch(() => ({ isSolvent: false, totalBacking: 0n, requiredBacking: 0n })),
+        group.getMembers().catch(() => []),
+      ]);
+
+      const isMember = (membersList && membersList.some((addr: string) => addr.toLowerCase() === memberAddress.toLowerCase())) ||
+        (m && m.addr && m.addr !== ethers.ZeroAddress && m.addr.toLowerCase() === memberAddress.toLowerCase());
+
+      return {
+        address: memberAddress,
+        isMember: Boolean(isMember),
+        bufferBalance: m?.bufferBalance ? ethers.formatEther(m.bufferBalance) : "0",
+        lockedDividends: m?.lockedDividends ? ethers.formatEther(m.lockedDividends) : "0",
+        paidInstallments: m?.paidInstallments ? Number(m.paidInstallments) : 0,
+        hasPaidCurrentRound: m?.hasPaidCurrentRound ?? false,
+        hasWon: m?.hasWon ?? false,
+        winRound: m?.winRound ? Number(m.winRound) : 0,
+        isDefaulted: m?.isDefaulted ?? false,
+        solvency: {
+          isSolvent: solvency?.isSolvent ?? false,
+          totalBacking: solvency?.totalBacking ? ethers.formatEther(solvency.totalBacking) : "0",
+          requiredBacking: solvency?.requiredBacking ? ethers.formatEther(solvency.requiredBacking) : "0",
+        },
+      };
+    } catch {
+      return {
+        address: memberAddress,
+        isMember: false,
+        bufferBalance: "0",
+        lockedDividends: "0",
+        paidInstallments: 0,
+        hasPaidCurrentRound: false,
+        hasWon: false,
+        winRound: 0,
+        isDefaulted: false,
+        solvency: {
+          isSolvent: false,
+          totalBacking: "0",
+          requiredBacking: "0",
+        },
+      };
+    }
   }
 }
