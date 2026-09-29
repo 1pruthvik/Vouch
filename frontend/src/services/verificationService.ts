@@ -1,3 +1,5 @@
+import { API_URL } from "../config/network";
+
 export interface JoinRequest {
   id: string;
   circleAddress: string;
@@ -14,6 +16,7 @@ export interface CircleRegistryEntry {
   installmentAmount: string;
   cycleDuration?: number;
   initializer: string;
+  minWalletAmt?: string;
   createdAt: number;
 }
 
@@ -22,7 +25,8 @@ const STORAGE_REQUESTS_KEY = "vouch_circle_join_requests";
 
 export class VerificationService {
   // 1. Register a new circle created by an initializer
-  public static registerCircle(entry: CircleRegistryEntry) {
+  public static async registerCircle(entry: CircleRegistryEntry): Promise<void> {
+    // 1. Local storage cache
     const circles = this.getAllCircles();
     const existingIndex = circles.findIndex(
       (c) => c.address.toLowerCase() === entry.address.toLowerCase()
@@ -32,10 +36,23 @@ export class VerificationService {
     } else {
       circles.unshift(entry);
     }
-    localStorage.setItem(STORAGE_CIRCLES_KEY, JSON.stringify(circles));
+    try {
+      localStorage.setItem(STORAGE_CIRCLES_KEY, JSON.stringify(circles));
+    } catch {}
+
+    // 2. Persist to central Backend database (shared across all browsers / devices / incognito)
+    try {
+      await fetch(`${API_URL}/circles/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry),
+      });
+    } catch (err) {
+      console.warn("Backend circle registration sync error (offline fallback used):", err);
+    }
   }
 
-  // 2. Get all known registered circles
+  // 2. Get all known registered circles (local cache)
   public static getAllCircles(): CircleRegistryEntry[] {
     try {
       const data = localStorage.getItem(STORAGE_CIRCLES_KEY);
@@ -45,7 +62,24 @@ export class VerificationService {
     }
   }
 
-  // 3. Get circle by address / ID
+  // 3. Fetch all circles from backend
+  public static async fetchAllCircles(): Promise<CircleRegistryEntry[]> {
+    try {
+      const res = await fetch(`${API_URL}/circles`);
+      if (res.ok) {
+        const circles: CircleRegistryEntry[] = await res.json();
+        if (Array.isArray(circles) && circles.length > 0) {
+          localStorage.setItem(STORAGE_CIRCLES_KEY, JSON.stringify(circles));
+          return circles;
+        }
+      }
+    } catch (err) {
+      console.warn("Backend fetchAllCircles error:", err);
+    }
+    return this.getAllCircles();
+  }
+
+  // 4. Get circle by address / ID
   public static getCircle(address: string): CircleRegistryEntry | null {
     if (!address) return null;
     const circles = this.getAllCircles();
@@ -55,7 +89,25 @@ export class VerificationService {
     );
   }
 
-  // 4. Get circles initialized by a specific wallet
+  // 5. Fetch single circle from backend
+  public static async fetchCircle(address: string): Promise<CircleRegistryEntry | null> {
+    if (!address) return null;
+    try {
+      const res = await fetch(`${API_URL}/circles/${address.toLowerCase()}`);
+      if (res.ok) {
+        const circle: CircleRegistryEntry = await res.json();
+        if (circle && circle.address) {
+          this.registerCircle(circle).catch(() => {});
+          return circle;
+        }
+      }
+    } catch (err) {
+      console.warn("Backend fetchCircle error:", err);
+    }
+    return this.getCircle(address);
+  }
+
+  // 6. Get circles initialized by a specific wallet
   public static getCirclesByInitializer(
     initializerAddress: string
   ): CircleRegistryEntry[] {
@@ -66,42 +118,82 @@ export class VerificationService {
     );
   }
 
-  // 5. Submit a join request from an applicant
-  public static submitJoinRequest(
+  // 7. Fetch circles initialized by a specific wallet from backend
+  public static async fetchCirclesByInitializer(
+    initializerAddress: string
+  ): Promise<CircleRegistryEntry[]> {
+    if (!initializerAddress) return [];
+    try {
+      const res = await fetch(`${API_URL}/circles/initializer/${initializerAddress.toLowerCase()}`);
+      if (res.ok) {
+        const list: CircleRegistryEntry[] = await res.json();
+        if (Array.isArray(list)) {
+          return list;
+        }
+      }
+    } catch (err) {
+      console.warn("Backend fetchCirclesByInitializer error:", err);
+    }
+    return this.getCirclesByInitializer(initializerAddress);
+  }
+
+  // 8. Submit a join request from an applicant
+  public static async submitJoinRequest(
     circleAddress: string,
     applicantAddress: string,
     applicantName?: string
-  ): JoinRequest {
-    const requests = this.getAllRequests();
+  ): Promise<JoinRequest> {
     const cleanCircle = circleAddress.toLowerCase();
     const cleanApplicant = applicantAddress.toLowerCase();
 
-    // Check if already exists
+    // Local cache update
+    const requests = this.getAllRequests();
     const existing = requests.find(
       (r) =>
         r.circleAddress.toLowerCase() === cleanCircle &&
         r.applicantAddress.toLowerCase() === cleanApplicant
     );
 
-    if (existing) {
-      return existing;
+    let currentReq = existing;
+    if (!currentReq) {
+      currentReq = {
+        id: `${cleanCircle}_${cleanApplicant}`,
+        circleAddress: cleanCircle,
+        applicantAddress: cleanApplicant,
+        applicantName: applicantName || `Member (${applicantAddress.substring(0, 6)}...)`,
+        requestedAt: Date.now(),
+        status: "pending",
+      };
+      requests.unshift(currentReq);
+      try {
+        localStorage.setItem(STORAGE_REQUESTS_KEY, JSON.stringify(requests));
+      } catch {}
     }
 
-    const newRequest: JoinRequest = {
-      id: `${cleanCircle}_${cleanApplicant}_${Date.now()}`,
-      circleAddress,
-      applicantAddress,
-      applicantName: applicantName || `Member (${applicantAddress.substring(0, 6)}...)`,
-      requestedAt: Date.now(),
-      status: "pending",
-    };
+    // Persist to central Backend database
+    try {
+      const res = await fetch(`${API_URL}/circles/${cleanCircle}/requests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicantAddress: cleanApplicant,
+          applicantName: currentReq.applicantName,
+        }),
+      });
+      if (res.ok) {
+        const backendReq = await res.json();
+        if (backendReq && backendReq.status) {
+          return backendReq;
+        }
+      }
+    } catch (err) {
+      console.warn("Backend submitJoinRequest error (offline fallback used):", err);
+    }
 
-    requests.unshift(newRequest);
-    localStorage.setItem(STORAGE_REQUESTS_KEY, JSON.stringify(requests));
-    return newRequest;
+    return currentReq;
   }
 
-  // 6. Get all requests
+  // 9. Get all requests (local cache)
   public static getAllRequests(): JoinRequest[] {
     try {
       const data = localStorage.getItem(STORAGE_REQUESTS_KEY);
@@ -111,7 +203,7 @@ export class VerificationService {
     }
   }
 
-  // 7. Get requests for a specific circle
+  // 10. Get requests for a specific circle (local cache)
   public static getRequestsForCircle(circleAddress: string): JoinRequest[] {
     if (!circleAddress) return [];
     const requests = this.getAllRequests();
@@ -120,7 +212,32 @@ export class VerificationService {
     );
   }
 
-  // 8. Get specific applicant's status for a circle
+  // 11. Fetch requests for a specific circle from backend
+  public static async fetchRequestsForCircle(circleAddress: string): Promise<JoinRequest[]> {
+    if (!circleAddress) return [];
+    try {
+      const res = await fetch(`${API_URL}/circles/${circleAddress.toLowerCase()}/requests`);
+      if (res.ok) {
+        const list: JoinRequest[] = await res.json();
+        if (Array.isArray(list)) {
+          // Merge into local cache
+          const current = this.getAllRequests().filter(
+            (r) => r.circleAddress.toLowerCase() !== circleAddress.toLowerCase()
+          );
+          const merged = [...list, ...current];
+          try {
+            localStorage.setItem(STORAGE_REQUESTS_KEY, JSON.stringify(merged));
+          } catch {}
+          return list;
+        }
+      }
+    } catch (err) {
+      console.warn("Backend fetchRequestsForCircle error:", err);
+    }
+    return this.getRequestsForCircle(circleAddress);
+  }
+
+  // 12. Get specific applicant's status for a circle (local cache)
   public static getApplicantStatus(
     circleAddress: string,
     applicantAddress: string
@@ -135,28 +252,53 @@ export class VerificationService {
     return req ? req.status : "none";
   }
 
-  // 9. Initializer verifies (approves) or rejects a join request
-  public static setRequestStatus(
-    requestId: string,
-    status: "verified" | "rejected"
-  ) {
-    const requests = this.getAllRequests();
-    const target = requests.find((r) => r.id === requestId);
-    if (target) {
-      target.status = status;
-      localStorage.setItem(STORAGE_REQUESTS_KEY, JSON.stringify(requests));
-    }
-  }
-
-  // 10. Initializer verifies an applicant directly by address
-  public static verifyApplicant(
+  // 13. Fetch specific applicant's status from backend
+  public static async fetchApplicantStatus(
     circleAddress: string,
     applicantAddress: string
-  ) {
-    const requests = this.getAllRequests();
+  ): Promise<"pending" | "verified" | "rejected" | "none"> {
+    if (!circleAddress || !applicantAddress) return "none";
+    try {
+      const res = await fetch(
+        `${API_URL}/circles/${circleAddress.toLowerCase()}/requests/${applicantAddress.toLowerCase()}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.status) {
+          // Sync to local
+          const reqs = this.getAllRequests();
+          const target = reqs.find(
+            (r) =>
+              r.circleAddress.toLowerCase() === circleAddress.toLowerCase() &&
+              r.applicantAddress.toLowerCase() === applicantAddress.toLowerCase()
+          );
+          if (target) {
+            target.status = data.status;
+          } else if (data.status !== "none") {
+            reqs.unshift(data);
+          }
+          try {
+            localStorage.setItem(STORAGE_REQUESTS_KEY, JSON.stringify(reqs));
+          } catch {}
+          return data.status;
+        }
+      }
+    } catch (err) {
+      console.warn("Backend fetchApplicantStatus error:", err);
+    }
+    return this.getApplicantStatus(circleAddress, applicantAddress);
+  }
+
+  // 14. Initializer verifies (approves) an applicant
+  public static async verifyApplicant(
+    circleAddress: string,
+    applicantAddress: string
+  ): Promise<void> {
     const cleanCircle = circleAddress.toLowerCase();
     const cleanApplicant = applicantAddress.toLowerCase();
 
+    // Local update
+    const requests = this.getAllRequests();
     const target = requests.find(
       (r) =>
         r.circleAddress.toLowerCase() === cleanCircle &&
@@ -167,25 +309,38 @@ export class VerificationService {
       target.status = "verified";
     } else {
       requests.unshift({
-        id: `${cleanCircle}_${cleanApplicant}_${Date.now()}`,
-        circleAddress,
-        applicantAddress,
+        id: `${cleanCircle}_${cleanApplicant}`,
+        circleAddress: cleanCircle,
+        applicantAddress: cleanApplicant,
         requestedAt: Date.now(),
         status: "verified",
       });
     }
-    localStorage.setItem(STORAGE_REQUESTS_KEY, JSON.stringify(requests));
+    try {
+      localStorage.setItem(STORAGE_REQUESTS_KEY, JSON.stringify(requests));
+    } catch {}
+
+    // Persist to central Backend database
+    try {
+      await fetch(
+        `${API_URL}/circles/${cleanCircle}/requests/${cleanApplicant}/verify`,
+        { method: "POST" }
+      );
+    } catch (err) {
+      console.warn("Backend verifyApplicant error:", err);
+    }
   }
 
-  // 11. Initializer rejects an applicant
-  public static rejectApplicant(
+  // 15. Initializer rejects an applicant
+  public static async rejectApplicant(
     circleAddress: string,
     applicantAddress: string
-  ) {
-    const requests = this.getAllRequests();
+  ): Promise<void> {
     const cleanCircle = circleAddress.toLowerCase();
     const cleanApplicant = applicantAddress.toLowerCase();
 
+    // Local update
+    const requests = this.getAllRequests();
     const target = requests.find(
       (r) =>
         r.circleAddress.toLowerCase() === cleanCircle &&
@@ -196,13 +351,25 @@ export class VerificationService {
       target.status = "rejected";
     } else {
       requests.unshift({
-        id: `${cleanCircle}_${cleanApplicant}_${Date.now()}`,
-        circleAddress,
-        applicantAddress,
+        id: `${cleanCircle}_${cleanApplicant}`,
+        circleAddress: cleanCircle,
+        applicantAddress: cleanApplicant,
         requestedAt: Date.now(),
         status: "rejected",
       });
     }
-    localStorage.setItem(STORAGE_REQUESTS_KEY, JSON.stringify(requests));
+    try {
+      localStorage.setItem(STORAGE_REQUESTS_KEY, JSON.stringify(requests));
+    } catch {}
+
+    // Persist to central Backend database
+    try {
+      await fetch(
+        `${API_URL}/circles/${cleanCircle}/requests/${cleanApplicant}/reject`,
+        { method: "POST" }
+      );
+    } catch (err) {
+      console.warn("Backend rejectApplicant error:", err);
+    }
   }
 }

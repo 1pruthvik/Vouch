@@ -24,3 +24,6 @@ export const CONTRACT_ADDRESSES = {
   MockYieldVault: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   MockERC20: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
 };
+
+export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+

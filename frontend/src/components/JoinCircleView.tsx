@@ -88,9 +88,15 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
         }
       }
 
-      // 3. Check applicant verification status
-      const status = VerificationService.getApplicantStatus(cleanAddr, account);
-      setVerificationStatus(status);
+      // 3. Check applicant verification status (local + backend)
+      const localStatus = VerificationService.getApplicantStatus(cleanAddr, account);
+      setVerificationStatus(localStatus);
+
+      VerificationService.fetchApplicantStatus(cleanAddr, account).then((remoteStatus) => {
+        if (remoteStatus) {
+          setVerificationStatus(remoteStatus);
+        }
+      });
     } catch (err: any) {
       console.error(err);
       onShowNotification("Could not find circle with this address.", true);
@@ -107,7 +113,7 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
     }
   }, [initialCircleId, handleLookup]);
 
-  // Real-time synchronization for approvals from initializer across tabs
+  // Real-time synchronization for approvals from initializer across tabs and backend
   useEffect(() => {
     const handleStorageChange = () => {
       if (searchedCircle) {
@@ -116,14 +122,31 @@ export const JoinCircleView: React.FC<JoinCircleViewProps> = ({
       }
     };
     window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+
+    // Auto-poll backend for status change (e.g. Initializer approving in another browser/device)
+    let pollTimer: any = null;
+    if (searchedCircle && account) {
+      pollTimer = setInterval(async () => {
+        try {
+          const freshStatus = await VerificationService.fetchApplicantStatus(searchedCircle.address, account);
+          if (freshStatus) {
+            setVerificationStatus(freshStatus);
+          }
+        } catch {}
+      }, 2500);
+    }
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      if (pollTimer) clearInterval(pollTimer);
+    };
   }, [searchedCircle, account]);
 
-  const handleRequestVerification = () => {
+  const handleRequestVerification = async () => {
     if (!searchedCircle || !account) return;
     try {
-      VerificationService.submitJoinRequest(searchedCircle.address, account);
       setVerificationStatus("pending");
+      await VerificationService.submitJoinRequest(searchedCircle.address, account);
       onShowNotification("Verification request submitted to the circle initializer!");
     } catch (err: any) {
       onShowNotification(err.message || "Failed to submit request", true);

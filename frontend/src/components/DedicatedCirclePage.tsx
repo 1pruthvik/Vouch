@@ -29,17 +29,26 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
   const [copiedId, setCopiedId] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadCircleData = useCallback(async () => {
-    setIsLoading(true);
+  const loadCircleData = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
-      // 1. Registry Data
+      // 1. Registry Data (local + backend)
       const reg = VerificationService.getCircle(circleAddress);
       setRegistryCircle(reg);
+      VerificationService.fetchCircle(circleAddress).then((r) => {
+        if (r) setRegistryCircle(r);
+      });
 
-      // 2. Initializer Requests
-      const reqs = VerificationService.getRequestsForCircle(circleAddress);
-      setPendingRequests(reqs.filter((r) => r.status === "pending"));
-      setVerifiedRequests(reqs.filter((r) => r.status === "verified"));
+      // 2. Initializer Requests (local + backend)
+      const localReqs = VerificationService.getRequestsForCircle(circleAddress);
+      setPendingRequests(localReqs.filter((r) => r.status === "pending"));
+      setVerifiedRequests(localReqs.filter((r) => r.status === "verified"));
+
+      const remoteReqs = await VerificationService.fetchRequestsForCircle(circleAddress);
+      if (Array.isArray(remoteReqs)) {
+        setPendingRequests(remoteReqs.filter((r) => r.status === "pending"));
+        setVerifiedRequests(remoteReqs.filter((r) => r.status === "verified"));
+      }
 
       // 3. On-chain Details
       if (contractService && circleAddress.startsWith("0x")) {
@@ -54,27 +63,31 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
         }
       }
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [circleAddress, account, contractService]);
 
   useEffect(() => {
-    loadCircleData();
+    loadCircleData(false);
+    const interval = setInterval(() => {
+      loadCircleData(true);
+    }, 2500);
+    return () => clearInterval(interval);
   }, [loadCircleData]);
 
   const isInitializer =
     (registryCircle && registryCircle.initializer.toLowerCase() === account.toLowerCase()) ||
     (groupDetails && groupDetails.members[0]?.toLowerCase() === account.toLowerCase());
 
-  const handleVerifyApplicant = (applicantAddress: string) => {
-    VerificationService.verifyApplicant(circleAddress, applicantAddress);
-    loadCircleData();
+  const handleVerifyApplicant = async (applicantAddress: string) => {
+    await VerificationService.verifyApplicant(circleAddress, applicantAddress);
+    await loadCircleData(true);
     onShowNotification(`Verified applicant ${applicantAddress.substring(0, 6)}...`);
   };
 
-  const handleRejectApplicant = (applicantAddress: string) => {
-    VerificationService.rejectApplicant(circleAddress, applicantAddress);
-    loadCircleData();
+  const handleRejectApplicant = async (applicantAddress: string) => {
+    await VerificationService.rejectApplicant(circleAddress, applicantAddress);
+    await loadCircleData(true);
     onShowNotification(`Rejected applicant ${applicantAddress.substring(0, 6)}...`);
   };
 

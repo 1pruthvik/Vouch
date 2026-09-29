@@ -23,8 +23,9 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
   const [pendingRequestsMap, setPendingRequestsMap] = useState<{ [addr: string]: number }>({});
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-  const loadMyCircles = () => {
+  const loadMyCircles = async () => {
     if (!account) return;
+    // 1. Local cache
     const myCircles = VerificationService.getCirclesByInitializer(account);
     setCreatedCircles(myCircles);
 
@@ -34,10 +35,29 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
       counts[c.address] = reqs.filter((r) => r.status === "pending").length;
     });
     setPendingRequestsMap(counts);
+
+    // 2. Backend fetch
+    try {
+      const remoteCircles = await VerificationService.fetchCirclesByInitializer(account);
+      setCreatedCircles(remoteCircles);
+
+      const remoteCounts: { [addr: string]: number } = {};
+      await Promise.all(
+        remoteCircles.map(async (c) => {
+          const reqs = await VerificationService.fetchRequestsForCircle(c.address);
+          remoteCounts[c.address] = reqs.filter((r) => r.status === "pending").length;
+        })
+      );
+      setPendingRequestsMap(remoteCounts);
+    } catch (err) {
+      console.warn("Error loading my circles from backend:", err);
+    }
   };
 
   useEffect(() => {
     loadMyCircles();
+    const interval = setInterval(loadMyCircles, 3000);
+    return () => clearInterval(interval);
   }, [account]);
 
   // Listen for storage events (e.g. join requests from other tabs)

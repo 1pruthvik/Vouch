@@ -37,8 +37,9 @@ export const CreateGroupView: React.FC<CreateGroupViewProps> = ({
   const [circleRequests, setCircleRequests] = useState<{ [circleAddr: string]: JoinRequest[] }>({});
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-  const loadInitializerData = () => {
+  const loadInitializerData = async () => {
     if (!account) return;
+    // 1. Local cached
     const myCircles = VerificationService.getCirclesByInitializer(account);
     setInitializedCircles(myCircles);
 
@@ -47,10 +48,29 @@ export const CreateGroupView: React.FC<CreateGroupViewProps> = ({
       reqMap[c.address] = VerificationService.getRequestsForCircle(c.address);
     });
     setCircleRequests(reqMap);
+
+    // 2. Fetch from backend
+    try {
+      const backendCircles = await VerificationService.fetchCirclesByInitializer(account);
+      setInitializedCircles(backendCircles);
+
+      const updatedReqMap: { [circleAddr: string]: JoinRequest[] } = {};
+      await Promise.all(
+        backendCircles.map(async (c) => {
+          const reqs = await VerificationService.fetchRequestsForCircle(c.address);
+          updatedReqMap[c.address] = reqs;
+        })
+      );
+      setCircleRequests(updatedReqMap);
+    } catch (err) {
+      console.warn("Error refreshing initializer data:", err);
+    }
   };
 
   useEffect(() => {
     loadInitializerData();
+    const interval = setInterval(loadInitializerData, 3000);
+    return () => clearInterval(interval);
   }, [account, deployedCircleAddress]);
 
   const numMembers = typeof memberCount === "number" ? memberCount : 0;

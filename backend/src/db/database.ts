@@ -1,4 +1,6 @@
-import initSqlJs, { Database as SqlJsDatabase } from "sql.js";
+// @ts-ignore
+import initSqlJs from "sql.js";
+type SqlJsDatabase = any;
 import * as path from "path";
 import * as fs from "fs";
 import { CONFIG } from "../config";
@@ -133,6 +135,27 @@ class DatabaseManager {
       CREATE TABLE IF NOT EXISTS sync_state (
         key TEXT PRIMARY KEY,
         value TEXT,
+        updated_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS circle_registrations (
+        address TEXT PRIMARY KEY,
+        name TEXT,
+        member_count INTEGER,
+        installment_amount TEXT,
+        cycle_duration INTEGER,
+        initializer TEXT,
+        min_wallet_amt TEXT,
+        created_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS circle_join_requests (
+        id TEXT PRIMARY KEY,
+        circle_address TEXT,
+        applicant_address TEXT,
+        applicant_name TEXT,
+        status TEXT,
+        requested_at INTEGER,
         updated_at INTEGER
       );
     `);
@@ -575,6 +598,171 @@ class DatabaseManager {
       total_defaults_absorbed: defaultsCount,
       total_reserve_accumulated: totalReserve.toString(),
       latest_block: latestBlock,
+    };
+  }
+
+  // --- Circle Registrations & Join Requests ---
+
+  public upsertCircleRegistration(entry: {
+    address: string;
+    name?: string;
+    member_count?: number;
+    installment_amount?: string;
+    cycle_duration?: number;
+    initializer: string;
+    min_wallet_amt?: string;
+    created_at?: number;
+  }): void {
+    if (!this.db) return;
+    const now = Math.floor(Date.now() / 1000);
+    this.db.run(
+      `INSERT INTO circle_registrations (address, name, member_count, installment_amount, cycle_duration, initializer, min_wallet_amt, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(address) DO UPDATE SET
+         name = excluded.name,
+         member_count = excluded.member_count,
+         installment_amount = excluded.installment_amount,
+         cycle_duration = excluded.cycle_duration,
+         initializer = excluded.initializer,
+         min_wallet_amt = excluded.min_wallet_amt`,
+      [
+        entry.address.toLowerCase(),
+        entry.name || "Savings Circle",
+        entry.member_count || 5,
+        entry.installment_amount || "1.0",
+        entry.cycle_duration || 0,
+        (entry.initializer || "").toLowerCase(),
+        entry.min_wallet_amt || "0",
+        entry.created_at || now,
+      ]
+    );
+    this.save();
+  }
+
+  public getAllCircleRegistrations(): any[] {
+    if (!this.db) return [];
+    const stmt = this.db.prepare("SELECT * FROM circle_registrations ORDER BY created_at DESC");
+    const results: any[] = [];
+    while (stmt.step()) {
+      results.push(stmt.getAsObject());
+    }
+    stmt.free();
+    return results;
+  }
+
+  public getCircleRegistration(address: string): any | null {
+    if (!this.db || !address) return null;
+    const stmt = this.db.prepare("SELECT * FROM circle_registrations WHERE LOWER(address) = LOWER(?)");
+    stmt.bind([address]);
+    let result: any = null;
+    if (stmt.step()) {
+      result = stmt.getAsObject();
+    }
+    stmt.free();
+    return result;
+  }
+
+  public getCirclesByInitializer(initializer: string): any[] {
+    if (!this.db || !initializer) return [];
+    const stmt = this.db.prepare("SELECT * FROM circle_registrations WHERE LOWER(initializer) = LOWER(?) ORDER BY created_at DESC");
+    stmt.bind([initializer]);
+    const results: any[] = [];
+    while (stmt.step()) {
+      results.push(stmt.getAsObject());
+    }
+    stmt.free();
+    return results;
+  }
+
+  public submitJoinRequest(circleAddress: string, applicantAddress: string, applicantName?: string): any {
+    if (!this.db) return null;
+    const cleanCircle = circleAddress.toLowerCase();
+    const cleanApplicant = applicantAddress.toLowerCase();
+    const now = Math.floor(Date.now() / 1000);
+    const id = `${cleanCircle}_${cleanApplicant}`;
+
+    const existing = this.getApplicantJoinStatus(circleAddress, applicantAddress);
+    if (existing && existing.status !== "none") {
+      return existing;
+    }
+
+    const defaultName = applicantName || `Member (${applicantAddress.substring(0, 6)}...)`;
+    this.db.run(
+      `INSERT OR REPLACE INTO circle_join_requests (id, circle_address, applicant_address, applicant_name, status, requested_at, updated_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?)`,
+      [id, cleanCircle, cleanApplicant, defaultName, now, now]
+    );
+    this.save();
+    return {
+      id,
+      circleAddress: cleanCircle,
+      applicantAddress: cleanApplicant,
+      applicantName: defaultName,
+      status: "pending",
+      requestedAt: now * 1000,
+    };
+  }
+
+  public getJoinRequestsForCircle(circleAddress: string): any[] {
+    if (!this.db || !circleAddress) return [];
+    const stmt = this.db.prepare("SELECT * FROM circle_join_requests WHERE LOWER(circle_address) = LOWER(?) ORDER BY requested_at DESC");
+    stmt.bind([circleAddress]);
+    const results: any[] = [];
+    while (stmt.step()) {
+      const row: any = stmt.getAsObject();
+      results.push({
+        id: row.id,
+        circleAddress: row.circle_address,
+        applicantAddress: row.applicant_address,
+        applicantName: row.applicant_name,
+        status: row.status,
+        requestedAt: row.requested_at > 10000000000 ? row.requested_at : row.requested_at * 1000,
+      });
+    }
+    stmt.free();
+    return results;
+  }
+
+  public getApplicantJoinStatus(circleAddress: string, applicantAddress: string): any {
+    if (!this.db || !circleAddress || !applicantAddress) return { status: "none" };
+    const stmt = this.db.prepare("SELECT * FROM circle_join_requests WHERE LOWER(circle_address) = LOWER(?) AND LOWER(applicant_address) = LOWER(?)");
+    stmt.bind([circleAddress, applicantAddress]);
+    let result: any = null;
+    if (stmt.step()) {
+      const row: any = stmt.getAsObject();
+      result = {
+        id: row.id,
+        circleAddress: row.circle_address,
+        applicantAddress: row.applicant_address,
+        applicantName: row.applicant_name,
+        status: row.status,
+        requestedAt: row.requested_at > 10000000000 ? row.requested_at : row.requested_at * 1000,
+      };
+    }
+    stmt.free();
+    return result || { status: "none" };
+  }
+
+  public updateJoinRequestStatus(circleAddress: string, applicantAddress: string, status: "verified" | "rejected"): any {
+    if (!this.db) return null;
+    const cleanCircle = circleAddress.toLowerCase();
+    const cleanApplicant = applicantAddress.toLowerCase();
+    const now = Math.floor(Date.now() / 1000);
+    const id = `${cleanCircle}_${cleanApplicant}`;
+
+    this.db.run(
+      `INSERT INTO circle_join_requests (id, circle_address, applicant_address, applicant_name, status, requested_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`,
+      [id, cleanCircle, cleanApplicant, `Member (${applicantAddress.substring(0, 6)}...)`, status, now, now]
+    );
+    this.save();
+    return {
+      id,
+      circleAddress: cleanCircle,
+      applicantAddress: cleanApplicant,
+      status,
+      updatedAt: now * 1000,
     };
   }
 }
