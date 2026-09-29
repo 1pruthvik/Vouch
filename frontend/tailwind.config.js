@@ -27,6 +27,43 @@ export default {
           800: "#60060e",
           900: "#4c050a",
         }
+      },
+      animation: {
+        'blink-3': 'blink3Times 1.8s ease-in-out forwards',
+        'pulse-glow': 'pulseGlow 2.5s infinite',
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      },
+      keyframes: {
+        blink3Times: {
+          '0%, 100%': {
+            opacity: '1',
+            transform: 'scale(1.02)',
+            boxShadow: '0 0 25px rgba(245, 158, 11, 0.6)',
+            borderColor: '#f59e0b',
+          },
+          '16%, 50%, 83%': {
+            opacity: '0.25',
+            transform: 'scale(1.0)',
+            boxShadow: '0 0 0px transparent',
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+          },
+          '33%, 66%': {
+            opacity: '1',
+            transform: 'scale(1.02)',
+            boxShadow: '0 0 35px rgba(245, 158, 11, 0.85)',
+            borderColor: '#fbbf24',
+          },
+        },
+        pulseGlow: {
+          '0%, 100%': {
+            boxShadow: '0 0 15px rgba(136, 13, 25, 0.3)',
+            borderColor: 'rgba(136, 13, 25, 0.4)',
+          },
+          '50%': {
+            boxShadow: '0 0 25px rgba(249, 128, 128, 0.6)',
+            borderColor: 'rgba(249, 128, 128, 0.8)',
+          },
+        }
       }
     },
   },

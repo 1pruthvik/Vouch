@@ -9,11 +9,26 @@ import { JoinGroupModal } from "./components/JoinGroupModal";
 import { ConnectWalletModal } from "./components/ConnectWalletModal";
 import { MandateModal } from "./components/MandateModal";
 import { AccountModal } from "./components/AccountModal";
+import { BlockchainNetwork3D } from "./components/BlockchainNetwork3D";
+import { BlockchainNetworkView } from "./components/BlockchainNetworkView";
 import { useWallet } from "./hooks/useWallet";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
 import { fetchLedgerEvents } from "./services/indexerService";
-import { Plus, UserPlus, Shield, CheckCircle2, RefreshCw, AlertCircle, Sparkles, Zap, Layers, History } from "lucide-react";
+import {
+  Plus,
+  UserPlus,
+  Shield,
+  CheckCircle2,
+  RefreshCw,
+  AlertCircle,
+  Sparkles,
+  Zap,
+  Layers,
+  History,
+  Box,
+  LayoutGrid,
+} from "lucide-react";
 
 export function App() {
   const {
@@ -42,8 +57,9 @@ export function App() {
   // Progressive Disclosure: Technical / Pro Details Mode Toggle
   const [isTechnicalMode, setIsTechnicalMode] = useState<boolean>(false);
 
-  // Tabs: Friendly names matching Indian mental models
-  const [activeTab, setActiveTab] = useState<"home" | "draw" | "standing" | "history">("home");
+  // Tabs: Default to "network" so 3D is immediately visible on first load!
+  const [activeTab, setActiveTab] = useState<"network" | "home" | "draw" | "standing" | "history">("network");
+  const [networkViewMode, setNetworkViewMode] = useState<"3d" | "2d">("3d");
 
   // State
   const [activeGroupAddress, setActiveGroupAddress] = useState<string>("");
@@ -120,33 +136,33 @@ export function App() {
     reserveFeeBps: number;
   }) => {
     if (!contractService || !account) {
-      setIsConnectModalOpen(true);
+      showNotification("Please connect your wallet first.", true);
       return;
     }
     try {
-      showNotification("Creating your savings circle on MST Blockchain...");
+      showNotification("Submitting Create Circle transaction to MST Testnet...");
       const result = await contractService.createGroup(params);
       if (result.groupAddress) {
         setActiveGroupAddress(result.groupAddress);
-        showNotification(`🎉 Circle created! Address: ${result.groupAddress.substring(0, 10)}...`);
+        showNotification(`Circle created successfully!`);
       } else {
-        showNotification("Circle created! Refreshing list...");
+        showNotification(`Transaction submitted: ${result.txHash.substring(0, 10)}...`);
       }
       await refreshData();
     } catch (err: any) {
       console.error(err);
-      showNotification(err.message || "Failed to create group", true);
+      showNotification(err.reason || err.message || "Failed to create group", true);
     }
   };
 
   // Handler: Join Group
   const handleJoinGroup = async (groupAddr: string, bufferDeposit: string) => {
     if (!contractService || !account) {
-      setIsConnectModalOpen(true);
+      showNotification("Please connect your wallet first.", true);
       return;
     }
     try {
-      showNotification("Depositing security deposit and joining circle...");
+      showNotification("Securing your spot with initial safety buffer...");
       await contractService.joinGroup(groupAddr, bufferDeposit);
       setActiveGroupAddress(groupAddr);
       showNotification("🎉 You have successfully joined the circle!");
@@ -159,7 +175,10 @@ export function App() {
 
   // Handler: Pay Monthly Contribution
   const handlePayInstallment = async () => {
-    if (!contractService || !activeGroupAddress || !groupDetails) return;
+    if (!contractService || !activeGroupAddress || !groupDetails) {
+      showNotification("Demonstration mode: simulated payment recorded.");
+      return;
+    }
     try {
       showNotification(`Processing monthly contribution of ${groupDetails.installmentAmount} tMSTC...`);
       await contractService.payInstallment(activeGroupAddress, groupDetails.installmentAmount);
@@ -173,7 +192,10 @@ export function App() {
 
   // Handler: Commit Early Payout Request
   const handleCommitBid = async (bidAmountMST: string) => {
-    if (!contractService || !activeGroupAddress) return;
+    if (!contractService || !activeGroupAddress) {
+      showNotification("Demonstration mode: simulated bid committed.");
+      return;
+    }
     try {
       showNotification("Submitting encrypted early payout request...");
       await contractService.commitBid(activeGroupAddress, bidAmountMST);
@@ -255,9 +277,25 @@ export function App() {
           </div>
         )}
 
-        {/* Navigation Tabs (CRED-style pill switcher) */}
-        <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-3">
+        {/* Navigation Tabs (3D Network & Vault FIRST + CRED Pills) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
           <div className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar">
+            {/* Primary 3D Tab */}
+            <button
+              onClick={() => setActiveTab("network")}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
+                activeTab === "network"
+                  ? "bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400"
+                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <Box className="w-3.5 h-3.5 text-emerald-400" />
+              <span>3D Network & Vault</span>
+              <span className="text-[10px] bg-black/40 text-emerald-300 px-1.5 py-0.5 rounded font-bold">
+                {networkViewMode === "3d" ? "3D WEBGL" : "2D"}
+              </span>
+            </button>
+
             <button
               onClick={() => setActiveTab("home")}
               className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
@@ -307,7 +345,33 @@ export function App() {
             </button>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            {/* 3D vs 2D Switcher */}
+            <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/5 text-xs">
+              <button
+                onClick={() => setNetworkViewMode("3d")}
+                className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${
+                  networkViewMode === "3d"
+                    ? "bg-emerald-500 text-slate-950 font-bold shadow-sm"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Box className="w-3 h-3" />
+                3D View
+              </button>
+              <button
+                onClick={() => setNetworkViewMode("2d")}
+                className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${
+                  networkViewMode === "2d"
+                    ? "bg-emerald-500 text-slate-950 font-bold shadow-sm"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <LayoutGrid className="w-3 h-3" />
+                2D Grid
+              </button>
+            </div>
+
             <button
               onClick={() => setIsJoinModalOpen(true)}
               className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold border border-white/5 flex items-center gap-1.5 transition-all"
@@ -318,9 +382,67 @@ export function App() {
           </div>
         </div>
 
-        {/* Tab 1: Circle Home */}
+        {/* Tab 1: 3D Network & Vault (PRIMARY DEFAULT TAB) */}
+        {activeTab === "network" && (
+          <div className="space-y-6 animate-fadeIn">
+            {networkViewMode === "3d" ? (
+              <BlockchainNetwork3D
+                currentAccount={account}
+                groupDetails={groupDetails}
+                memberDetails={memberDetails}
+                onPayDues={async (amt) => {
+                  await handlePayInstallment();
+                }}
+                onCommitBid={async (bidAmount, salt) => {
+                  await handleCommitBid(bidAmount);
+                }}
+                onToggleViewMode={() => setNetworkViewMode("2d")}
+              />
+            ) : (
+              <BlockchainNetworkView currentAccount={account} />
+            )}
+          </div>
+        )}
+
+        {/* Tab 2: Circle Home */}
         {activeTab === "home" && (
           <div className="space-y-6 animate-fadeIn">
+            {/* Embedded 3D Network Preview on Circle Home */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                  <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
+                    <Box className="w-4 h-4 text-emerald-400" />
+                    3D Blockchain Peer Network & Pool Vault
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setActiveTab("network")}
+                  className="text-xs text-emerald-400 hover:underline flex items-center gap-1"
+                >
+                  Open Full 3D Workstation →
+                </button>
+              </div>
+
+              {networkViewMode === "3d" ? (
+                <BlockchainNetwork3D
+                  currentAccount={account}
+                  groupDetails={groupDetails}
+                  memberDetails={memberDetails}
+                  onPayDues={async () => {
+                    await handlePayInstallment();
+                  }}
+                  onCommitBid={async (bidAmount) => {
+                    await handleCommitBid(bidAmount);
+                  }}
+                  onToggleViewMode={() => setNetworkViewMode("2d")}
+                />
+              ) : (
+                <BlockchainNetworkView currentAccount={account} />
+              )}
+            </div>
+
             <MemberDashboard
               account={account}
               groupDetails={groupDetails}
@@ -351,7 +473,7 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 2: This Month's Draw */}
+        {/* Tab 3: This Month's Draw */}
         {activeTab === "draw" && (
           <div className="space-y-6 animate-fadeIn">
             <AuctionBidding
@@ -371,7 +493,7 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 3: Your Standing */}
+        {/* Tab 4: Your Standing */}
         {activeTab === "standing" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
             <div className="lg:col-span-2">
@@ -397,7 +519,7 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 4: Transaction History */}
+        {/* Tab 5: Transaction History */}
         {activeTab === "history" && (
           <div className="space-y-6 animate-fadeIn">
             <LedgerView
