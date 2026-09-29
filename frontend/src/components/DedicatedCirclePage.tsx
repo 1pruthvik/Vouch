@@ -535,7 +535,6 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
       {/* ── Section: Participant Invitations & Whitelist Tracking ── */}
       {isInitializer && (
         <div className="p-6 bg-neutral-950 rounded-2xl space-y-6 text-xs">
->>>>>>> origin/nivish
           <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
             <div className="space-y-0.5">
               <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
