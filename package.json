@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Vouch — Decentralized, Autonomous ROSCA & Chit Fund Protocol on MST Blockchain with AI Risk Scoring",
   "scripts": {
-    "build": "npm --prefix backend install && npm --prefix backend run build",
+    "build": "npm --prefix backend install --include=dev && npm --prefix backend run build",
     "start": "npm --prefix backend start",
     "contracts:install": "cd contracts && npm install",
     "contracts:compile": "cd contracts && npx hardhat compile",
