@@ -5,6 +5,7 @@ import { VerificationService, CircleRegistryEntry, JoinRequest } from "../servic
 import { ContractService, GroupDetails, MemberDetails } from "../services/contractService";
 import { extractCircleAddress } from "./JoinCircleView";
 import { EditCircleModal } from "./EditCircleModal";
+import { MSTChainVisualizer3D } from "./MSTChainVisualizer3D";
 import { ethers } from "ethers";
 
 interface DedicatedCirclePageProps {
@@ -24,6 +25,7 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
 }) => {
   const cleanCircleAddress = extractCircleAddress(circleAddress);
 
+  const [activeTab, setActiveTab] = useState<"visualizer" | "management">("visualizer");
   const [registryCircle, setRegistryCircle] = useState<CircleRegistryEntry | null>(null);
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
   const [memberDetails, setMemberDetails] = useState<MemberDetails | null>(null);
@@ -324,9 +326,70 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
         </div>
       </div>
 
-      {/* ── Section for Initializer: Public Key Whitelist & Verification Console ── */}
-      {isInitializer && (
-        <div className="p-6 bg-neutral-950 rounded-2xl space-y-6 text-xs">
+      {/* ── Sub Navigation Tabs: 3D Visualizer vs Console Management ── */}
+      <div className="flex items-center justify-center gap-3 sm:gap-6 pt-1 pb-1">
+        <button
+          type="button"
+          onClick={() => setActiveTab("visualizer")}
+          className={`px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl flex items-center gap-2 transition-all cursor-pointer border ${
+            activeTab === "visualizer"
+              ? "bg-red-950/50 text-red-400 border-red-500 shadow-[0_0_15px_rgba(255,23,68,0.3)]"
+              : "bg-neutral-950 text-neutral-400 border-neutral-900 hover:text-white"
+          }`}
+        >
+          <Shield className="w-4 h-4 text-red-500" />
+          <span>3D Chain & Bidding Visualizer</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("management")}
+          className={`px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl flex items-center gap-2 transition-all cursor-pointer border ${
+            activeTab === "management"
+              ? "bg-red-950/50 text-red-400 border-red-500 shadow-[0_0_15px_rgba(255,23,68,0.3)]"
+              : "bg-neutral-950 text-neutral-400 border-neutral-900 hover:text-white"
+          }`}
+        >
+          <Users className="w-4 h-4 text-red-500" />
+          <span>Circle Whitelist & Console</span>
+        </button>
+      </div>
+
+      {/* ── View 1: 3D Blockchain Explorer & Bidding Lifecycle ── */}
+      {activeTab === "visualizer" ? (
+        <MSTChainVisualizer3D
+          circleAddress={cleanCircleAddress}
+          circleName={circleName}
+          memberCount={memberCount}
+          installmentAmount={installmentMst}
+          allowedMembers={allowedMembers}
+          currentAccount={account}
+          isInitializer={Boolean(isInitializer)}
+          onPayDues={handlePayContribution}
+          onCommitBid={async (bidAmt, salt) => {
+            if (contractService) {
+              try {
+                const amtBN = ethers.parseEther(bidAmt);
+                const cleanSalt = salt.startsWith("0x") ? salt.padEnd(66, "0") : ("0x" + salt).padEnd(66, "0");
+                const hash = ethers.solidityPackedKeccak256(
+                  ["uint256", "bytes32", "address"],
+                  [amtBN, cleanSalt, account]
+                );
+                await contractService.commitBid(cleanCircleAddress, hash);
+                onShowNotification("Secret bid committed successfully on MST Blockchain!");
+                await loadCircleData(true);
+              } catch (err: any) {
+                console.warn("On-chain commit error (using simulated commitment):", err);
+              }
+            }
+          }}
+          onShowNotification={onShowNotification}
+        />
+      ) : (
+        <>
+          {/* ── View 2: Whitelist & Access Console ── */}
+          {isInitializer && (
+            <div className="p-6 bg-neutral-950 rounded-2xl space-y-6 text-xs">
           <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
             <div className="space-y-0.5">
               <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
@@ -520,6 +583,8 @@ export const DedicatedCirclePage: React.FC<DedicatedCirclePageProps> = ({
           <span>{isPaying ? "Submitting Contribution..." : `Pay Contribution (${installmentMst} tMSTC)`}</span>
         </button>
       </div>
+      </>
+      )}
 
       {/* Edit Circle Modal */}
       {isEditModalOpen && (
