@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Header } from "./components/Header";
-import { LoginPage } from "./components/LoginPage";
+import { ConnectWalletPage } from "./components/ConnectWalletPage";
 import { MemberDashboard, AvailableCircle } from "./components/MemberDashboard";
 import { AuctionBidding } from "./components/AuctionBidding";
 import { RiskAdvisorCard } from "./components/RiskAdvisorCard";
 import { LedgerView, LedgerEvent } from "./components/LedgerView";
 import { CreateGroupModal } from "./components/CreateGroupModal";
 import { JoinGroupModal } from "./components/JoinGroupModal";
-import { ConnectWalletModal } from "./components/ConnectWalletModal";
 import { MandateModal } from "./components/MandateModal";
 import { AccountModal } from "./components/AccountModal";
 import { BlockchainNetwork3D } from "./components/BlockchainNetwork3D";
@@ -29,18 +28,12 @@ export function App() {
     error: walletError,
     connectWallet,
     connectWithPrivateKey,
+    disconnectWallet,
     clearError,
   } = useWallet();
 
-  // Authentication State
-  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; picture?: string } | null>(() => {
-    const saved = localStorage.getItem("vouch_user");
-    return saved ? JSON.parse(saved) : null;
-  });
-
   const [contractService, setContractService] = useState<ContractService | null>(null);
 
-  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isMandateModalOpen, setIsMandateModalOpen] = useState(false);
@@ -63,16 +56,6 @@ export function App() {
   const [isMandateActive, setIsMandateActive] = useState<boolean>(() => {
     return localStorage.getItem("vouch_autopay_active") === "true";
   });
-
-  const handleLoginSuccess = (user: { name: string; email: string; picture?: string }) => {
-    setCurrentUser(user);
-    localStorage.setItem("vouch_user", JSON.stringify(user));
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem("vouch_user");
-  };
 
   const loadAvailableGroups = useCallback(async () => {
     try {
@@ -135,10 +118,10 @@ export function App() {
   }, [contractService, activeGroupAddress]);
 
   useEffect(() => {
-    if (currentUser) {
+    if (account) {
       loadAvailableGroups();
     }
-  }, [currentUser, loadAvailableGroups]);
+  }, [account, loadAvailableGroups]);
 
   useEffect(() => {
     if (activeGroupAddress) {
@@ -192,10 +175,10 @@ export function App() {
   }, [activeGroupAddress, contractService, account]);
 
   useEffect(() => {
-    if (activeGroupAddress && currentUser) {
+    if (activeGroupAddress && account) {
       refreshData();
     }
-  }, [activeGroupAddress, currentUser, refreshData]);
+  }, [activeGroupAddress, account, refreshData]);
 
   const handleCreateGroup = async (params: {
     groupName: string;
@@ -206,7 +189,7 @@ export function App() {
     reserveFeeBps: number;
   }) => {
     if (!contractService || !account) {
-      setIsConnectModalOpen(true);
+      setIsAccountModalOpen(true);
       return;
     }
     try {
@@ -236,7 +219,7 @@ export function App() {
 
   const handleJoinGroup = async (groupAddr: string, bufferDeposit: string) => {
     if (!contractService || !account) {
-      setIsConnectModalOpen(true);
+      setIsAccountModalOpen(true);
       return;
     }
     try {
@@ -304,13 +287,16 @@ export function App() {
     }
   };
 
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-
-  // If not logged in, render LoginPage first
-  if (!currentUser) {
+  // If not connected to wallet, render ConnectWalletPage first
+  if (!account) {
     return (
-      <LoginPage
-        onLoginSuccess={handleLoginSuccess}
+      <ConnectWalletPage
+        onConnectExtension={connectWallet}
+        onConnectPrivateKey={connectWithPrivateKey}
+        detectedProviders={detectedProviders}
+        isConnecting={isConnecting}
+        error={walletError}
+        onClearError={clearError}
       />
     );
   }
@@ -328,8 +314,6 @@ export function App() {
         account={account}
         balance={balance}
         isConnecting={isConnecting}
-        currentUser={currentUser}
-        onLogout={handleLogout}
         onOpenAccountModal={() => setIsAccountModalOpen(true)}
         onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
       />
@@ -481,16 +465,6 @@ export function App() {
       </main>
 
       {/* Modals */}
-      <ConnectWalletModal
-        isOpen={isConnectModalOpen}
-        onClose={() => setIsConnectModalOpen(false)}
-        onConnectExtension={connectWallet}
-        onConnectPrivateKey={connectWithPrivateKey}
-        onClearError={clearError}
-        detectedProviders={detectedProviders}
-        error={walletError}
-      />
-
       <CreateGroupModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
@@ -537,6 +511,7 @@ export function App() {
         detectedProviders={detectedProviders}
         onConnectExtension={connectWallet}
         onConnectPrivateKey={connectWithPrivateKey}
+        onDisconnect={disconnectWallet}
       />
     </div>
   );

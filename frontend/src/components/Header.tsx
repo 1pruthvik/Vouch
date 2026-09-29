@@ -5,8 +5,6 @@ interface HeaderProps {
   account: string | null;
   balance: string;
   isConnecting: boolean;
-  currentUser?: { name: string; email: string; picture?: string } | null;
-  onLogout?: () => void;
   onOpenAccountModal: () => void;
   onOpenCreateGroupModal: () => void;
 }
@@ -14,8 +12,6 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   account,
   isConnecting,
-  currentUser,
-  onLogout,
   onOpenAccountModal,
   onOpenCreateGroupModal,
 }) => {
@@ -33,31 +29,6 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right Controls */}
       <div className="flex items-center gap-3">
-        {currentUser && (
-          <div className="hidden md:flex items-center gap-2 text-xs text-neutral-400">
-            {currentUser.picture ? (
-              <img
-                src={currentUser.picture}
-                alt=""
-                className="w-6 h-6 rounded-full"
-              />
-            ) : (
-              <span className="w-6 h-6 rounded-full bg-red-950 text-red-400 flex items-center justify-center font-bold text-[10px]">
-                {currentUser.name.charAt(0).toUpperCase()}
-              </span>
-            )}
-            <span className="text-neutral-300 font-medium">{currentUser.name}</span>
-            {onLogout && (
-              <button
-                onClick={onLogout}
-                title="Sign out of Google"
-                className="p-1 text-neutral-500 hover:text-red-400 transition-colors bg-transparent border-none cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        )}
 
         <button
           onClick={onOpenCreateGroupModal}

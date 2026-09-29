@@ -15,6 +15,7 @@ interface AccountModalProps {
   detectedProviders?: EIP6963ProviderDetail[];
   onConnectExtension?: (detail?: EIP6963ProviderDetail) => Promise<boolean>;
   onConnectPrivateKey?: (key: string) => Promise<boolean>;
+  onDisconnect?: () => void;
 }
 
 export const AccountModal: React.FC<AccountModalProps> = ({
@@ -27,6 +28,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   detectedProviders = [],
   onConnectExtension,
   onConnectPrivateKey,
+  onDisconnect,
 }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [connectTab, setConnectTab] = useState<"extension" | "privateKey">("extension");
@@ -127,13 +129,25 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             {onToggleTechnicalMode && (
               <button
                 onClick={onToggleTechnicalMode}
-                className="w-full py-2.5 px-4 rounded-lg bg-neutral-950 hover:bg-neutral-900 transition-all flex items-center justify-between text-xs font-semibold text-white"
+                className="w-full py-2.5 px-4 rounded-lg bg-neutral-950 hover:bg-neutral-900 transition-all flex items-center justify-between text-xs font-semibold text-white cursor-pointer border-none"
               >
                 <div className="flex items-center gap-2">
                   <Code2 className="w-4 h-4 text-red-500" />
                   <span>Technical EVM Telemetry</span>
                 </div>
                 <span className="text-red-400">{isTechnicalMode ? "Enabled" : "Disabled"}</span>
+              </button>
+            )}
+
+            {onDisconnect && (
+              <button
+                onClick={() => {
+                  onDisconnect();
+                  onClose();
+                }}
+                className="w-full py-2.5 px-4 rounded-lg bg-red-950/30 hover:bg-red-900/40 text-red-400 hover:text-red-300 transition-all text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer border-none"
+              >
+                Disconnect Wallet
               </button>
             )}
           </div>
