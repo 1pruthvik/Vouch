@@ -28,6 +28,7 @@ export function App() {
     error: walletError,
     connectWallet,
     connectWithPrivateKey,
+    clearError,
   } = useWallet();
 
   const [contractService, setContractService] = useState<ContractService | null>(null);
@@ -227,7 +228,14 @@ export function App() {
         groupName={groupDetails?.name}
         isTechnicalMode={isTechnicalMode}
         onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
-        onOpenAccountModal={() => setIsAccountModalOpen(true)}
+        onOpenAccountModal={() => {
+          if (!account) {
+            clearError();
+            setIsConnectModalOpen(true);
+          } else {
+            setIsAccountModalOpen(true);
+          }
+        }}
         onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
       />
 
@@ -392,6 +400,7 @@ export function App() {
         onClose={() => setIsConnectModalOpen(false)}
         onConnectExtension={connectWallet}
         onConnectPrivateKey={connectWithPrivateKey}
+        onClearError={clearError}
         detectedProviders={detectedProviders}
         error={walletError}
       />

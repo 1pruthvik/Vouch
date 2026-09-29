@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { X, Copy, Check, Key, Shield, ArrowRight, AlertCircle, Globe, ExternalLink, Code2 } from "lucide-react";
-import { formatINR } from "../utils/formatters";
+import { formatINR, parseWalletError } from "../utils/formatters";
 import { EIP6963ProviderDetail } from "../types/global";
 import { MST_TESTNET } from "../config/network";
 
@@ -52,7 +52,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         setErrorMsg("No browser extension detected. Connect via Private Key or install BridgeKey.");
       }
     } catch (err: any) {
-      setErrorMsg(err.message || "Failed to connect extension.");
+      setErrorMsg(parseWalletError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -71,7 +71,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         setErrorMsg("Invalid private key format. Please check and retry.");
       }
     } catch (err: any) {
-      setErrorMsg(err.message || "Failed to connect with private key.");
+      setErrorMsg(parseWalletError(err));
     } finally {
       setIsSubmitting(false);
     }

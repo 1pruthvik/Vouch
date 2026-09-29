@@ -60,3 +60,72 @@ export function getTrafficLightStatus(
     description: "All payments and security deposit are fully confirmed on-chain.",
   };
 }
+
+export function parseWalletError(err: any): string {
+  if (!err) return "An unknown error occurred.";
+
+  const rawMsg = typeof err === "string" ? err : err.message || err.reason || err.shortMessage || "";
+
+  // 1. Check for user rejection
+  if (
+    err.code === 4001 ||
+    err.code === "ACTION_REJECTED" ||
+    rawMsg.includes("user rejected") ||
+    rawMsg.includes("User rejected") ||
+    rawMsg.includes("User denied")
+  ) {
+    return "Connection request was cancelled in your wallet.";
+  }
+
+  // 2. Check for BridgeKey / Extension updated
+  if (rawMsg.includes("BridgeKey was updated") || rawMsg.includes("updated. Refresh this page")) {
+    return "BridgeKey extension was updated. Please refresh the page, then click Connect Wallet again.";
+  }
+
+  // 3. Extract nested message from ethers v6 "could not coalesce error"
+  const messageMatch = rawMsg.match(/"message":\s*"([^"]+)"/);
+  if (messageMatch && messageMatch[1]) {
+    const inner = messageMatch[1];
+    if (inner.includes("BridgeKey was updated")) {
+      return "BridgeKey extension was updated. Please refresh the page, then click Connect Wallet again.";
+    }
+    if (inner.includes("User rejected") || inner.includes("user rejected") || inner.includes("User denied")) {
+      return "Connection request was cancelled in your wallet.";
+    }
+    return inner;
+  }
+
+  // 4. Check for nested error objects
+  if (err.info?.error?.message) {
+    return parseWalletError(err.info.error.message);
+  }
+  if (err.error?.message) {
+    return parseWalletError(err.error.message);
+  }
+  if (err.data?.message) {
+    return parseWalletError(err.data.message);
+  }
+
+  // 5. Invalid private key
+  if (
+    rawMsg.includes("invalid private key") ||
+    rawMsg.includes("invalid HexString") ||
+    rawMsg.includes("expected hex string") ||
+    rawMsg.includes("invalid BytesLike") ||
+    rawMsg.includes("invalid key format")
+  ) {
+    return "Invalid private key format. Must be a valid 64-character hex string (e.g. 0x...).";
+  }
+
+  // 6. Long unparsed json / coalesce errors
+  if (rawMsg.includes("could not coalesce error")) {
+    return "Unable to communicate with browser extension. Please refresh the page or use Private Key.";
+  }
+
+  if (rawMsg.length > 0 && rawMsg.length < 150 && !rawMsg.includes("{")) {
+    return rawMsg;
+  }
+
+  return "Failed to connect wallet. Please refresh the page or use Private Key.";
+}
+

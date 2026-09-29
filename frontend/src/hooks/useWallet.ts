@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ethers } from "ethers";
 import { MST_TESTNET } from "../config/network";
 import { EIP6963ProviderDetail, EIP6963AnnounceProviderEvent } from "../types/global";
+import { parseWalletError } from "../utils/formatters";
 
 export function useWallet() {
   const [account, setAccount] = useState<string | null>(null);
@@ -139,7 +140,7 @@ export function useWallet() {
       }
     } catch (err: any) {
       console.error("Wallet connection error:", err);
-      setError(err?.message || "Failed to connect wallet.");
+      setError(parseWalletError(err));
       return false;
     } finally {
       setIsConnecting(false);
@@ -152,7 +153,13 @@ export function useWallet() {
     setError(null);
     try {
       setIsConnecting(true);
-      const formattedKey = privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`;
+      const cleanKey = privateKey.trim();
+      const formattedKey = cleanKey.startsWith("0x") ? cleanKey : `0x${cleanKey}`;
+      
+      if (!/^0x[0-9a-fA-F]{64}$/.test(formattedKey)) {
+        throw new Error("Invalid private key format. Must be a 64-character hexadecimal key (with optional 0x prefix).");
+      }
+
       const rpcProvider = new ethers.JsonRpcProvider(MST_TESTNET.rpcUrl);
       const wallet = new ethers.Wallet(formattedKey, rpcProvider);
 
@@ -166,12 +173,16 @@ export function useWallet() {
       return true;
     } catch (err: any) {
       console.error("Private key connection error:", err);
-      setError(err?.message || "Invalid private key format.");
+      setError(parseWalletError(err));
       return false;
     } finally {
       setIsConnecting(false);
     }
   };
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
   const disconnectWallet = () => {
     setAccount(null);
@@ -180,6 +191,7 @@ export function useWallet() {
     setProvider(null);
     setSigner(null);
     setIsPrivateKeyMode(false);
+    setError(null);
   };
 
   useEffect(() => {
@@ -227,6 +239,7 @@ export function useWallet() {
     connectWallet,
     connectWithPrivateKey,
     disconnectWallet,
+    clearError,
     switchToMSTTestnet,
     isCorrectNetwork: isPrivateKeyMode || chainId === MST_TESTNET.chainId,
   };
