@@ -96,6 +96,59 @@ export function createApiRouter(indexer: IndexerService, keeper: KeeperBot): Rou
     res.json(members);
   });
 
+  // Group Invitations
+  router.get("/groups/:id/invitations", (req: Request, res: Response) => {
+    const { id } = req.params;
+    const invitations = db.getInvitations(id);
+    res.json(invitations);
+  });
+
+  router.post("/groups/:id/invitations", (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { name, email, wallet_address, status } = req.body;
+    if (!name || !email || !wallet_address) {
+      return res.status(400).json({ error: "Name, email and wallet_address are required" });
+    }
+
+    const invitationId = `inv-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    db.addInvitation({
+      id: invitationId,
+      group_address: id,
+      name,
+      email,
+      wallet_address,
+      status: status || "PENDING",
+    });
+
+    res.json({
+      success: true,
+      invitation: {
+        id: invitationId,
+        group_address: id,
+        name,
+        email,
+        wallet_address,
+        status: status || "PENDING",
+      },
+    });
+  });
+
+  router.patch("/invitations/:id", (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    if (!status) {
+      return res.status(400).json({ error: "Status is required" });
+    }
+    db.updateInvitationStatus(id, status);
+    res.json({ success: true, id, status });
+  });
+
+  router.delete("/invitations/:id", (req: Request, res: Response) => {
+    const { id } = req.params;
+    db.deleteInvitation(id);
+    res.json({ success: true, id });
+  });
+
   // Group Ledger / Events
   router.get("/groups/:id/ledger", (req: Request, res: Response) => {
     const { id } = req.params;

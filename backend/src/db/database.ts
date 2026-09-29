@@ -130,6 +130,17 @@ class DatabaseManager {
         updated_at INTEGER
       );
 
+      CREATE TABLE IF NOT EXISTS invitations (
+        id TEXT PRIMARY KEY,
+        group_address TEXT,
+        name TEXT,
+        email TEXT,
+        wallet_address TEXT,
+        status TEXT,
+        created_at INTEGER,
+        updated_at INTEGER
+      );
+
       CREATE TABLE IF NOT EXISTS sync_state (
         key TEXT PRIMARY KEY,
         value TEXT,
@@ -504,6 +515,75 @@ class DatabaseManager {
     }
     stmt.free();
     return results;
+  }
+
+  // --- Invitations ---
+
+  public addInvitation(inv: {
+    id: string;
+    group_address: string;
+    name: string;
+    email: string;
+    wallet_address: string;
+    status?: string;
+  }): void {
+    if (!this.db) return;
+    const now = Math.floor(Date.now() / 1000);
+    this.db.run(
+      `INSERT OR REPLACE INTO invitations (
+        id, group_address, name, email, wallet_address, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        inv.id,
+        inv.group_address.toLowerCase(),
+        inv.name,
+        inv.email,
+        inv.wallet_address.toLowerCase(),
+        inv.status || "PENDING",
+        now,
+        now,
+      ]
+    );
+    this.save();
+  }
+
+  public getInvitations(groupAddress: string): Array<{
+    id: string;
+    group_address: string;
+    name: string;
+    email: string;
+    wallet_address: string;
+    status: string;
+    created_at: number;
+    updated_at: number;
+  }> {
+    if (!this.db) return [];
+    const stmt = this.db.prepare(
+      "SELECT * FROM invitations WHERE group_address = ? ORDER BY created_at DESC"
+    );
+    stmt.bind([groupAddress.toLowerCase()]);
+    const results: any[] = [];
+    while (stmt.step()) {
+      results.push(stmt.getAsObject());
+    }
+    stmt.free();
+    return results;
+  }
+
+  public updateInvitationStatus(id: string, status: string): void {
+    if (!this.db) return;
+    const now = Math.floor(Date.now() / 1000);
+    this.db.run(
+      "UPDATE invitations SET status = ?, updated_at = ? WHERE id = ?",
+      [status, now, id]
+    );
+    this.save();
+  }
+
+  public deleteInvitation(id: string): void {
+    if (!this.db) return;
+    this.db.run("DELETE FROM invitations WHERE id = ?", [id]);
+    this.save();
   }
 
   // --- Sync State ---

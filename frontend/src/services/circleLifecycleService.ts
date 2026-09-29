@@ -1,3 +1,4 @@
+import { isAddress } from "viem";
 import { MST_TO_INR_RATE } from "../utils/formatters";
 
 export type CircleStatus =
@@ -9,81 +10,11 @@ export type CircleStatus =
   | "AUCTION_SETTLED"
   | "CLOSED";
 
-export interface DemoUser {
-  id: string;
+export interface ParticipantInput {
   name: string;
   email: string;
-  address: string;
-  avatarBg: string;
-  creditScore: number;
+  walletAddress: string;
 }
-
-export const DEMO_USERS: DemoUser[] = [
-  {
-    id: "user-1",
-    name: "Arjun Kumar",
-    email: "arjun@example.com",
-    address: "0x71C8F21c83B386f786f4a3E0b90494F3c419392B",
-    avatarBg: "bg-emerald-500",
-    creditScore: 820,
-  },
-  {
-    id: "user-2",
-    name: "Priya Sharma",
-    email: "priya@example.com",
-    address: "0x39A88F110B74f5ea0ba39494ce839613fffba742",
-    avatarBg: "bg-indigo-500",
-    creditScore: 790,
-  },
-  {
-    id: "user-3",
-    name: "Rahul N",
-    email: "rahul@example.com",
-    address: "0x91F221A378D33B037A6668fOd128c4BBA28bb659",
-    avatarBg: "bg-amber-500",
-    creditScore: 750,
-  },
-  {
-    id: "user-4",
-    name: "Ananya Rao",
-    email: "ananya@example.com",
-    address: "0x58f91a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f",
-    avatarBg: "bg-rose-500",
-    creditScore: 840,
-  },
-  {
-    id: "user-5",
-    name: "Vikram Patel",
-    email: "vikram@example.com",
-    address: "0xb794f5ea0ba39494ce839613fffba74279579268",
-    avatarBg: "bg-purple-500",
-    creditScore: 780,
-  },
-  {
-    id: "user-6",
-    name: "Sneha Iyer",
-    email: "sneha@example.com",
-    address: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
-    avatarBg: "bg-teal-500",
-    creditScore: 810,
-  },
-  {
-    id: "user-7",
-    name: "Karan Mehta",
-    email: "karan@example.com",
-    address: "0x2468135790abcdef1234567890abcdef12345678",
-    avatarBg: "bg-blue-500",
-    creditScore: 760,
-  },
-  {
-    id: "user-8",
-    name: "Meera Nair",
-    email: "meera@example.com",
-    address: "0x1357924680fedcba0987654321fedcba09876543",
-    avatarBg: "bg-orange-500",
-    creditScore: 830,
-  },
-];
 
 export interface CircleMember {
   address: string;
@@ -101,10 +32,10 @@ export interface CircleMember {
 
 export interface CircleInvitation {
   id: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  userAddress: string;
+  circleId: string;
+  participantName: string;
+  participantEmail: string;
+  walletAddress: string;
   sentAt: string;
   status: "PENDING" | "ACCEPTED" | "DECLINED";
 }
@@ -124,7 +55,7 @@ export interface CircleData {
   address: string;
   name: string;
   creatorAddress: string;
-  memberCount: number; // capacity (e.g. 5)
+  memberCount: number; // configured capacity (e.g. 5)
   installmentAmount: string; // e.g. "5.0" tMSTC
   installmentAmountINR: number; // e.g. 5000
   cycleDurationSeconds: number;
@@ -146,7 +77,7 @@ export interface CircleData {
   isCustomCircle?: boolean;
 }
 
-const STORAGE_KEY = "vouch_circles_v2";
+const STORAGE_KEY = "vouch_circles_v3";
 
 export class CircleLifecycleService {
   private static getInitialCircles(): CircleData[] {
@@ -164,87 +95,19 @@ export class CircleLifecycleService {
         reserveFeeBps: 250,
         currentRound: 1,
         totalRounds: 5,
-        status: "AUCTION_COMMIT",
-        createdAt: "Yesterday, 10:00 AM",
+        status: "WAITING_FOR_MEMBERS",
+        createdAt: "Today, 09:00 AM",
         currentPotINR: 25000,
-        members: [
-          {
-            address: "0x71C8F21c83B386f786f4a3E0b90494F3c419392B",
-            name: "Arjun Kumar",
-            email: "arjun@example.com",
-            joinedAt: "Yesterday, 10:05 AM",
-            hasPaidContribution: true,
-            hasCommittedBid: false,
-            hasRevealedBid: false,
-            hasWon: false,
-            isCreator: true,
-          },
-          {
-            address: "0x39A88F110B74f5ea0ba39494ce839613fffba742",
-            name: "Priya Sharma",
-            email: "priya@example.com",
-            joinedAt: "Yesterday, 10:15 AM",
-            hasPaidContribution: true,
-            hasCommittedBid: false,
-            hasRevealedBid: false,
-            hasWon: false,
-          },
-          {
-            address: "0x91F221A378D33B037A6668fOd128c4BBA28bb659",
-            name: "Rahul N",
-            email: "rahul@example.com",
-            joinedAt: "Yesterday, 10:30 AM",
-            hasPaidContribution: true,
-            hasCommittedBid: false,
-            hasRevealedBid: false,
-            hasWon: false,
-          },
-          {
-            address: "0x58f91a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f",
-            name: "Ananya Rao",
-            email: "ananya@example.com",
-            joinedAt: "Yesterday, 11:00 AM",
-            hasPaidContribution: true,
-            hasCommittedBid: false,
-            hasRevealedBid: false,
-            hasWon: false,
-          },
-          {
-            address: "0xb794f5ea0ba39494ce839613fffba74279579268",
-            name: "Vikram Patel",
-            email: "vikram@example.com",
-            joinedAt: "Yesterday, 11:20 AM",
-            hasPaidContribution: true,
-            hasCommittedBid: false,
-            hasRevealedBid: false,
-            hasWon: false,
-          },
-        ],
+        members: [], // Starts with 0 members!
         invitations: [],
         auditTrail: [
           {
-            id: "ev-1",
+            id: "ev-alpha-1",
             eventName: "CircleCreated",
             actor: "0x71C8F21c83B386f786f4a3E0b90494F3c419392B",
-            description: "ChitGroup deployed to MST Testnet (Chain ID 91562037)",
-            timestamp: "Yesterday, 10:00 AM",
-            txHash: "0x58f91a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f",
-          },
-          {
-            id: "ev-2",
-            eventName: "AllMembersJoined",
-            actor: "Community",
-            description: "All 5 members joined and deposited refundable security buffers",
-            timestamp: "Yesterday, 11:20 AM",
-            txHash: "0x77d88c9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e",
-          },
-          {
-            id: "ev-3",
-            eventName: "RoundContributionsCollected",
-            actor: "ChitGroup Contract",
-            description: "Round 1 contributions collected. Gross pot: ₹25,000 (25.0 tMSTC)",
+            description: "ChitGroup smart contract initialized on MST Testnet (Chain ID 91562037). Awaiting member invitations.",
             timestamp: "Today, 09:00 AM",
-            txHash: "0x31a04b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a",
+            txHash: "0x58f91a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f",
           },
         ],
       },
@@ -259,60 +122,50 @@ export class CircleLifecycleService {
         cycleDurationSeconds: 30 * 24 * 3600,
         discountCapBps: 2500,
         reserveFeeBps: 200,
-        currentRound: 2,
+        currentRound: 1,
         totalRounds: 4,
-        status: "COLLECTING",
-        createdAt: "3 days ago",
+        status: "WAITING_FOR_MEMBERS",
+        createdAt: "Yesterday, 04:30 PM",
         currentPotINR: 40000,
-        members: [
-          {
-            address: "0x39A88F110B74f5ea0ba39494ce839613fffba742",
-            name: "Priya Sharma",
-            joinedAt: "3 days ago",
-            hasPaidContribution: true,
-            hasCommittedBid: false,
-            hasRevealedBid: false,
-            hasWon: true,
-            winRound: 1,
-            isCreator: true,
-          },
-          {
-            address: "0x71C8F21c83B386f786f4a3E0b90494F3c419392B",
-            name: "Arjun Kumar",
-            joinedAt: "3 days ago",
-            hasPaidContribution: true,
-            hasCommittedBid: false,
-            hasRevealedBid: false,
-            hasWon: false,
-          },
-          {
-            address: "0x91F221A378D33B037A6668fOd128c4BBA28bb659",
-            name: "Rahul N",
-            joinedAt: "3 days ago",
-            hasPaidContribution: false,
-            hasCommittedBid: false,
-            hasRevealedBid: false,
-            hasWon: false,
-          },
-          {
-            address: "0x58f91a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f",
-            name: "Ananya Rao",
-            joinedAt: "3 days ago",
-            hasPaidContribution: true,
-            hasCommittedBid: false,
-            hasRevealedBid: false,
-            hasWon: false,
-          },
-        ],
+        members: [],
         invitations: [],
         auditTrail: [
           {
             id: "ev-b1",
-            eventName: "AuctionSettled",
+            eventName: "CircleCreated",
             actor: "0x39A88F110B74f5ea0ba39494ce839613fffba742",
-            description: "Round 1 pot paid to Priya Sharma at ₹34,000 (₹6,000 dividend distributed)",
-            timestamp: "Yesterday, 02:45 PM",
+            description: "Circle created. 0/4 members joined. Ready for participant invitations.",
+            timestamp: "Yesterday, 04:30 PM",
             txHash: "0x9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b",
+          },
+        ],
+      },
+      {
+        id: "family-emergency-pool",
+        address: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+        name: "Family Emergency Pool",
+        creatorAddress: "0x91F221A378D33B037A6668fOd128c4BBA28bb659",
+        memberCount: 5,
+        installmentAmount: "2.0",
+        installmentAmountINR: 2000,
+        cycleDurationSeconds: 30 * 24 * 3600,
+        discountCapBps: 3000,
+        reserveFeeBps: 150,
+        currentRound: 1,
+        totalRounds: 5,
+        status: "WAITING_FOR_MEMBERS",
+        createdAt: "2 days ago",
+        currentPotINR: 10000,
+        members: [],
+        invitations: [],
+        auditTrail: [
+          {
+            id: "ev-f1",
+            eventName: "CircleCreated",
+            actor: "0x91F221A378D33B037A6668fOd128c4BBA28bb659",
+            description: "Circle created with ₹2,000 monthly contribution.",
+            timestamp: "2 days ago",
+            txHash: "0x77d88c9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e",
           },
         ],
       },
@@ -356,7 +209,7 @@ export class CircleLifecycleService {
   }
 
   /**
-   * Create a new circle starting with 0 members and status WAITING_FOR_MEMBERS
+   * Create a new savings circle starting with 0 members and status WAITING_FOR_MEMBERS
    */
   public static createNewCircle(params: {
     name: string;
@@ -399,7 +252,7 @@ export class CircleLifecycleService {
       status: "WAITING_FOR_MEMBERS",
       createdAt: "Just now",
       currentPotINR: totalPotINR,
-      members: [], // Starts strictly with 0 members!
+      members: [], // Strictly 0 members!
       invitations: [],
       isCustomCircle: true,
       auditTrail: [
@@ -407,7 +260,7 @@ export class CircleLifecycleService {
           id: `audit-${Date.now()}-1`,
           eventName: "CircleCreated",
           actor: params.creatorAddress || "Organizer",
-          description: `Savings circle "${params.name}" created. Contract initialized at ${address.substring(0, 10)}... (0/${params.memberCount} members)`,
+          description: `Savings circle "${params.name}" deployed. Contract initialized at ${address.substring(0, 10)}... (0/${params.memberCount} members).`,
           timestamp: "Just now",
           txHash: params.txHash,
           isSimulated: !params.txHash,
@@ -421,12 +274,128 @@ export class CircleLifecycleService {
   }
 
   /**
-   * Send invitations to selected users
+   * Validate and manually send invitations to participants
    */
-  public static sendInvitations(
+  public static sendManualInvitations(
     circleAddressOrId: string,
-    usersToInvite: DemoUser[]
-  ): CircleData | null {
+    participants: ParticipantInput[]
+  ): { success: boolean; circle?: CircleData; error?: string } {
+    const circles = this.getAllCircles();
+    const idx = circles.findIndex(
+      (c) =>
+        c.id.toLowerCase() === circleAddressOrId.toLowerCase() ||
+        c.address.toLowerCase() === circleAddressOrId.toLowerCase()
+    );
+    if (idx === -1) {
+      return { success: false, error: "Circle not found." };
+    }
+
+    const circle = { ...circles[idx] };
+    const currentMemberAddresses = new Set(circle.members.map((m) => m.address.toLowerCase()));
+    const currentMemberEmails = new Set(circle.members.map((m) => m.email?.toLowerCase()).filter(Boolean));
+    const activeInvitedAddresses = new Set(
+      circle.invitations.filter((i) => i.status === "PENDING").map((i) => i.walletAddress.toLowerCase())
+    );
+    const activeInvitedEmails = new Set(
+      circle.invitations.filter((i) => i.status === "PENDING").map((i) => i.participantEmail.toLowerCase())
+    );
+
+    const remainingSlots = circle.memberCount - (circle.members.length + circle.invitations.filter((i) => i.status === "PENDING").length);
+
+    if (participants.length > remainingSlots) {
+      return {
+        success: false,
+        error: `Cannot invite ${participants.length} participants. Only ${remainingSlots} open slot${remainingSlots === 1 ? "" : "s"} remaining in this circle.`,
+      };
+    }
+
+    // Validate each participant
+    const batchEmails = new Set<string>();
+    const batchAddresses = new Set<string>();
+    const newInvitations: CircleInvitation[] = [];
+
+    for (let i = 0; i < participants.length; i++) {
+      const p = participants[i];
+      const cleanName = p.name.trim();
+      const cleanEmail = p.email.trim().toLowerCase();
+      const cleanAddress = p.walletAddress.trim();
+
+      if (!cleanName) {
+        return { success: false, error: `Participant #${i + 1}: Name is required.` };
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        return { success: false, error: `Participant "${cleanName}": Invalid email format (${cleanEmail}).` };
+      }
+      if (!isAddress(cleanAddress)) {
+        return {
+          success: false,
+          error: `Participant "${cleanName}": Invalid EVM blockchain wallet address (${cleanAddress}). Must be a 0x-prefixed 40-hex-character address.`,
+        };
+      }
+
+      // Check duplicates within batch
+      if (batchEmails.has(cleanEmail)) {
+        return { success: false, error: `Duplicate email "${cleanEmail}" in your invitation batch.` };
+      }
+      if (batchAddresses.has(cleanAddress.toLowerCase())) {
+        return { success: false, error: `Duplicate wallet address "${cleanAddress}" in your invitation batch.` };
+      }
+      batchEmails.add(cleanEmail);
+      batchAddresses.add(cleanAddress.toLowerCase());
+
+      // Check duplicates against circle
+      if (currentMemberAddresses.has(cleanAddress.toLowerCase()) || currentMemberEmails.has(cleanEmail)) {
+        return { success: false, error: `"${cleanName}" (${cleanAddress.substring(0, 8)}...) is already an active member of this circle.` };
+      }
+      if (activeInvitedAddresses.has(cleanAddress.toLowerCase()) || activeInvitedEmails.has(cleanEmail)) {
+        return { success: false, error: `"${cleanName}" (${cleanEmail}) already has a pending invitation for this circle.` };
+      }
+
+      const invId = `inv-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      newInvitations.push({
+        id: invId,
+        circleId: circle.id,
+        participantName: cleanName,
+        participantEmail: cleanEmail,
+        walletAddress: cleanAddress,
+        sentAt: "Just now",
+        status: "PENDING",
+      });
+
+      // Synchronize with backend indexer REST API if available
+      try {
+        fetch(`http://localhost:4000/api/groups/${circle.address}/invitations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: cleanName,
+            email: cleanEmail,
+            wallet_address: cleanAddress,
+            status: "PENDING",
+          }),
+        }).catch(() => {});
+      } catch {}
+    }
+
+    circle.invitations = [...circle.invitations, ...newInvitations];
+    circle.auditTrail.unshift({
+      id: `audit-${Date.now()}`,
+      eventName: "InvitationsSent",
+      actor: circle.creatorAddress ? `${circle.creatorAddress.substring(0, 8)}... (Owner)` : "Owner",
+      description: `Sent invitations to ${newInvitations.length} participant${newInvitations.length === 1 ? "" : "s"}: ${newInvitations.map((i) => `${i.participantName} (${i.walletAddress.substring(0, 8)}...)`).join(", ")}`,
+      timestamp: "Just now",
+      isSimulated: true,
+    });
+
+    circles[idx] = circle;
+    this.saveCircles(circles);
+    return { success: true, circle };
+  }
+
+  /**
+   * Cancel / Remove an invitation
+   */
+  public static cancelInvitation(circleAddressOrId: string, invitationId: string): CircleData | null {
     const circles = this.getAllCircles();
     const idx = circles.findIndex(
       (c) =>
@@ -436,35 +405,23 @@ export class CircleLifecycleService {
     if (idx === -1) return null;
 
     const circle = { ...circles[idx] };
-    const currentMemberAddresses = new Set(circle.members.map((m) => m.address.toLowerCase()));
-    const alreadyInvitedIds = new Set(circle.invitations.map((i) => i.userId));
+    const inv = circle.invitations.find((i) => i.id === invitationId);
+    circle.invitations = circle.invitations.filter((i) => i.id !== invitationId);
 
-    const remainingSlots = circle.memberCount - circle.members.length;
-    const validInvites = usersToInvite
-      .filter((u) => !currentMemberAddresses.has(u.address.toLowerCase()) && !alreadyInvitedIds.has(u.id))
-      .slice(0, remainingSlots);
+    if (inv) {
+      circle.auditTrail.unshift({
+        id: `audit-${Date.now()}`,
+        eventName: "InvitationCancelled",
+        actor: "Owner",
+        description: `Invitation for ${inv.participantName} (${inv.participantEmail}) was cancelled.`,
+        timestamp: "Just now",
+      });
+    }
 
-    if (validInvites.length === 0) return circle;
-
-    const newInvitations: CircleInvitation[] = validInvites.map((u) => ({
-      id: `inv-${Date.now()}-${u.id}`,
-      userId: u.id,
-      userName: u.name,
-      userEmail: u.email,
-      userAddress: u.address,
-      sentAt: "Just now",
-      status: "PENDING",
-    }));
-
-    circle.invitations = [...circle.invitations, ...newInvitations];
-    circle.auditTrail.unshift({
-      id: `audit-${Date.now()}`,
-      eventName: "InvitationsSent",
-      actor: "Organizer",
-      description: `Sent invitations to ${validInvites.length} participants (${validInvites.map((u) => u.name).join(", ")})`,
-      timestamp: "Just now",
-      isSimulated: true,
-    });
+    // Backend sync
+    try {
+      fetch(`http://localhost:4000/api/invitations/${invitationId}`, { method: "DELETE" }).catch(() => {});
+    } catch {}
 
     circles[idx] = circle;
     this.saveCircles(circles);
@@ -472,7 +429,7 @@ export class CircleLifecycleService {
   }
 
   /**
-   * Accept an invitation and join as a member
+   * Accept an invitation and join as a confirmed on-chain member
    */
   public static acceptInvitation(
     circleAddressOrId: string,
@@ -495,9 +452,9 @@ export class CircleLifecycleService {
     inv.status = "ACCEPTED";
 
     const newMember: CircleMember = {
-      address: inv.userAddress,
-      name: inv.userName,
-      email: inv.userEmail,
+      address: inv.walletAddress,
+      name: inv.participantName,
+      email: inv.participantEmail,
       joinedAt: "Just now",
       hasPaidContribution: false,
       hasCommittedBid: false,
@@ -509,25 +466,34 @@ export class CircleLifecycleService {
     circle.auditTrail.unshift({
       id: `audit-${Date.now()}`,
       eventName: "MemberJoined",
-      actor: inv.userName,
-      description: `${inv.userName} (${inv.userAddress.substring(0, 8)}...) accepted invitation and deposited security buffer`,
+      actor: inv.participantName,
+      description: `${inv.participantName} (${inv.walletAddress.substring(0, 8)}...) accepted invitation, deposited refundable security buffer, and joined as active member.`,
       timestamp: "Just now",
       txHash,
       isSimulated: !txHash,
     });
 
-    // Check if circle is now full
+    // Check if circle has reached capacity
     if (circle.members.length >= circle.memberCount) {
       circle.status = "READY";
       circle.auditTrail.unshift({
         id: `audit-ready-${Date.now()}`,
         eventName: "CircleReady",
         actor: "Protocol",
-        description: `Circle reached full capacity (${circle.memberCount}/${circle.memberCount} members). Ready for Round 1.`,
+        description: `All ${circle.memberCount} participant slots filled. Savings circle is active and ready for Round 1!`,
         timestamp: "Just now",
         isSimulated: true,
       });
     }
+
+    // Backend sync
+    try {
+      fetch(`http://localhost:4000/api/invitations/${invitationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "ACCEPTED" }),
+      }).catch(() => {});
+    } catch {}
 
     circles[idx] = circle;
     this.saveCircles(circles);
@@ -535,7 +501,7 @@ export class CircleLifecycleService {
   }
 
   /**
-   * Fast-forward: Accept all pending invitations to quickly fill the circle
+   * Accept all pending invitations
    */
   public static acceptAllInvitations(circleAddressOrId: string): CircleData | null {
     const circles = this.getAllCircles();
@@ -554,9 +520,9 @@ export class CircleLifecycleService {
       inv.status = "ACCEPTED";
       if (circle.members.length < circle.memberCount) {
         circle.members.push({
-          address: inv.userAddress,
-          name: inv.userName,
-          email: inv.userEmail,
+          address: inv.walletAddress,
+          name: inv.participantName,
+          email: inv.participantEmail,
           joinedAt: "Just now",
           hasPaidContribution: false,
           hasCommittedBid: false,
@@ -570,7 +536,7 @@ export class CircleLifecycleService {
       id: `audit-${Date.now()}`,
       eventName: "BatchMembersJoined",
       actor: "Community",
-      description: `${pending.length} invited members joined the savings circle.`,
+      description: `${pending.length} invited participant${pending.length === 1 ? "" : "s"} accepted invitations and joined on-chain.`,
       timestamp: "Just now",
       isSimulated: true,
     });
@@ -602,7 +568,7 @@ export class CircleLifecycleService {
       id: `audit-${Date.now()}`,
       eventName: "RoundStarted",
       actor: "Contract State Machine",
-      description: `Round ${circle.currentRound} contribution period opened. Dues: ₹${circle.installmentAmountINR.toLocaleString("en-IN")} / member`,
+      description: `Round ${circle.currentRound} contribution period opened. Dues: ₹${circle.installmentAmountINR.toLocaleString("en-IN")} / member.`,
       timestamp: "Just now",
       isSimulated: true,
     });
@@ -636,7 +602,7 @@ export class CircleLifecycleService {
       member.hasPaidContribution = true;
     }
 
-    // Mark other demo members paid as well if they are simulating
+    // Mark other members as paid
     circle.members.forEach((m) => {
       m.hasPaidContribution = true;
     });
@@ -646,7 +612,7 @@ export class CircleLifecycleService {
       id: `audit-${Date.now()}`,
       eventName: "InstallmentPaid",
       actor: member ? member.name : memberAddress.substring(0, 8),
-      description: `Monthly contribution of ₹${circle.installmentAmountINR.toLocaleString("en-IN")} confirmed. Round 1 collection complete.`,
+      description: `Monthly contribution of ₹${circle.installmentAmountINR.toLocaleString("en-IN")} confirmed on MST Testnet. Round ${circle.currentRound} collection complete.`,
       timestamp: "Just now",
       txHash,
       isSimulated: !txHash,
@@ -692,7 +658,6 @@ export class CircleLifecycleService {
       member.revealedBidINR = requestedPayoutINR;
     }
 
-    // Set stage to reveal
     circle.status = "AUCTION_REVEAL";
     circle.auditTrail.unshift({
       id: `audit-${Date.now()}`,
@@ -746,8 +711,8 @@ export class CircleLifecycleService {
 
     circle.status = "AUCTION_SETTLED";
     circle.winningBidINR = payout;
-    circle.winnerAddress = winner ? winner.address : "0x71C8F21c83B386f786f4a3E0b90494F3c419392B";
-    circle.winnerName = winner ? winner.name : "Arjun Kumar";
+    circle.winnerAddress = winner ? winner.address : circle.creatorAddress;
+    circle.winnerName = winner ? winner.name : "Winner";
     circle.discountSavingsPerMemberINR = dividendPerMember;
     circle.settlementTxHash = txHash || "0x58f91a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f";
 
@@ -764,7 +729,7 @@ export class CircleLifecycleService {
       id: `audit-settle-${Date.now()}`,
       eventName: "AuctionSettled",
       actor: "Contract Settlement Engine",
-      description: `Round ${circle.currentRound} settled: ${circle.winnerName} received ₹${payout.toLocaleString("en-IN")}. Total discount of ₹${totalDiscount.toLocaleString("en-IN")} credited as ₹${dividendPerMember.toLocaleString("en-IN")} savings dividend per member.`,
+      description: `Round ${circle.currentRound} settled: ${circle.winnerName} received ₹${payout.toLocaleString("en-IN")}. Total discount of ₹${totalDiscount.toLocaleString("en-IN")} distributed as ₹${dividendPerMember.toLocaleString("en-IN")} savings dividend per member.`,
       timestamp: "Just now",
       txHash: circle.settlementTxHash,
       isSimulated: !txHash,
@@ -792,7 +757,6 @@ export class CircleLifecycleService {
       circle.currentRound += 1;
       circle.status = "COLLECTING";
 
-      // Reset round payment states
       circle.members.forEach((m) => {
         m.hasPaidContribution = false;
         m.hasCommittedBid = false;
@@ -808,7 +772,7 @@ export class CircleLifecycleService {
         id: `audit-round-${Date.now()}`,
         eventName: "RoundAdvanced",
         actor: "Contract State Machine",
-        description: `Advanced to Round ${circle.currentRound} of ${circle.totalRounds}. Contribution period started.`,
+        description: `Advanced to Round ${circle.currentRound} of ${circle.totalRounds}. Monthly contribution dues open.`,
         timestamp: "Just now",
         isSimulated: true,
       });
