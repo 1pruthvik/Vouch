@@ -94,21 +94,21 @@ export const RiskAdvisorCard: React.FC<RiskAdvisorProps> = ({
   };
 
   return (
-    <div ref={cardRef} className="v-card p-5 sm:p-6 space-y-4 anim-fade-up">
+    <div ref={cardRef} className="v-card p-5 sm:p-6 space-y-4 anim-fade-up border border-black/[0.06]">
       {/* Header */}
-      <div className="flex items-center justify-between pb-1 border-b border-white/[0.04]">
+      <div className="flex items-center justify-between pb-1 border-b border-black/[0.05]">
         <div className="flex items-center gap-2.5">
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
-            style={{ background: "rgba(245, 166, 35, 0.1)" }}
+            style={{ background: "rgba(233, 185, 73, 0.15)" }}
           >
-            <Sparkles className="w-4 h-4 text-[#f5a623]" />
+            <Sparkles className="w-4 h-4 text-[#946800]" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white font-display flex items-center gap-1.5">
+            <h3 className="text-sm font-bold text-[#121316] font-display flex items-center gap-1.5">
               AI Risk Advisor
             </h3>
-            <p className="text-[11px] text-[#5f6578]">Off-chain credit & default analysis</p>
+            <p className="text-[11px] text-[#5F6368]">Off-chain credit & default analysis</p>
           </div>
         </div>
 
@@ -121,25 +121,25 @@ export const RiskAdvisorCard: React.FC<RiskAdvisorProps> = ({
       {/* Analytical Risk Gauge */}
       <div className="space-y-2">
         <div className="flex justify-between items-center text-xs">
-          <span className="text-slate-400 font-medium">Estimated Default Risk:</span>
-          <span className="font-bold text-white font-mono tabular-nums">{probPercent}%</span>
+          <span className="text-[#5F6368] font-medium">Estimated Default Risk:</span>
+          <span className="font-bold text-[#121316] font-mono tabular-nums">{probPercent}%</span>
         </div>
 
-        <div className="w-full h-2 rounded-full bg-slate-900 border border-white/5 overflow-hidden p-0.5">
+        <div className="w-full h-2 rounded-full bg-black/[0.05] border border-black/[0.04] overflow-hidden p-0.5">
           <div
             ref={meterRef}
             className={`h-full rounded-full transition-all ${
               status === "green"
-                ? "bg-gradient-to-r from-emerald-500 to-teal-400"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-500"
                 : status === "yellow"
-                ? "bg-gradient-to-r from-amber-500 to-amber-400"
+                ? "bg-gradient-to-r from-amber-500 to-[#E9B949]"
                 : "bg-gradient-to-r from-rose-500 to-rose-400"
             }`}
             style={{ width: `${Math.min(100, Math.max(8, probPercent))}%` }}
           />
         </div>
 
-        <div className="flex justify-between text-[10px] text-[#5f6578] font-mono">
+        <div className="flex justify-between text-[10px] text-[#8F959E] font-mono">
           <span>0% (Prime)</span>
           <span>Buffer: {multiplier}x</span>
           <span>100% (High Risk)</span>
@@ -148,72 +148,72 @@ export const RiskAdvisorCard: React.FC<RiskAdvisorProps> = ({
 
       {/* On-Chain Evidence Breakdown */}
       <div className="space-y-2 pt-1">
-        <p className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">
+        <p className="text-[10px] uppercase font-semibold text-[#8F959E] tracking-wider">
           On-Chain Verified Evidence
         </p>
         <div className="space-y-1.5 text-xs">
-          <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-            <span className="text-[#9ca3b4] flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Payment Discipline
+          <div className="flex items-center justify-between p-2 rounded-xl bg-[#FAF9F5] border border-black/[0.05]">
+            <span className="text-[#5F6368] flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Payment Discipline
             </span>
-            <span className="font-semibold text-emerald-400">Consistent</span>
+            <span className="font-semibold text-emerald-700">Consistent</span>
           </div>
 
-          <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-            <span className="text-[#9ca3b4] flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" /> Collateral Coverage
+          <div className="flex items-center justify-between p-2 rounded-xl bg-[#FAF9F5] border border-black/[0.05]">
+            <span className="text-[#5F6368] flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" /> Collateral Coverage
             </span>
-            <span className="font-semibold text-indigo-400">Solvent</span>
+            <span className="font-semibold text-indigo-700">Solvent</span>
           </div>
 
-          <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-            <span className="text-[#9ca3b4] flex items-center gap-1.5">
-              <HeartHandshake className="w-3.5 h-3.5 text-amber-400" /> Social Vouching
+          <div className="flex items-center justify-between p-2 rounded-xl bg-[#FAF9F5] border border-black/[0.05]">
+            <span className="text-[#5F6368] flex items-center gap-1.5">
+              <HeartHandshake className="w-3.5 h-3.5 text-[#946800]" /> Social Vouching
             </span>
-            <span className="font-semibold text-amber-400">Peer Staked</span>
+            <span className="font-semibold text-[#946800]">Peer Staked</span>
           </div>
         </div>
       </div>
 
       {/* Advisory Insight Box */}
-      <div className="p-3.5 rounded-xl flex items-start gap-2.5 bg-white/[0.02] border border-white/[0.06]">
+      <div className="p-3.5 rounded-2xl flex items-start gap-2.5 bg-[#FAF9F5] border border-black/[0.06]">
         <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: dotColor }} />
-        <p className="text-xs leading-relaxed text-[#9ca3b4]">{advisoryNote}</p>
+        <p className="text-xs leading-relaxed text-[#5F6368]">{advisoryNote}</p>
       </div>
 
       {/* Expandable Reasoning Accordion ("Why this assessment?") */}
-      <div className="border-t border-white/[0.06] pt-2">
+      <div className="border-t border-black/[0.06] pt-2">
         <button
           onClick={toggleReasoning}
-          className="w-full flex items-center justify-between py-1 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors"
+          className="w-full flex items-center justify-between py-1 text-xs font-medium text-[#5F6368] hover:text-[#121316] transition-colors"
         >
           <span className="flex items-center gap-1.5">
-            <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
+            <HelpCircle className="w-3.5 h-3.5 text-indigo-600" />
             Why this assessment?
           </span>
           <ChevronDown
             className={`w-3.5 h-3.5 transition-transform duration-200 ${
-              isReasoningExpanded ? "rotate-180 text-emerald-400" : ""
+              isReasoningExpanded ? "rotate-180 text-emerald-600" : ""
             }`}
           />
         </button>
 
         {isReasoningExpanded && (
-          <div ref={reasoningRef} className="pt-2 space-y-2 text-[11px] text-slate-400">
-            <div className="p-2.5 rounded-lg bg-slate-900/60 border border-white/[0.04] space-y-1">
-              <p className="font-semibold text-slate-200">1. On-Chain Solvency Check</p>
+          <div ref={reasoningRef} className="pt-2 space-y-2 text-[11px] text-[#5F6368]">
+            <div className="p-2.5 rounded-xl bg-[#FAF9F5] border border-black/[0.05] space-y-1">
+              <p className="font-semibold text-[#121316]">1. On-Chain Solvency Check</p>
               <p className="text-[10px] leading-relaxed">
                 Smart contract checks total collateral backing (security buffer + peer vouches) against required remaining round dues.
               </p>
             </div>
-            <div className="p-2.5 rounded-lg bg-slate-900/60 border border-white/[0.04] space-y-1">
-              <p className="font-semibold text-slate-200">2. XGBoost Moral Hazard Modeling</p>
+            <div className="p-2.5 rounded-xl bg-[#FAF9F5] border border-black/[0.05] space-y-1">
+              <p className="font-semibold text-[#121316]">2. XGBoost Moral Hazard Modeling</p>
               <p className="text-[10px] leading-relaxed">
                 Trained on 10,000 ROSCA cycles. Models the +24% statistical drop in repayment discipline after a member receives an early pot payout.
               </p>
             </div>
-            <div className="p-2.5 rounded-lg bg-slate-900/60 border border-white/[0.04] space-y-1">
-              <p className="font-semibold text-slate-200">3. Non-Custodial Protection</p>
+            <div className="p-2.5 rounded-xl bg-[#FAF9F5] border border-black/[0.05] space-y-1">
+              <p className="font-semibold text-[#121316]">3. Non-Custodial Protection</p>
               <p className="text-[10px] leading-relaxed">
                 AI provides advisory recommendations only. Collateral rules and payouts are enforced autonomously by the smart contracts.
               </p>

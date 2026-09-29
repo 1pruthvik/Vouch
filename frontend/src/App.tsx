@@ -4,6 +4,7 @@ import { MemberDashboard, AvailableCircle } from "./components/MemberDashboard";
 import { AuctionBidding } from "./components/AuctionBidding";
 import { RiskAdvisorCard } from "./components/RiskAdvisorCard";
 import { LedgerView, LedgerEvent } from "./components/LedgerView";
+import { VouchOverview } from "./components/VouchOverview";
 import { CreateGroupModal } from "./components/CreateGroupModal";
 import { JoinGroupModal } from "./components/JoinGroupModal";
 import { ConnectWalletModal } from "./components/ConnectWalletModal";
@@ -15,7 +16,7 @@ import { useLenis } from "./hooks/useLenis";
 import { ContractService, GroupDetails, MemberDetails } from "./services/contractService";
 import { fetchRiskAdvisory, RiskPredictionResponse } from "./services/aiService";
 import { fetchLedgerEvents, fetchIndexedGroups } from "./services/indexerService";
-import { UserPlus, Shield, CheckCircle2, AlertCircle, Sparkles, Home, Box, History } from "lucide-react";
+import { UserPlus, Shield, CheckCircle2, AlertCircle, Sparkles, Home, Box, History, LayoutDashboard } from "lucide-react";
 import gsap from "gsap";
 
 export function App() {
@@ -48,8 +49,8 @@ export function App() {
   // Progressive Disclosure: Technical Pro Mode Toggle
   const [isTechnicalMode, setIsTechnicalMode] = useState<boolean>(false);
 
-  // Tabs
-  const [activeTab, setActiveTab] = useState<"home" | "draw" | "standing" | "network" | "history">("home");
+  // Tabs (overview default matching editorial reference)
+  const [activeTab, setActiveTab] = useState<"overview" | "home" | "draw" | "standing" | "network" | "history">("overview");
 
   // State
   const [activeGroupAddress, setActiveGroupAddress] = useState<string>(() => {
@@ -151,7 +152,7 @@ export function App() {
   }, [provider, signer]);
 
   // Tab switch GSAP animation
-  const handleTabChange = (tab: "home" | "draw" | "standing" | "network" | "history") => {
+  const handleTabChange = (tab: "overview" | "home" | "draw" | "standing" | "network" | "history") => {
     setActiveTab(tab);
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!prefersReducedMotion && tabContentRef.current) {
@@ -337,92 +338,117 @@ export function App() {
   };
 
   const tabs = [
-    { id: "home" as const, label: "Circle Home", icon: <Home className="w-4 h-4" /> },
-    { id: "draw" as const, label: "This Month's Draw", icon: <Sparkles className="w-4 h-4" /> },
-    { id: "standing" as const, label: "Your Standing", icon: <Shield className="w-4 h-4" /> },
-    { id: "network" as const, label: "3D Network", icon: <Box className="w-4 h-4" /> },
-    { id: "history" as const, label: "Transactions", icon: <History className="w-4 h-4" /> },
+    { id: "overview" as const, label: "Overview", icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
+    { id: "home" as const, label: "Circle Home", icon: <Home className="w-3.5 h-3.5" /> },
+    { id: "draw" as const, label: "This Month's Draw", icon: <Sparkles className="w-3.5 h-3.5" /> },
+    { id: "standing" as const, label: "Your Standing", icon: <Shield className="w-3.5 h-3.5" /> },
+    { id: "network" as const, label: "3D Network", icon: <Box className="w-3.5 h-3.5" /> },
+    { id: "history" as const, label: "Transactions", icon: <History className="w-3.5 h-3.5" /> },
   ];
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-app)", color: "var(--text-primary)" }}>
-      {/* Header */}
-      <Header
-        account={account}
-        balance={balance}
-        isConnecting={isConnecting}
-        groupName={groupDetails?.name}
-        isTechnicalMode={isTechnicalMode}
-        onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
-        onOpenAccountModal={() => {
-          if (!account) {
-            clearError();
-            setIsConnectModalOpen(true);
-          } else {
-            setIsAccountModalOpen(true);
-          }
-        }}
-        onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
-        onSwitchGroup={() => {
-          setActiveGroupAddress("");
-          setGroupDetails(null);
-        }}
-      />
+    <div className="min-h-screen bg-[#EAE6DF] py-3 sm:py-6 px-2 sm:px-4 lg:px-6 font-sans selection:bg-[#E9B949]/35">
+      {/* Central Constrained Shell (Matching Reference Rounded Container) */}
+      <div className="max-w-[1340px] w-full mx-auto bg-[#FAF9F5] rounded-[28px] sm:rounded-[40px] shadow-2xl border border-black/[0.06] overflow-hidden min-h-[92vh] flex flex-col">
+        {/* Header */}
+        <Header
+          account={account}
+          balance={balance}
+          isConnecting={isConnecting}
+          groupName={groupDetails?.name}
+          isTechnicalMode={isTechnicalMode}
+          activeTab={activeTab}
+          onTabChange={(tab) => handleTabChange(tab)}
+          onToggleTechnicalMode={() => setIsTechnicalMode(!isTechnicalMode)}
+          onOpenAccountModal={() => {
+            if (!account) {
+              clearError();
+              setIsConnectModalOpen(true);
+            } else {
+              setIsAccountModalOpen(true);
+            }
+          }}
+          onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
+          onSwitchGroup={() => {
+            setActiveGroupAddress("");
+            setGroupDetails(null);
+          }}
+        />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
-        {/* Toast */}
-        {notification && (
-          <div className={`v-toast ${notification.isError ? "v-toast-error" : "v-toast-success"}`}>
-            <div className="flex items-center gap-2.5">
-              {notification.isError ? (
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              ) : (
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-              )}
-              <span>{notification.message}</span>
-            </div>
-            <button
-              onClick={() => setNotification(null)}
-              className="text-inherit opacity-60 hover:opacity-100 ml-4 transition-opacity"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Navigation Tabs (FinTech Segmented Switcher) */}
-        <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-3">
-          <div className="flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar">
-            {tabs.map((tab) => (
+        {/* Main Content Area */}
+        <main className="flex-1 w-full mx-auto px-4 sm:px-8 lg:px-12 py-6 space-y-6">
+          {/* Toast Notification */}
+          {notification && (
+            <div className={`v-toast ${notification.isError ? "v-toast-error" : "v-toast-success"}`}>
+              <div className="flex items-center gap-2.5">
+                {notification.isError ? (
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                )}
+                <span>{notification.message}</span>
+              </div>
               <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-                  activeTab === tab.id
-                    ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
-                    : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
-                }`}
+                onClick={() => setNotification(null)}
+                className="text-inherit opacity-60 hover:opacity-100 ml-4 transition-opacity"
               >
-                {tab.icon}
-                {tab.label}
+                ✕
               </button>
-            ))}
-          </div>
+            </div>
+          )}
 
-          <div className="hidden sm:flex items-center gap-2">
-            <button
-              onClick={() => setIsJoinModalOpen(true)}
-              className="v-btn-ghost text-xs"
-            >
-              <UserPlus className="w-3.5 h-3.5 text-[#2dd4a8]" />
-              Join Circle
-            </button>
-          </div>
-        </div>
+          {/* Secondary Sub-navigation Pill Bar for Workspace Tabs */}
+          {activeTab !== "overview" && (
+            <div className="flex items-center justify-between gap-3 border-b border-black/[0.06] pb-4">
+              <div className="flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar bg-black/[0.02] p-1 rounded-full border border-black/[0.04]">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                      activeTab === tab.id
+                        ? "bg-[#121316] text-white shadow-sm font-semibold"
+                        : "text-[#5F6368] hover:text-[#121316] hover:bg-black/[0.04]"
+                    }`}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
 
-        {/* Tab Content Container */}
-        <div ref={tabContentRef}>
+              <div className="hidden sm:flex items-center gap-2">
+                <button
+                  onClick={() => setIsJoinModalOpen(true)}
+                  className="btn-pill-secondary text-xs px-3.5 py-1.5 flex items-center gap-1.5"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-[#121316]" />
+                  Join Circle
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Tab Content Container */}
+          <div ref={tabContentRef}>
+            {/* Tab 0: Editorial Overview (Reference Landing Experience) */}
+            {activeTab === "overview" && (
+              <VouchOverview
+                account={account}
+                groupDetails={groupDetails}
+                memberDetails={memberDetails}
+                riskAdvisory={riskAdvisory}
+                onOpenDrawTab={() => handleTabChange("draw")}
+                onOpenStandingTab={() => handleTabChange("standing")}
+                onOpenLedgerTab={() => handleTabChange("history")}
+                onOpenDashboardTab={() => handleTabChange("home")}
+                onOpenConnectModal={() => {
+                  clearError();
+                  setIsConnectModalOpen(true);
+                }}
+                onOpenCreateGroupModal={() => setIsCreateModalOpen(true)}
+              />
+            )}
           {/* Tab 1: Group Home */}
           {activeTab === "home" && (
             <div className="space-y-5 anim-fade-up">
@@ -536,6 +562,7 @@ export function App() {
           )}
         </div>
       </main>
+      </div>
 
       {/* Modals */}
       <ConnectWalletModal

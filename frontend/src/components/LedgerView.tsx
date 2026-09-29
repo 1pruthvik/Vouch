@@ -153,16 +153,16 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   });
 
   return (
-    <div className="v-card p-6 sm:p-7 space-y-5 anim-fade-up relative">
+    <div className="v-card p-6 sm:p-7 space-y-5 anim-fade-up relative border border-black/[0.06]">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-black/[0.05]">
         <div>
-          <h3 className="text-base font-bold text-white font-display">Blockchain Audit Statement</h3>
-          <p className="text-xs text-[#9ca3b4] mt-0.5">
+          <h3 className="text-base font-bold text-[#121316] font-display">Blockchain Audit Statement</h3>
+          <p className="text-xs text-[#5F6368] mt-0.5">
             Click any row to inspect verifiable on-chain cryptographic proofs
           </p>
         </div>
-        <div className="v-badge v-badge-green self-start sm:self-auto">
+        <div className="v-badge v-badge-gold self-start sm:self-auto">
           <CheckCircle2 className="w-3.5 h-3.5" />
           MST Blockchain Verified
         </div>
@@ -172,30 +172,30 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
       <div className="flex items-center gap-2">
         <button
           onClick={() => setFilterType("ALL")}
-          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
             filterType === "ALL"
-              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-              : "bg-white/5 text-slate-400 hover:text-white"
+              ? "bg-[#121316] text-white shadow-sm"
+              : "bg-black/[0.04] text-[#5F6368] hover:text-[#121316]"
           }`}
         >
           All Activity ({displayEvents.length})
         </button>
         <button
           onClick={() => setFilterType("CONTRIBUTIONS")}
-          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
             filterType === "CONTRIBUTIONS"
-              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-              : "bg-white/5 text-slate-400 hover:text-white"
+              ? "bg-[#121316] text-white shadow-sm"
+              : "bg-black/[0.04] text-[#5F6368] hover:text-[#121316]"
           }`}
         >
           Contributions
         </button>
         <button
           onClick={() => setFilterType("PAYOUTS")}
-          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
             filterType === "PAYOUTS"
-              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-              : "bg-white/5 text-slate-400 hover:text-white"
+              ? "bg-[#121316] text-white shadow-sm"
+              : "bg-black/[0.04] text-[#5F6368] hover:text-[#121316]"
           }`}
         >
           Draw Payouts
@@ -205,16 +205,16 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
       {/* Transaction List or Empty State */}
       {filteredEvents.length === 0 ? (
         <div className="py-12 text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-white/5 text-[#5f6578] flex items-center justify-center mx-auto">
+          <div className="w-12 h-12 rounded-2xl bg-black/[0.03] text-[#8F959E] flex items-center justify-center mx-auto">
             <History className="w-6 h-6" />
           </div>
-          <p className="text-sm font-semibold text-white font-display">No Transactions Found</p>
-          <p className="text-xs text-[#9ca3b4] max-w-sm mx-auto">
+          <p className="text-sm font-semibold text-[#121316] font-display">No Transactions Found</p>
+          <p className="text-xs text-[#5F6368] max-w-sm mx-auto">
             Transactions will appear here automatically once group members join, contribute, or settle draws.
           </p>
         </div>
       ) : (
-        <div ref={listRef} className="space-y-1 divide-y divide-white/5">
+        <div ref={listRef} className="space-y-1 divide-y divide-black/[0.05]">
           {filteredEvents.map((ev, index) => {
             const { title, isCredit, icon, inrAmount, iconBg } = formatTransaction(ev);
             const explorerUrl = `${MST_TESTNET.explorerUrl}/tx/${ev.txHash}`;
@@ -225,7 +225,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 key={ev.id || index}
                 onClick={() => setSelectedTx(ev)}
                 className={`py-3.5 px-3 rounded-xl transition-all cursor-pointer group flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                  isSelected ? "bg-white/[0.06] border border-emerald-500/30" : "hover:bg-white/[0.03]"
+                  isSelected ? "bg-black/[0.04] border border-black/10" : "hover:bg-black/[0.02]"
                 }`}
               >
                 {/* Left */}
@@ -237,19 +237,19 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     {icon}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-white font-display flex items-center gap-1.5">
+                    <p className="text-sm font-semibold text-[#121316] font-display flex items-center gap-1.5">
                       {title}
-                      <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
+                      <span className="text-[10px] text-[#8F959E] font-mono hidden sm:inline">
                         (Round {ev.round})
                       </span>
                     </p>
-                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#5f6578]">
+                    <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#5F6368]">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         {ev.timestamp}
                       </span>
                       <span>·</span>
-                      <span className="font-mono text-slate-400">
+                      <span className="font-mono text-[#8F959E]">
                         {ev.member ? `${ev.member.substring(0, 6)}...${ev.member.substring(ev.member.length - 4)}` : "Community Pool"}
                       </span>
                     </div>
@@ -259,10 +259,10 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 {/* Right */}
                 <div className="flex items-center justify-between sm:justify-end gap-4 text-right">
                   <div>
-                    <p className={`text-sm font-bold font-display tabular-nums ${isCredit ? "text-[#2dd4a8]" : "text-white"}`}>
+                    <p className={`text-sm font-bold font-display tabular-nums ${isCredit ? "text-emerald-700" : "text-[#121316]"}`}>
                       {isCredit ? `+${inrAmount}` : `-${inrAmount}`}
                     </p>
-                    <p className="text-[10px] text-[#5f6578] font-mono tabular-nums">
+                    <p className="text-[10px] text-[#8F959E] font-mono tabular-nums">
                       {ev.amount}
                     </p>
                   </div>
@@ -271,11 +271,11 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={(e) => copyToClipboard(ev.txHash, e)}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                      className="p-1.5 rounded-lg bg-black/[0.04] hover:bg-black/[0.08] text-[#5F6368] hover:text-[#121316] transition-colors"
                       title="Copy Transaction Hash"
                     >
                       {copiedHash === ev.txHash ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
                       ) : (
                         <Copy className="w-3.5 h-3.5" />
                       )}
@@ -285,19 +285,19 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                       href={explorerUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-1 text-[11px]"
+                      className="p-1.5 rounded-lg bg-black/[0.04] hover:bg-black/[0.08] text-[#5F6368] hover:text-[#121316] transition-colors inline-flex items-center gap-1 text-[11px]"
                       title="View on MSTScan Explorer"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
 
-                    <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-300 transition-transform group-hover:translate-x-0.5" />
+                    <ChevronRight className="w-4 h-4 text-[#8F959E] group-hover:text-[#121316] transition-transform group-hover:translate-x-0.5" />
                   </div>
                 </div>
 
                 {/* Technical Mode Details */}
                 {isTechnicalMode && (
-                  <div className="w-full text-[10px] font-mono flex items-center gap-2 pt-1 border-t border-white/5 text-purple-400/80">
+                  <div className="w-full text-[10px] font-mono flex items-center gap-2 pt-1 border-t border-black/[0.05] text-purple-700">
                     <Code2 className="w-3 h-3" />
                     <span>Event: {ev.eventName}</span>
                     <span>|</span>
@@ -312,70 +312,70 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
 
       {/* Transaction Detail Drawer Modal */}
       {selectedTx && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm anim-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm anim-fade-in">
           <div
             ref={drawerRef}
-            className="w-full max-w-lg rounded-2xl bg-[#0E1117] border border-white/10 p-6 sm:p-7 shadow-2xl space-y-6 relative"
+            className="w-full max-w-lg rounded-3xl bg-[#FAF9F5] border border-black/10 p-6 sm:p-8 shadow-2xl space-y-6 relative"
           >
             {/* Drawer Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-white/5">
+            <div className="flex items-center justify-between pb-3 border-b border-black/[0.06]">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-700">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-white font-display">Transaction Audit Proof</h4>
-                  <p className="text-xs text-slate-400">MST Testnet Blockchain Record (Chain ID 91562037)</p>
+                  <h4 className="text-base font-bold text-[#121316] font-display">Transaction Audit Proof</h4>
+                  <p className="text-xs text-[#5F6368]">MST Testnet Blockchain Record (Chain ID 91562037)</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedTx(null)}
-                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                className="p-1.5 rounded-full bg-black/[0.04] hover:bg-black/[0.08] text-[#5F6368] hover:text-[#121316] transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Transaction Data Fields */}
-            <div className="space-y-3.5 text-xs">
-              <div className="flex justify-between items-center p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                <span className="text-slate-400">Event Type:</span>
-                <span className="font-semibold text-white font-mono">{selectedTx.eventName}</span>
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between items-center p-3 rounded-2xl bg-white border border-black/[0.05]">
+                <span className="text-[#5F6368]">Event Type:</span>
+                <span className="font-semibold text-[#121316] font-mono">{selectedTx.eventName}</span>
               </div>
 
-              <div className="flex justify-between items-center p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                <span className="text-slate-400">Transacted Amount:</span>
+              <div className="flex justify-between items-center p-3 rounded-2xl bg-white border border-black/[0.05]">
+                <span className="text-[#5F6368]">Transacted Amount:</span>
                 <div className="text-right">
-                  <span className="font-bold text-emerald-400 text-sm">{formatINR(selectedTx.amount.split(" ")[0])}</span>
-                  <span className="text-[11px] text-slate-400 font-mono ml-1.5">({selectedTx.amount})</span>
+                  <span className="font-bold text-emerald-700 text-sm">{formatINR(selectedTx.amount.split(" ")[0])}</span>
+                  <span className="text-[11px] text-[#5F6368] font-mono ml-1.5">({selectedTx.amount})</span>
                 </div>
               </div>
 
-              <div className="flex justify-between items-center p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                <span className="text-slate-400">Chit Round:</span>
-                <span className="font-semibold text-white">Round {selectedTx.round}</span>
+              <div className="flex justify-between items-center p-3 rounded-2xl bg-white border border-black/[0.05]">
+                <span className="text-[#5F6368]">Chit Round:</span>
+                <span className="font-semibold text-[#121316]">Round {selectedTx.round}</span>
               </div>
 
-              <div className="flex justify-between items-center p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                <span className="text-slate-400">Timestamp:</span>
-                <span className="text-slate-300 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+              <div className="flex justify-between items-center p-3 rounded-2xl bg-white border border-black/[0.05]">
+                <span className="text-[#5F6368]">Timestamp:</span>
+                <span className="text-[#121316] flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#8F959E]" />
                   {selectedTx.timestamp}
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
-                <span className="text-slate-400">Member Address:</span>
+              <div className="p-3 rounded-2xl bg-white border border-black/[0.05] space-y-1">
+                <span className="text-[#5F6368]">Member Address:</span>
                 <div className="flex items-center justify-between gap-2 mt-0.5">
-                  <span className="font-mono text-slate-300 break-all text-[11px]">{selectedTx.member || "Community Pool"}</span>
+                  <span className="font-mono text-[#121316] break-all text-[11px]">{selectedTx.member || "Community Pool"}</span>
                   {selectedTx.member && (
                     <button
                       onClick={(e) => copyToClipboard(selectedTx.member, e)}
-                      className="p-1 text-slate-400 hover:text-white"
+                      className="p-1 text-[#8F959E] hover:text-[#121316]"
                       title="Copy Address"
                     >
                       {copiedHash === selectedTx.member ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
                       ) : (
                         <Copy className="w-3.5 h-3.5" />
                       )}
@@ -384,17 +384,17 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
-                <span className="text-slate-400">Cryptographic Transaction Hash:</span>
+              <div className="p-3 rounded-2xl bg-white border border-black/[0.05] space-y-1">
+                <span className="text-[#5F6368]">Cryptographic Transaction Hash:</span>
                 <div className="flex items-center justify-between gap-2 mt-0.5">
-                  <span className="font-mono text-emerald-400 break-all text-[11px]">{selectedTx.txHash}</span>
+                  <span className="font-mono text-emerald-700 break-all text-[11px]">{selectedTx.txHash}</span>
                   <button
                     onClick={(e) => copyToClipboard(selectedTx.txHash, e)}
-                    className="p-1 text-slate-400 hover:text-white"
+                    className="p-1 text-[#8F959E] hover:text-[#121316]"
                     title="Copy Transaction Hash"
                   >
                     {copiedHash === selectedTx.txHash ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
                     ) : (
                       <Copy className="w-3.5 h-3.5" />
                     )}
@@ -404,8 +404,8 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
             </div>
 
             {/* Independent Verification Callout */}
-            <div className="p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/20 flex items-start gap-2.5 text-xs text-indigo-300">
-              <Info className="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" />
+            <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-start gap-2.5 text-xs text-indigo-900">
+              <Info className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
               <p className="leading-relaxed text-[11px]">
                 Every action on Vouch is non-custodial and cryptographically anchored. You can independently verify this receipt on the public explorer.
               </p>
@@ -413,14 +413,14 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
 
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-3 pt-2">
-              <button onClick={() => setSelectedTx(null)} className="v-btn-secondary text-xs px-4 py-2">
+              <button onClick={() => setSelectedTx(null)} className="btn-pill-secondary text-xs px-4 py-2">
                 Dismiss
               </button>
               <a
                 href={`${MST_TESTNET.explorerUrl}/tx/${selectedTx.txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="v-btn-primary text-xs px-4 py-2 flex items-center gap-1.5"
+                className="btn-pill-primary text-xs px-5 py-2.5 flex items-center gap-1.5"
               >
                 Inspect on MSTScan
                 <ExternalLink className="w-3.5 h-3.5" />
