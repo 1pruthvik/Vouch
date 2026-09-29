@@ -29,6 +29,7 @@ export const CONFIG = {
   FACTORY_ADDRESS: process.env.FACTORY_ADDRESS || deployments.ChitFactory || "",
   VOUCH_REGISTRY_ADDRESS: process.env.VOUCH_REGISTRY_ADDRESS || deployments.VouchRegistry || "",
   YIELD_VAULT_ADDRESS: process.env.YIELD_VAULT_ADDRESS || deployments.MockYieldVault || "",
+  DATABASE_URL: process.env.DATABASE_URL || "",
   DB_FILE: process.env.DB_FILE || path.resolve(__dirname, "../../data/vouch.sqlite"),
   POLL_INTERVAL_MS: parseInt(process.env.POLL_INTERVAL_MS || "5000", 10),
   KEEPER_INTERVAL_MS: parseInt(process.env.KEEPER_INTERVAL_MS || "8000", 10),

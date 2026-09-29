@@ -92,8 +92,16 @@ export class ContractService {
     const parsedInstallment = ethers.parseEther(params.installmentAmount);
     const safetyFactor = params.safetyFactorBps || 12000;
 
-    // 1. If factory address is configured, use ChitFactory
-    if (factoryAddr && factoryAddr.trim() !== "") {
+    // 1. If factory address is configured and deployed on-chain, use ChitFactory
+    let hasFactoryCode = false;
+    if (factoryAddr && factoryAddr.trim() !== "" && factoryAddr !== ethers.ZeroAddress) {
+      try {
+        const code = await this.provider.getCode(factoryAddr);
+        hasFactoryCode = Boolean(code && code !== "0x" && code.length > 2);
+      } catch {}
+    }
+
+    if (hasFactoryCode) {
       const factory = new ethers.Contract(factoryAddr, ChitFactoryABI, this.signer);
       const tx = await factory.createGroup(
         params.groupName,

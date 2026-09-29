@@ -178,9 +178,6 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
         <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
           My Savings Circles
         </h2>
-        <p className="text-xs sm:text-sm text-neutral-400 max-w-md mx-auto">
-          View all circles you have created or been whitelisted to join.
-        </p>
       </div>
 
       {/* Filter Tabs */}
@@ -224,13 +221,6 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
           </div>
           <div className="space-y-1">
             <h3 className="text-base font-bold text-white">No Circles Found</h3>
-            <p className="text-xs text-neutral-400 max-w-sm mx-auto">
-              {filterTab === "created"
-                ? "You haven't created any savings circles yet. Deploy a new circle to start saving."
-                : filterTab === "invited"
-                ? "You haven't been added to any savings circle whitelists yet."
-                : "No savings circles found in your account."}
-            </p>
           </div>
           <button
             type="button"
@@ -238,7 +228,7 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
             className="btn-primary py-3 px-6 text-xs inline-flex items-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Create a Circle Now</span>
+            <span>Create a Circle</span>
           </button>
         </div>
       ) : (
@@ -264,33 +254,33 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
                       {isInitializer ? (
                         <span className="px-2 py-0.5 rounded bg-red-950/40 text-red-400 font-semibold text-[10px] flex items-center gap-1">
                           <Shield className="w-3 h-3" />
-                          <span>Initializer (Created by You)</span>
+                          <span>Initializer</span>
                         </span>
                       ) : role === "member" ? (
-                        <span className="px-2 py-0.5 rounded bg-green-950/40 text-green-400 font-semibold text-[10px] flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>Joined Member</span>
+                        <span className="px-2 py-0.5 rounded bg-neutral-900 text-neutral-300 font-semibold text-[10px] flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-neutral-400" />
+                          <span>Member</span>
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded bg-blue-950/40 text-blue-400 font-semibold text-[10px] flex items-center gap-1">
-                          <Key className="w-3 h-3" />
-                          <span>Whitelisted / Invited</span>
+                        <span className="px-2 py-0.5 rounded bg-neutral-900 text-neutral-300 font-semibold text-[10px] flex items-center gap-1">
+                          <Key className="w-3 h-3 text-neutral-400" />
+                          <span>Whitelisted</span>
                         </span>
                       )}
 
                       {isStarted ? (
-                        <span className="px-2 py-0.5 rounded bg-green-950/40 text-green-400 font-semibold text-[10px] flex items-center gap-1">
-                          <Lock className="w-3 h-3" />
-                          <span>Started & Locked</span>
+                        <span className="px-2 py-0.5 rounded bg-neutral-900 text-neutral-300 font-semibold text-[10px] flex items-center gap-1">
+                          <Lock className="w-3 h-3 text-neutral-400" />
+                          <span>Started</span>
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded bg-yellow-950/40 text-yellow-400 font-semibold text-[10px]">
+                        <span className="px-2 py-0.5 rounded bg-neutral-900 text-neutral-400 font-semibold text-[10px]">
                           Forming
                         </span>
                       )}
 
                       {isInitializer && pendingCount > 0 && (
-                        <span className="px-2 py-0.5 rounded bg-yellow-950/40 text-yellow-400 font-semibold text-[10px] animate-pulse">
+                        <span className="px-2 py-0.5 rounded bg-red-950/30 text-red-400 font-semibold text-[10px]">
                           {pendingCount} Pending Request{pendingCount > 1 ? "s" : ""}
                         </span>
                       )}
@@ -312,7 +302,7 @@ export const MyCirclesView: React.FC<MyCirclesViewProps> = ({
                       title="Copy Invite Link"
                     >
                       {copiedLink === clean ? (
-                        <Check className="w-3.5 h-3.5 text-green-400" />
+                        <Check className="w-3.5 h-3.5 text-red-400" />
                       ) : (
                         <Share2 className="w-3.5 h-3.5 text-red-500" />
                       )}
