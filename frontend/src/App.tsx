@@ -143,6 +143,10 @@ export function App() {
         });
         localStorage.setItem("vouch_custom_groups", JSON.stringify(saved));
         showNotification(`Savings Circle deployed successfully at ${cleanAddr}!`);
+        setActiveCircleAddress(cleanAddr);
+        if (typeof window !== "undefined") {
+          window.history.pushState({}, "", `?circle=${cleanAddr}`);
+        }
         return cleanAddr;
       } else {
         showNotification("Group creation transaction confirmed on blockchain.");
@@ -160,6 +164,9 @@ export function App() {
   const handleJoinSuccess = (circleAddr: string) => {
     showNotification(`Joined circle ${circleAddr.substring(0, 10)}...`);
     setActiveCircleAddress(circleAddr);
+    if (typeof window !== "undefined") {
+      window.history.pushState({}, "", `?circle=${circleAddr}`);
+    }
   };
 
   // If not connected to wallet, render ConnectWalletPage
@@ -217,10 +224,16 @@ export function App() {
             circleAddress={activeCircleAddress}
             account={account}
             contractService={contractService}
-            onBack={() => setActiveCircleAddress(null)}
+            onBack={() => {
+              setActiveCircleAddress(null);
+              if (typeof window !== "undefined") {
+                window.history.pushState({}, "", window.location.pathname);
+              }
+            }}
             onShowNotification={showNotification}
           />
         ) : (
+
           <>
             {/* ── 2 Main Navigation Tabs: Create and My Circles ── */}
             <div className="flex items-center justify-center gap-6 sm:gap-12 pt-2 pb-2 flex-wrap">

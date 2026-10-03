@@ -144,12 +144,14 @@ export const BlockchainNetwork3D: React.FC<BlockchainNetwork3DProps> = ({
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.maxPolarAngle = Math.PI / 2 + 0.1;
-    controls.minDistance = 6;
-    controls.maxDistance = 30;
+    controls.dampingFactor = 0.035;
+    controls.rotateSpeed = 1.35;
+    controls.minPolarAngle = 0.0001;
+    controls.maxPolarAngle = Math.PI - 0.0001;
+    controls.minDistance = 2;
+    controls.maxDistance = 60;
     controls.autoRotate = autoRotate;
-    controls.autoRotateSpeed = 0.6;
+    controls.autoRotateSpeed = 0.85;
     controlsRef.current = controls;
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
